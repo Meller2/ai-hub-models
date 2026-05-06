@@ -104,7 +104,7 @@ jobs:
         cache-to: type=gha,scope=gpu_builder,mode=max
         build-args: |
           QAIHM_CI=${{ env.QAIHM_CI }}
-          QAIHM_TEST_MODELS=${{ inputs.models }}
+          QAIHM_TEST_MODELS=${{ inputs.models || 'all' }}
 
   run_tests:
     name: "Run GPU Tests"
