@@ -492,20 +492,29 @@ def get_device_and_chipset_name(device: hub.Device) -> tuple[str | None, str | N
 
 @overload
 def assert_success_and_get_target_models(
+    jobs: hub.CompileJob | hub.QuantizeJob | hub.LinkJob,
+) -> hub.Model: ...
+
+
+@overload
+def assert_success_and_get_target_models(
     jobs: Mapping[str, hub.CompileJob | hub.QuantizeJob | hub.LinkJob],
 ) -> dict[str, hub.Model]: ...
 
 
 @overload
 def assert_success_and_get_target_models(
-    jobs: Mapping[str | None, hub.CompileJob | hub.QuantizeJob | hub.LinkJob],
-) -> dict[str | None, hub.Model]: ...
+    jobs: Mapping[str, Mapping[str, hub.CompileJob | hub.QuantizeJob | hub.LinkJob]],
+) -> dict[str, dict[str, hub.Model]]: ...
 
 
 def assert_success_and_get_target_models(
-    jobs: Mapping[str | None, hub.CompileJob | hub.QuantizeJob | hub.LinkJob]
-    | Mapping[str, hub.CompileJob | hub.QuantizeJob | hub.LinkJob],
-) -> dict[str | None, hub.Model] | dict[str, hub.Model]:
+    jobs: hub.CompileJob
+    | hub.QuantizeJob
+    | hub.LinkJob
+    | Mapping[str, hub.CompileJob | hub.QuantizeJob | hub.LinkJob]
+    | Mapping[str, Mapping[str, hub.CompileJob | hub.QuantizeJob | hub.LinkJob]],
+) -> hub.Model | dict[str, hub.Model] | dict[str, dict[str, hub.Model]]:
     """
     Assert all jobs succeeded and extract their target models.
 
@@ -516,7 +525,7 @@ def assert_success_and_get_target_models(
 
     Returns
     -------
-    target_models : dict[str | None, hub.Model] | dict[str, hub.Model]
+    target_models : hub.Model | dict[str, hub.Model] | dict[str, dict[str, hub.Model]]
         A dict mapping names to target models.
 
     Raises
@@ -524,9 +533,24 @@ def assert_success_and_get_target_models(
     AssertionError
         If any job failed and no target model is available.
     """
-    target_models = {}
-    for name, job in jobs.items():
-        target_model = job.get_target_model()
-        assert target_model is not None, f"Job failed for {name}: {job.url}"
-        target_models[name] = target_model
-    return target_models
+    if isinstance(jobs, dict):
+        target_models: dict[str, hub.Model | dict[str, hub.Model]] = {}
+        for name, job_or_gn_map in jobs.items():
+            if isinstance(job_or_gn_map, dict):
+                target_models[name] = {}
+                for gn, job in job_or_gn_map.items():
+                    target_model = job.get_target_model()
+                    assert target_model is not None, f"Job failed for {name}: {job.url}"
+                    target_models[name][gn] = target_model  # type: ignore[index]
+            else:
+                target_model = job_or_gn_map.get_target_model()
+                assert target_model is not None, (
+                    f"Job failed for {name}: {job_or_gn_map.url}"
+                )
+                target_models[name] = target_model
+        return target_models  # type: ignore[return-value]
+
+    assert not isinstance(jobs, Mapping)
+    target_model = jobs.get_target_model()
+    assert target_model is not None, f"Job failed: {jobs.url}"
+    return target_model

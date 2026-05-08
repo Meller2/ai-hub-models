@@ -18,11 +18,9 @@ from qai_hub_models.configs.model_disable_reasons import (
 from qai_hub_models.configs.perf_yaml import QAIHMModelPerf
 from qai_hub_models.models.common import Precision
 from qai_hub_models.scorecard import (
-    ScorecardCompilePath,
     ScorecardDevice,
     ScorecardProfilePath,
 )
-from qai_hub_models.scorecard.device import cs_x_elite
 from qai_hub_models.scorecard.execution_helpers import (
     get_model_test_precisions,
 )
@@ -33,11 +31,8 @@ from qai_hub_models.scorecard.results.chipset_helpers import (
 from qai_hub_models.scorecard.results.numerics_diff import (
     NumericsDiff,
 )
-from qai_hub_models.scorecard.results.performance_summary import (
-    CompileScorecardJob,
-    ModelCompileSummary,
-    ModelPerfSummary,
-    ProfileScorecardJob,
+from qai_hub_models.scorecard.results.scorecard_summary import (
+    ScorecardExportTestSummary,
 )
 from qai_hub_models.utils.numerics_yaml import QAIHMModelNumerics
 from qai_hub_models.utils.testing_export_eval import QAIHMModelReleaseAssets
@@ -86,11 +81,8 @@ def _clean_old_failure_reasons(
 
 
 def update_code_gen_failure_reasons(
+    summaries: list[ScorecardExportTestSummary],
     enabled_test_paths: dict[Precision, list[ScorecardProfilePath]],
-    components: list[str] | None,
-    compile_summary: ModelCompileSummary,
-    link_summary: ModelCompileSummary,
-    profile_summary: ModelPerfSummary,
     code_gen_config: QAIHMModelCodeGen,
 ) -> None:
     """
@@ -99,90 +91,9 @@ def update_code_gen_failure_reasons(
 
     If relevant jobs can't be found in the given scorecard summaries, then no changes are made to the config.
     """
-    model_id = compile_summary.model_id
-
-    # Limit to only public paths. If a path is not public, then we don't track it in code-gen.yaml.
-    enabled_test_paths = {
-        p: [path for path in paths if path.is_published]
-        for p, paths in enabled_test_paths.items()
-    }
-
-    compile_failures: dict[
-        Precision, dict[ScorecardCompilePath, dict[str, CompileScorecardJob]]
-    ] = {
-        p: {path.compile_path: {} for path in paths}
-        for p, paths in enabled_test_paths.items()
-    }
-    link_failures: dict[
-        Precision, dict[ScorecardCompilePath, dict[str, CompileScorecardJob]]
-    ] = {
-        p: {path.compile_path: {} for path in paths}
-        for p, paths in enabled_test_paths.items()
-    }
-    profile_failures: dict[
-        Precision, dict[ScorecardProfilePath, dict[str, ProfileScorecardJob]]
-    ] = {p: {path: {} for path in paths} for p, paths in enabled_test_paths.items()}
-    too_slow_profile_jobs: dict[
-        Precision, dict[ScorecardProfilePath, dict[str, ProfileScorecardJob]]
-    ] = copy.deepcopy(profile_failures)
-
-    has_profile_jobs: dict[Precision, dict[ScorecardProfilePath, bool]] = {
-        p: {} for p in enabled_test_paths
-    }
-
-    default_device = ScorecardDevice.get(device_name=code_gen_config.default_device)
-    canary_devices = ScorecardDevice.canary_devices()
-
-    def process_model(
-        precision: Precision, path: ScorecardProfilePath, device: ScorecardDevice
-    ) -> None:
-        for component_id in components or [model_id]:
-            # Skip model if it can't compile for any canary device.
-            compile_job = compile_summary.get_run(
-                precision, device, path.compile_path, component_id
-            )
-            if compile_job.failed:
-                compile_failures[precision][path.compile_path][component_id] = (
-                    compile_job
-                )
-
-            # Skip model if it can't link for any canary device (AOT runtimes only).
-            link_job = link_summary.get_run(
-                precision, device, path.compile_path, component_id
-            )
-            if link_job.failed:
-                link_failures[precision][path.compile_path][component_id] = link_job
-
-            if device == default_device:
-                # Skip model if it can't be profiled on its default device.
-                profile_job = profile_summary.get_run(
-                    precision, device, path, component_id
-                )
-                if (
-                    profile_job.status_message is not None
-                    and "memory usage exceeded" in profile_job.status_message
-                ):
-                    # X Elite has the most memory by far. If X Elite can run it, then we support it,
-                    x_elite_profile_job = profile_summary.get_run(
-                        precision, cs_x_elite, path, component_id
-                    )
-                    if x_elite_profile_job.success:
-                        profile_job = x_elite_profile_job
-
-                if profile_job.failed:
-                    profile_failures[precision][path][component_id] = profile_job
-                if not profile_job.skipped:
-                    has_profile_jobs[precision][path] = True
-                if profile_job.success and (
-                    profile_job.inference_time_milliseconds
-                    >= MAX_ACCEPTABLE_INFERENCE_TIME_MS
-                ):
-                    too_slow_profile_jobs[precision][path][component_id] = profile_job
-
-    for precision, sc_paths in enabled_test_paths.items():
-        for path in sc_paths:
-            for device in {default_device, *canary_devices}:
-                process_model(precision, path, device)
+    default_device = code_gen_config.default_device
+    if not ScorecardDevice.get(default_device).enabled:
+        return
 
     supported_precisions = list(enabled_test_paths.keys())
     _clean_old_failure_reasons(
@@ -192,46 +103,27 @@ def update_code_gen_failure_reasons(
         clean_accuracy=False,
     )
 
-    # Add new failure reasons
-    for precision, sc_paths in enabled_test_paths.items():
-        for path in sc_paths:
-            if not path.supports_precision(precision):
-                path_failure_reason = f"{path.runtime} does not support {precision!s}"
-            elif failed_compile_jobs := compile_failures[precision][path.compile_path]:
-                failures = [
-                    f"{key}:{val.job_id}" if key != model_id else str(val.job_id)
-                    for key, val in failed_compile_jobs.items()
-                ]
-                path_failure_reason = f"Compilation Failure(s): {' '.join(failures)}"
-            elif failed_link_jobs := link_failures[precision][path.compile_path]:
-                failures = [
-                    f"{key}:{val.job_id}" if key != model_id else str(val.job_id)
-                    for key, val in failed_link_jobs.items()
-                ]
-                path_failure_reason = f"Link Failure(s): {' '.join(failures)}"
-            elif failed_profile_jobs := profile_failures[precision][path]:
-                failures = [
-                    f"{key}:{val.job_id}" if key != model_id else str(val.job_id)
-                    for key, val in failed_profile_jobs.items()
-                ]
-                path_failure_reason = f"Profiling Failure(s): {' '.join(failures)}"
-            elif slow_profile_jobs := too_slow_profile_jobs[precision][path]:
-                failures = [
-                    f"{key}:{val.job_id}" if key != model_id else str(val.job_id)
-                    for key, val in slow_profile_jobs.items()
-                ]
-                path_failure_reason = f"Profiling jobs slower than {MAX_ACCEPTABLE_INFERENCE_TIME_MS}ms: {' '.join(failures)}"
-            elif not has_profile_jobs[precision].get(path, False):
-                path_failure_reason = (
-                    f"No profile jobs found with default device {default_device}"
-                )
-            else:
-                path_failure_reason = ""
+    default_device = code_gen_config.default_device
+    for summary in summaries:
+        params = summary.params
+        assert params.precision is not None
+        assert params.device is not None
+        assert isinstance(params.path, ScorecardProfilePath)
 
-            if path_failure_reason:
-                code_gen_config.disabled_paths.get_disable_reasons(
-                    precision, path.runtime
-                ).scorecard_failure = path_failure_reason
+        disable_reasons = code_gen_config.disabled_paths.get_disable_reasons(
+            params.precision, params.path.runtime
+        )
+        if disable_reasons.scorecard_failure:
+            continue
+        if params.precision not in enabled_test_paths:
+            continue
+        if params.path not in enabled_test_paths[params.precision]:
+            continue
+
+        if failure_reason := summary.get_failure_reason(
+            exclude_device_jobs=params.device != default_device
+        ):
+            disable_reasons.scorecard_failure = failure_reason
 
 
 def update_code_gen_accuracy_failure_reasons(

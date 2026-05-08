@@ -6,11 +6,9 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Callable, Iterator, Mapping
-from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Callable, Iterator
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Literal, cast, overload
+from typing import Any, cast
 
 import qai_hub as hub
 from pydantic import Field
@@ -19,25 +17,13 @@ from qai_hub.public_rest_api import DatasetEntries
 from qai_hub_models.configs.tool_versions import ToolVersions
 from qai_hub_models.datasets.common import DatasetMetadata
 from qai_hub_models.evaluators.metrics import MetricMetadata
-from qai_hub_models.models.common import Precision, TargetRuntime
+from qai_hub_models.models.common import Precision
 from qai_hub_models.scorecard import (
-    ScorecardCompilePath,
-    ScorecardDevice,
     ScorecardProfilePath,
 )
 from qai_hub_models.scorecard.artifacts import ScorecardArtifact
-from qai_hub_models.scorecard.device import cs_universal
-from qai_hub_models.scorecard.envvars import (
-    DisableWorkbenchJobTimeoutEnvvar,
-)
-from qai_hub_models.scorecard.errors import CachedScorecardJobError
-from qai_hub_models.scorecard.execution_helpers import get_async_job_cache_name
-from qai_hub_models.scorecard.results.scorecard_job import ScorecardJob
-from qai_hub_models.scorecard.results.yaml import (
-    CompileScorecardJobYaml,
-    ScorecardJobYaml,
-    get_scorecard_job_yaml_type,
-)
+from qai_hub_models.scorecard.params import ScExportTestParams
+from qai_hub_models.scorecard.results.yaml import CompileScorecardJobYaml
 from qai_hub_models.utils.asset_loaders import load_yaml, qaihm_temp_dir
 from qai_hub_models.utils.base_config import BaseQAIHMConfig
 from qai_hub_models.utils.file_hash import file_hashes_are_identical
@@ -107,436 +93,6 @@ def get_accuracy_columns() -> list[str]:
     cols.extend(["date", "branch", "chipset"])
     cols.extend(get_accuracy_metadata_columns())
     return cols
-
-
-def str_with_async_test_metadata(
-    val: str,
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath | TargetRuntime | None,
-    device: ScorecardDevice | None,
-    component: str | None = None,
-    graph_name: str | None = None,
-) -> str:
-    """
-    Generate a string (generally used for printing) that includes the scorecard run metadata with the value.
-    Prints : {model_name::model_component} | {path} | {device} | val
-
-    Parameters;
-        model_id: str
-            Model ID
-
-        precision: Precision
-            Model precision
-
-        path: ScorecardCompilePath | ScorecardProfilePath | TargetRuntime | None
-            Scorecard path
-
-        device: ScorecardDevice | None
-            Scorecard device
-
-        component: str | None = None
-            Name of model component (if applicable)
-
-        graph_name: str | None = None
-            QNN graph name for model
-    """
-    model_name = f"{model_id}::{component}" if component else model_id
-    model_name = f"{model_name}::{graph_name}" if graph_name else model_name
-    return f"{model_name} | {precision} | {f'{path.name} | ' if path else ''}{f'{device.name} | ' if device else ''}{val}"
-
-
-def assert_success_or_cache_job(
-    model_id: str,
-    job: hub.Job | None,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath | TargetRuntime | None,
-    device: ScorecardDevice = cs_universal,
-    component: str | None = None,
-    graph_name: str | None = None,
-) -> None:
-    if (
-        job is None
-        and path is None
-        and precision in [Precision.mixed, Precision.mixed_with_float]
-    ):
-        return  # For models where precision varies per-component, some components may not have jobs (e.g., float components in quantization)
-
-    assert job is not None
-    yaml_type = get_scorecard_job_yaml_type(job._job_type)
-    cache = yaml_type()
-    cache.set_job_id(
-        job.job_id, path, model_id, device, precision, component, graph_name
-    )
-    cache.to_file(yaml_type.ARTIFACT_TYPE.path, append=True)
-
-
-@overload
-def fetch_async_test_job(
-    job_type: Literal[hub.JobType.COMPILE],
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath,
-    device: ScorecardDevice,
-    component: str | None = None,
-    graph_name: str | None = None,
-    cache_path: str | Path | ScorecardJobYaml | None = None,
-    raise_if_not_successful: bool = False,
-) -> hub.CompileJob | None: ...
-
-
-@overload
-def fetch_async_test_job(
-    job_type: Literal[hub.JobType.PROFILE],
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath,
-    device: ScorecardDevice,
-    component: str | None = None,
-    graph_name: str | None = None,
-    cache_path: str | Path | ScorecardJobYaml | None = None,
-    raise_if_not_successful: bool = False,
-) -> hub.ProfileJob | None: ...
-
-
-@overload
-def fetch_async_test_job(
-    job_type: Literal[hub.JobType.INFERENCE],
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath,
-    device: ScorecardDevice,
-    component: str | None = None,
-    graph_name: str | None = None,
-    cache_path: str | Path | ScorecardJobYaml | None = None,
-    raise_if_not_successful: bool = False,
-) -> hub.InferenceJob | None: ...
-
-
-@overload
-def fetch_async_test_job(
-    job_type: Literal[hub.JobType.QUANTIZE],
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath | None,
-    device: ScorecardDevice,
-    component: str | None = None,
-    graph_name: str | None = None,
-    cache_path: str | Path | ScorecardJobYaml | None = None,
-    raise_if_not_successful: bool = False,
-) -> hub.QuantizeJob | None: ...
-
-
-@overload
-def fetch_async_test_job(
-    job_type: Literal[hub.JobType.LINK],
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath,
-    device: ScorecardDevice,
-    component: str | None = None,
-    graph_name: str | None = None,
-    cache_path: str | Path | ScorecardJobYaml | None = None,
-    raise_if_not_successful: bool = False,
-) -> hub.LinkJob | None: ...
-
-
-@overload
-def fetch_async_test_job(
-    job_type: hub.JobType,
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath,
-    device: ScorecardDevice,
-    component: str | None = None,
-    graph_name: str | None = None,
-    cache_path: str | Path | ScorecardJobYaml | None = None,
-    raise_if_not_successful: bool = False,
-) -> hub.Job | None: ...
-
-
-def fetch_async_test_job(
-    job_type: hub.JobType,
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath | None,
-    device: ScorecardDevice,
-    component: str | None = None,
-    graph_name: str | None = None,
-    cache_path: str | Path | ScorecardJobYaml | None = None,
-    raise_if_not_successful: bool = False,
-) -> hub.Job | None:
-    """
-    Get the successful async test job that corresponds to the given parameters.
-
-    Parameters
-    ----------
-    job_type
-        Type of job to fetch.
-    model_id
-        Model ID.
-    precision
-        Model precision.
-    path
-        Scorecard path.
-    device
-        Scorecard device.
-    component
-        Name of model component. Default is None.
-    graph_name
-        Graph name to fetch for multi-graph models. Default is None.
-    cache_path
-        Path to the cache file, a pre-parsed ScorecardJobYaml, or None to use the
-        default cache path. Default is None.
-    raise_if_not_successful
-        Raise a ValueError if any job is not successful. Default is False.
-
-    Returns
-    -------
-    cached_job : hub.Job | None
-        A successful Hub job, or None if this job type was not found in the cache.
-
-    Raises
-    ------
-    ValueError
-        If the job is cached but failed or is still running.
-    """
-    if isinstance(cache_path, ScorecardJobYaml):
-        job_yaml = cache_path
-    else:
-        yaml_type = get_scorecard_job_yaml_type(job_type)
-        job_yaml = (
-            yaml_type.from_file(cache_path, create_empty_if_no_file=True)
-            if cache_path
-            else yaml_type.from_test_artifacts()
-        )
-    scorecard_job: ScorecardJob = job_yaml.get_job(
-        path,
-        model_id,
-        device,
-        precision,
-        component,
-        graph_name,
-        wait_for_job=True,
-    )
-
-    if not scorecard_job.job_id:
-        # No job ID, this wasn't found in the cache.
-        return None
-    if raise_if_not_successful and not scorecard_job.success:
-        if scorecard_job.running:
-            error_str = f"still running after max allowed job duration of {DisableWorkbenchJobTimeoutEnvvar.max_workbench_job_duration_minutes()} minutes"
-        elif scorecard_job.skipped:
-            error_str = "did not run or is missing from the job cache"
-        else:
-            error_str = scorecard_job.job_status
-
-        raise CachedScorecardJobError(
-            str_with_async_test_metadata(
-                f"Prerequisite {scorecard_job.job._job_type.display_name.title()} job {error_str}: {scorecard_job.job.url}",
-                model_id,
-                precision,
-                path,
-                device,
-                component,
-                graph_name,
-            )
-        )
-
-    return scorecard_job.job
-
-
-@overload
-def fetch_async_test_jobs(
-    job_type: Literal[hub.JobType.COMPILE],
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath,
-    device: ScorecardDevice,
-    component_names: list[str] | dict[str, list[str] | None] | None = None,
-    cache_path: str | Path | ScorecardJobYaml | None = None,
-    raise_if_not_successful: bool = False,
-) -> Mapping[str | None, hub.CompileJob] | None: ...
-
-
-@overload
-def fetch_async_test_jobs(
-    job_type: Literal[hub.JobType.PROFILE],
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath,
-    device: ScorecardDevice,
-    component_names: list[str] | dict[str, list[str] | None] | None = None,
-    cache_path: str | Path | ScorecardJobYaml | None = None,
-    raise_if_not_successful: bool = False,
-) -> Mapping[str | None, hub.ProfileJob] | None: ...
-
-
-@overload
-def fetch_async_test_jobs(
-    job_type: Literal[hub.JobType.INFERENCE],
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath,
-    device: ScorecardDevice,
-    component_names: list[str] | dict[str, list[str] | None] | None = None,
-    cache_path: str | Path | ScorecardJobYaml | None = None,
-    raise_if_not_successful: bool = False,
-) -> Mapping[str | None, hub.InferenceJob] | None: ...
-
-
-@overload
-def fetch_async_test_jobs(
-    job_type: Literal[hub.JobType.QUANTIZE],
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath | None,
-    device: ScorecardDevice,
-    component_names: list[str] | dict[str, list[str] | None] | None = None,
-    cache_path: str | Path | ScorecardJobYaml | None = None,
-    raise_if_not_successful: bool = False,
-) -> Mapping[str | None, hub.QuantizeJob] | None: ...
-
-
-@overload
-def fetch_async_test_jobs(
-    job_type: Literal[hub.JobType.LINK],
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath,
-    device: ScorecardDevice,
-    component_names: list[str] | dict[str, list[str] | None] | None = None,
-    cache_path: str | Path | ScorecardJobYaml | None = None,
-    raise_if_not_successful: bool = False,
-) -> Mapping[str | None, hub.LinkJob] | None: ...
-
-
-@overload
-def fetch_async_test_jobs(
-    job_type: hub.JobType,
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath,
-    device: ScorecardDevice,
-    component_names: list[str] | dict[str, list[str] | None] | None = None,
-    cache_path: str | Path | ScorecardJobYaml | None = None,
-    raise_if_not_successful: bool = False,
-) -> Mapping[str | None, hub.Job] | None: ...
-
-
-def fetch_async_test_jobs(
-    job_type: hub.JobType,
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath | None,
-    device: ScorecardDevice,
-    component_names: list[str] | dict[str, list[str] | None] | None = None,
-    cache_path: str | Path | ScorecardJobYaml | None = None,
-    raise_if_not_successful: bool = False,
-) -> Mapping[str | None, hub.Job] | None:
-    """
-    Get the async test jobs that correspond to the given parameters.
-
-    Parameters
-    ----------
-    job_type
-        Type of hub job to fetch.
-    model_id
-        Model ID.
-    precision
-        Model precision.
-    path
-        Scorecard path.
-    device
-        Scorecard device.
-    component_names
-        Name of all model components (if applicable), or None if there are no components.
-        Can pass dict[str, list[str] | None] for multi-graph models where each
-        component can have multiple graph names.
-        Default is None.
-    cache_path
-        Path to the cache file, a pre-parsed ScorecardJobYaml, or None to use the
-        default cache path. Default is None.
-    raise_if_not_successful
-        Raise a ValueError if any job is not successful. Default is False.
-
-    Returns
-    -------
-    component_jobs : Mapping[str | None, hub.Job] | None
-        For models WITHOUT components, returns a dict: { None: Job }.
-        For models WITH components, returns a dict: { 'component_1_name': Job, ... }.
-        Returns None if one or more components do not have a cached job of the given type.
-
-        If the precision type is "variable", and the job type is QUANTIZE, some components may not have a cached job.
-        In this case, only components with cached jobs will be returned. Components without cached jobs are assumed
-        to be floating point components that do not require quantization, and will be excluded from the returned dict.
-
-    Raises
-    ------
-    ValueError
-        If raise_if_not_successful is True and any cached job failed or is still running.
-    """
-    component_gn_pairs: list[tuple[str | None, str | None]]
-    if isinstance(component_names, dict):
-        pairs: list[tuple[str | None, str | None]] = []
-        for cn, gns in component_names.items():
-            if gns is not None:
-                pairs.extend((cn, gn) for gn in gns)
-            else:
-                pairs.append((cn, None))
-        component_gn_pairs = pairs
-    elif isinstance(component_names, list):
-        component_gn_pairs = [(cn, None) for cn in component_names]
-    else:
-        component_gn_pairs = [(None, None)]
-
-    # Parse the YAML cache file once, rather than re-reading it per component.
-    if not isinstance(cache_path, ScorecardJobYaml):
-        yaml_type = get_scorecard_job_yaml_type(job_type)
-        cache_path = (
-            yaml_type.from_file(cache_path, create_empty_if_no_file=True)
-            if cache_path
-            else yaml_type.from_test_artifacts()
-        )
-
-    def _fetch(
-        component_and_gn: tuple[str | None, str | None],
-    ) -> tuple[str | None, hub.Job | None]:
-        component, graph_name = component_and_gn
-        key = f"{component}_{graph_name}" if graph_name else component
-        return key, fetch_async_test_job(
-            job_type,
-            model_id,
-            precision,
-            path,  # type: ignore[arg-type]
-            device,
-            component,
-            graph_name,
-            cache_path,
-            raise_if_not_successful,
-        )
-
-    component_jobs: dict[str | None, hub.Job | None] = {}
-    if len(component_gn_pairs) == 1:
-        component_jobs = dict([_fetch(component_gn_pairs[0])])
-    elif component_gn_pairs:
-        with ThreadPoolExecutor(max_workers=len(component_gn_pairs)) as pool:
-            component_jobs = dict(pool.map(_fetch, component_gn_pairs))
-
-    if (
-        precision in [Precision.mixed, Precision.mixed_with_float]
-        and hub.JobType.QUANTIZE
-    ):
-        # Variable precision quantize jobs may be missing for some components
-        # (if a component is floating point).
-        component_jobs = {
-            component: job
-            for component, job in component_jobs.items()
-            if job is not None
-        }
-
-    has_jobs = all(component_jobs.values())
-    return component_jobs if has_jobs else None  # type: ignore[return-value]
 
 
 def cache_dataset(model_id: str, dataset_name: str, dataset: hub.Dataset) -> None:
@@ -654,14 +210,7 @@ class CompileJobsAreIdenticalCache(BaseQAIHMConfig):
 
     compile_jobs_are_identical: dict[str, bool] = Field(default_factory=dict)
 
-    def is_identical(
-        self,
-        model_id: str,
-        precision: Precision,
-        path: ScorecardCompilePath | ScorecardProfilePath,
-        device: ScorecardDevice,
-        component_names: list[str] | None = None,
-    ) -> bool:
+    def is_identical(self, params: ScExportTestParams) -> bool:
         """
         Returns true if:
             * All compile jobs for the given parameters passed in previous and current scorecards,
@@ -671,71 +220,35 @@ class CompileJobsAreIdenticalCache(BaseQAIHMConfig):
         If the sameness of relevant compile jobs is not cached, sameness will be computed and added to the "CompileJobsAreIdentical" cache.
         """
         try:
-            each_component_is_identical = all(
-                self.compile_jobs_are_identical[
-                    self.get_cache_key(
-                        model_id, precision, path, device, component_name
-                    )
-                ]
-                for component_name in component_names or [None]  # type: ignore[list-item]
+            identical = all(
+                self.compile_jobs_are_identical[pp.compile_job_id]
+                for pp in params.all_compile_job_params
             )
         except KeyError:
             # This set of parameters is missing from the cache, we need to add them.
-            previous_compile_jobs = fetch_async_test_jobs(
-                hub.JobType.COMPILE,
-                model_id,
-                precision,
-                path,
-                device,
-                component_names,
-                CompileScorecardJobYaml.from_intermediates(),
+            previous_compile_jobs = (
+                CompileScorecardJobYaml.from_intermediates().get_all_jobs(params)
+            )
+            current_compile_jobs = (
+                CompileScorecardJobYaml.from_test_artifacts().get_all_jobs(params)
             )
 
-            current_compile_jobs = fetch_async_test_jobs(
-                hub.JobType.COMPILE,
-                model_id,
-                precision,
-                path,
-                device,
-                component_names,
-            )
+            identical = True
+            for (curr_params, curr_job), (prev_params, prev_job) in zip(
+                previous_compile_jobs.items(),
+                current_compile_jobs.items(),
+                strict=False,
+            ):
+                assert curr_params == prev_params
+                if (
+                    not curr_job
+                    or not prev_job
+                    or not self.compile_jobs_are_same(curr_job.job, prev_job.job)
+                ):
+                    self.compile_jobs_are_identical[curr_params.compile_job_id] = False
+                    identical = False
 
-            if not current_compile_jobs or not previous_compile_jobs:
-                each_component_is_identical = False
-                # If any jobs fail for a model, we treat all jobs as non-identical
-                for component in component_names or [None]:  # type: ignore[list-item]
-                    self.compile_jobs_are_identical[
-                        self.get_cache_key(model_id, precision, path, device, component)
-                    ] = False
-            else:
-                each_component_is_identical = True
-                for component in component_names or [None]:  # type: ignore[list-item]
-                    is_identical = self.compile_jobs_are_same(
-                        current_compile_jobs[component],
-                        previous_compile_jobs[component],
-                    )
-                    self.compile_jobs_are_identical[
-                        self.get_cache_key(model_id, precision, path, device, component)
-                    ] = is_identical
-                    each_component_is_identical = (
-                        each_component_is_identical and is_identical
-                    )
-
-        return each_component_is_identical
-
-    @staticmethod
-    def get_cache_key(
-        model_id: str,
-        precision: Precision,
-        path: ScorecardCompilePath | ScorecardProfilePath,
-        device: ScorecardDevice,
-        component: str | None = None,
-    ) -> str:
-        if isinstance(path, ScorecardProfilePath):
-            path = path.compile_path
-        if path.is_universal:
-            device = cs_universal
-        return get_async_job_cache_name(path, model_id, device, precision, component)
+        return identical
 
     @classmethod
     def compile_jobs_are_same(

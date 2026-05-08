@@ -13,71 +13,43 @@ import qai_hub as hub
 from qai_hub.public_rest_api import DatasetEntries
 
 from qai_hub_models.configs.perf_yaml import QAIHMModelPerf, ToolVersions
-from qai_hub_models.models.common import Precision
-from qai_hub_models.scorecard import (
-    ScorecardCompilePath,
-    ScorecardDevice,
-    ScorecardProfilePath,
-)
 from qai_hub_models.scorecard.execution_helpers import wait_for_prerequisite_job
 
 JobTypeVar = TypeVar(
     "JobTypeVar",
-    hub.ProfileJob,
-    hub.InferenceJob,
     hub.CompileJob,
-    hub.QuantizeJob,
     hub.LinkJob,
+    hub.InferenceJob,
+    hub.QuantizeJob,
+    hub.ProfileJob,
 )
-ScorecardPathTypeVar = TypeVar(
-    "ScorecardPathTypeVar", ScorecardCompilePath, ScorecardProfilePath
-)
-ScorecardPathOrNoneTypeVar = TypeVar(
-    "ScorecardPathOrNoneTypeVar", ScorecardCompilePath, ScorecardProfilePath, None
-)
-
-# Specific typevar. Autofill has trouble resolving types for nested generics without specifically listing inheritors of the generic base.
-ScorecardJobTypeVar = TypeVar(
-    "ScorecardJobTypeVar",
-    "QuantizeScorecardJob",
-    "CompileScorecardJob",
-    "ProfileScorecardJob",
-    "InferenceScorecardJob",
-    "LinkScorecardJob",
-)
+ScorecardJobTypeVar = TypeVar("ScorecardJobTypeVar", bound="ScorecardJob")
 
 
-class ScorecardJob(Generic[JobTypeVar, ScorecardPathOrNoneTypeVar]):
+"""
+The purpose of this class is to fetch & cache all information related to a workbench job.
+
+This allows us to fetch all job information at once, to avoid expensive sequential
+workbench API calls when doing analysis on the results.
+"""
+
+
+class ScorecardJob(Generic[JobTypeVar]):
     job_type_class: type[JobTypeVar]
+    job_type: hub.JobType
 
-    def __init__(
-        self,
-        model_id: str,
-        precision: Precision,
-        job_id: str | None,
-        device: ScorecardDevice,
-        wait_for_job: bool,  # If false, running jobs are treated like they were "skipped".
-        wait_for_max_job_duration: int
-        | None,  # Allow the job this many seconds after creation to complete
-        path: ScorecardPathOrNoneTypeVar,
-    ) -> None:
-        self.model_id = model_id
-        self.precision = precision
+    def __init__(self, job_id: str) -> None:
         self.job_id = job_id
-        self._device = device
-        self.wait_for_job = wait_for_job
-        self.wait_for_max_job_duration = wait_for_max_job_duration
-        self.path: ScorecardPathOrNoneTypeVar = path
-        self.__post_init__()
 
-    def __post_init__(self) -> None:
-        assert self.model_id
-        # Verify Job Exists
-        if self.job_id and not self.wait_for_job:
-            assert self.job
+    def wait(self, max_wait_seconds: int | None = None) -> hub.JobStatus:
+        s = wait_for_prerequisite_job(self.job, max_wait_seconds)
+        self.cache_results()
+        return s
 
-        if not self.skipped and not isinstance(self.job, self.job_type_class):
-            raise ValueError(
+    def cache_results(self) -> None:
+        # Verify job is the correct type
+        if not isinstance(self.job, self.job_type_class):
+            raise TypeError(
                 f"Job {self.job.job_id}({self.job.name}) is {type(self.job)}. Expected {self.job_type_class.__name__}"
             )
 
@@ -89,37 +61,23 @@ class ScorecardJob(Generic[JobTypeVar, ScorecardPathOrNoneTypeVar]):
         """
         if not self.job_id:
             raise ValueError("No Job ID")
-
-        job = cast(JobTypeVar, hub.get_job(self.job_id))
-        if self.wait_for_job:
-            wait_for_prerequisite_job(job, self.wait_for_max_job_duration)
-        return job
-
-    @cached_property
-    def skipped(self) -> bool:
-        #
-        # Running is treated as skipped.
-        #
-        # Either the class would have waited for this job already,
-        # or the class was told to treat running jobs like they were skipped.
-        #
-        return not self.job_id or self._job_status.running
+        return cast(JobTypeVar, hub.get_job(self.job_id))
 
     @cached_property
     def running(self) -> bool:
-        return bool(self.job_id) and self._job_status.running
+        return self._job_status.running
 
     @cached_property
     def failed(self) -> bool:
-        return not self.skipped and self._job_status.failure
+        return self._job_status.failure
 
     @cached_property
     def success(self) -> bool:
-        return not self.skipped and self._job_status.success
+        return self._job_status.success
 
     @cached_property
     def status_message(self) -> str | None:
-        return None if self.skipped else self._job_status.message
+        return self._job_status.message
 
     @cached_property
     def _job_status(self) -> hub.JobStatus:
@@ -131,34 +89,23 @@ class ScorecardJob(Generic[JobTypeVar, ScorecardPathOrNoneTypeVar]):
     @cached_property
     def job_status(self) -> str:
         """Get the job status of the profile job."""
-        if not self.skipped:
-            if self._job_status.success:
-                return "Passed"
-            if self._job_status.failure:
-                return "Failed"
+        if self._job_status.success:
+            return "Passed"
+        if self._job_status.failure:
+            return "Failed"
         return "Skipped"
 
     @cached_property
-    def device(self) -> hub.Device:
-        if not self.skipped and not isinstance(self.job, hub.QuantizeJob):
+    def hub_device(self) -> hub.Device:
+        if isinstance(
+            self.job, (hub.CompileJob, hub.LinkJob, hub.ProfileJob, hub.InferenceJob)
+        ):
             return self.job.device
-        return self._device.reference_device
+        raise NotImplementedError("Device is not applicable for this job type")
 
     @cached_property
     def tool_versions(self) -> ToolVersions:
         return ToolVersions.from_job(self.job, parse_version_tags=True)
-
-    @cached_property
-    def chipset(self) -> str:
-        """Chipset the job was run on."""
-        if self.skipped:
-            return self._device.chipset
-
-        hub_device = self.device
-        for attr in hub_device.attributes:
-            if attr.startswith("chipset:"):
-                return attr.split(":")[1]
-        raise ValueError("No chipset found.")
 
     @cached_property
     def date(self) -> datetime.datetime | None:
@@ -167,20 +114,28 @@ class ScorecardJob(Generic[JobTypeVar, ScorecardPathOrNoneTypeVar]):
         return self.job.date
 
 
-class QuantizeScorecardJob(ScorecardJob[hub.QuantizeJob, ScorecardCompilePath]):
+class QuantizeScorecardJob(ScorecardJob[hub.QuantizeJob]):
     job_type_class = hub.QuantizeJob
+    job_type = hub.JobType.QUANTIZE
 
 
-class CompileScorecardJob(ScorecardJob[hub.CompileJob, ScorecardCompilePath]):
+class CompileScorecardJob(ScorecardJob[hub.CompileJob]):
     job_type_class = hub.CompileJob
+    job_type = hub.JobType.COMPILE
 
 
-class ProfileScorecardJob(ScorecardJob[hub.ProfileJob, ScorecardProfilePath]):
+class LinkScorecardJob(ScorecardJob[hub.LinkJob]):
+    job_type_class = hub.LinkJob
+    job_type = hub.JobType.LINK
+
+
+class ProfileScorecardJob(ScorecardJob[hub.ProfileJob]):
     job_type_class = hub.ProfileJob
+    job_type = hub.JobType.PROFILE
 
-    def __post_init__(self) -> None:
-        super().__post_init__()
-        if not self.skipped and self._job_status.success:
+    def cache_results(self) -> None:
+        super().cache_results()
+        if self._job_status.success:
             assert self.profile_results  # Download results immediately
 
     @cached_property
@@ -257,8 +212,9 @@ class ProfileScorecardJob(ScorecardJob[hub.ProfileJob, ScorecardProfilePath]):
         )
 
 
-class InferenceScorecardJob(ScorecardJob[hub.InferenceJob, ScorecardProfilePath]):
+class InferenceScorecardJob(ScorecardJob[hub.InferenceJob]):
     job_type_class = hub.InferenceJob
+    job_type = hub.JobType.INFERENCE
 
     @property
     def input_dataset(self) -> DatasetEntries:
@@ -271,7 +227,3 @@ class InferenceScorecardJob(ScorecardJob[hub.InferenceJob, ScorecardProfilePath]
         if not self.success:
             raise ValueError("Can't get output dataset if job did not succeed.")
         return cast(DatasetEntries, self.job.download_output_data())
-
-
-class LinkScorecardJob(ScorecardJob[hub.LinkJob, ScorecardCompilePath]):
-    job_type_class = hub.LinkJob

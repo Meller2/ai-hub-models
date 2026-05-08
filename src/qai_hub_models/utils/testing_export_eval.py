@@ -10,11 +10,11 @@ import itertools
 import math
 import sys
 import tempfile
-from collections.abc import Callable, Mapping
-from concurrent.futures import Future, ThreadPoolExecutor
+from collections.abc import Callable, Iterable
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext, suppress
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypeVar, cast
 from unittest import mock
 
 import numpy as np
@@ -40,13 +40,22 @@ from qai_hub_models.scorecard.envvars import (
     IgnoreDeviceJobCacheEnvvar,
     S3ArtifactsDirEnvvar,
 )
-from qai_hub_models.scorecard.execution_helpers import (
-    get_async_job_cache_name,
+from qai_hub_models.scorecard.errors import CachedScorecardJobError
+from qai_hub_models.scorecard.params import (
+    JobTypeVar,
+    ScExportTestParams,
 )
 from qai_hub_models.scorecard.results.yaml import (
     CompileScorecardJobYaml,
+    InferenceScorecardJobYaml,
+    LinkScorecardJobYaml,
+    PreQDQCompileScorecardJobYaml,
+    ProfileScorecardJobYaml,
     QAIHMModelReleaseAssets,
+    QuantizeScorecardJobYaml,
     ScorecardAssetYaml,
+    ScorecardJobTypeVar,
+    ScorecardJobYaml,
     ToolVersionsByPathYaml,
 )
 from qai_hub_models.utils.asset_loaders import load_yaml
@@ -84,20 +93,37 @@ from qai_hub_models.utils.testing import (
     mock_tabulate_fn,
 )
 from qai_hub_models.utils.testing_async_utils import (
-    CachedScorecardJobError,
     CompileJobsAreIdenticalCache,
     append_line_to_file,
-    assert_success_or_cache_job,
     cache_dataset,
     callable_side_effect,
-    fetch_async_test_jobs,
     get_cached_dataset_entries,
-    str_with_async_test_metadata,
     write_accuracy,
 )
 
 ExportFunc = Callable[..., ExportResult | CollectionExportResult]
 JobFunc = Callable[..., hub.Job | dict[str, hub.Job]]
+
+
+def _get_component_gn(
+    model: Any,
+) -> tuple[list[str] | None, list[str] | None, dict[str, list[str]] | None]:
+    components: list[str] | None = None
+    graph_names: list[str] | None = None
+    component_graph_names: dict[str, list[str]] | None = None
+
+    if isinstance(model, CollectionModel):
+        components = model.component_class_names
+        for component_name, component in model.components.items():
+            if isinstance(component, MultiGraphBaseModel):
+                component_graph_names = component_graph_names or {}
+                component_graph_names[component_name] = list(
+                    component.get_input_spec().keys()
+                )
+    elif isinstance(model, MultiGraphBaseModel):
+        graph_names = list(model.get_input_spec().keys())
+
+    return components, graph_names, component_graph_names
 
 
 def _parse_export_result(
@@ -137,11 +163,7 @@ def _get_torch_cpu_key(model_id: str) -> str:
 
 
 def patch_hub_with_cached_jobs(
-    model_id: str,
-    precision: Precision,
-    path: ScorecardCompilePath | ScorecardProfilePath | None,
-    device: ScorecardDevice,
-    component_names: list[str] | None = None,
+    params: ScExportTestParams,
     patch_quantization: bool = False,
     patch_compile: bool = False,
     patch_link: bool = False,
@@ -176,17 +198,8 @@ def patch_hub_with_cached_jobs(
 
     Parameters
     ----------
-    model_id
-        Model ID.
-    precision
-        Model precision.
-    path
-        Scorecard path.
-    device
-        Scorecard device.
-    component_names
-        Name of all model components (if applicable), or None of there are no components.
-        Default is None.
+    params
+        Export test params.
     patch_quantization
         Whether to patch previously cached quantization jobs. Default is False.
     patch_compile
@@ -227,7 +240,8 @@ def patch_hub_with_cached_jobs(
         If jobs are still running or if any job failed.
     """
     device_patch = mock.patch(
-        "qai_hub.get_devices", return_value=[device.reference_device]
+        "qai_hub.get_devices",
+        return_value=[params.device.reference_device] if params.device else [],
     )
 
     calibration_datas_to_patch: list[hub.Dataset] = []
@@ -237,150 +251,105 @@ def patch_hub_with_cached_jobs(
     profile_jobs_to_patch: list[hub.ProfileJob] = []
     inference_jobs_to_patch: list[hub.InferenceJob] = []
 
-    # For multi-graph models, resolve graph names from the compile cache so
-    # that lookups use the full (component + graph_name) cache key.
-    # Used for compile, profile, and inference (which all key by graph_name).
-    # Link and quantize jobs do not use graph_name in their keys.
-    multi_graph_component_names: list[str] | dict[str, list[str] | None] | None = (
-        component_names
-    )
-    if (
-        component_names
-        and isinstance(component_names, list)
-        and QAIHMModelCodeGen.from_model(model_id).has_multi_graph
-    ):
-        compile_cache_path = CompileScorecardJobYaml.ARTIFACT_TYPE.path
-        if compile_cache_path.exists():
-            compile_yaml_data = load_yaml(compile_cache_path)
-            resolved: dict[str, list[str] | None] = {}
-            for comp in component_names:
-                if path:
-                    base_key = get_async_job_cache_name(
-                        path, model_id, device, precision, comp
-                    )
-                    graph_names = [
-                        k[len(base_key) + 1 :]
-                        for k in compile_yaml_data
-                        if k.startswith(base_key + "_")
-                    ]
-                    resolved[comp] = graph_names if graph_names else None
-                else:
-                    resolved[comp] = None
-            multi_graph_component_names = resolved
-
-    # Submit all fetch_async_test_jobs calls in parallel
-    quantize_future: Future | None = None
-    compile_future: Future | None = None
-    link_future: Future | None = None
-    profile_future: Future | None = None
-    inference_future: Future | None = None
+    def _get_jobs(
+        YamlT: type[ScorecardJobYaml[ScorecardJobTypeVar]],
+    ) -> Iterable[ScorecardJobTypeVar] | None:
+        yaml = YamlT.from_test_artifacts()
+        jobs = yaml.get_all_jobs(params, raise_if_not_successful=True).values()
+        if (
+            params.precision == Precision.mixed_with_float
+            and YamlT == QuantizeScorecardJobYaml
+        ):
+            # All jobs must be defined unless we're targeting mixed_with_float
+            return [x for x in jobs if x is not None]
+        if any(x is None for x in jobs):
+            return None
+        return cast(Iterable[ScorecardJobTypeVar], jobs)
 
     with ThreadPoolExecutor() as pool:
-        if patch_quantization:
-            quantize_future = pool.submit(
-                fetch_async_test_jobs,
-                hub.JobType.QUANTIZE,
-                model_id,
-                precision,
-                None,
-                device,
-                component_names,
-                raise_if_not_successful=True,
+        quantize_future = (
+            pool.submit(
+                _get_jobs,
+                QuantizeScorecardJobYaml,
             )
+            if patch_quantization
+            else None
+        )
 
-        if patch_compile:
-            assert path
-            compile_future = pool.submit(
-                fetch_async_test_jobs,
-                hub.JobType.COMPILE,
-                model_id,
-                precision,
-                path,
-                device,
-                multi_graph_component_names,
-                raise_if_not_successful=True,
+        compile_future = (
+            pool.submit(
+                _get_jobs,
+                CompileScorecardJobYaml,
             )
+            if patch_compile
+            else None
+        )
 
-        if patch_link:
-            assert path
-            link_future = pool.submit(
-                fetch_async_test_jobs,
-                hub.JobType.LINK,
-                model_id,
-                precision,
-                path,
-                device,
-                component_names,
-                raise_if_not_successful=True,
+        link_future = (
+            pool.submit(
+                _get_jobs,
+                LinkScorecardJobYaml,
             )
+            if patch_link
+            else None
+        )
 
-        if patch_profile:
-            assert path
-            profile_future = pool.submit(
-                fetch_async_test_jobs,
-                hub.JobType.PROFILE,
-                model_id,
-                precision,
-                path,
-                device,
-                multi_graph_component_names,
-                raise_if_not_successful=True,
+        profile_future = (
+            pool.submit(
+                _get_jobs,
+                ProfileScorecardJobYaml,
             )
+            if patch_profile
+            else None
+        )
 
-        if patch_inference:
-            assert path
-            inference_future = pool.submit(
-                fetch_async_test_jobs,
-                hub.JobType.INFERENCE,
-                model_id,
-                precision,
-                path,
-                device,
-                multi_graph_component_names,
-                raise_if_not_successful=True,
+        inference_future = (
+            pool.submit(
+                _get_jobs,
+                InferenceScorecardJobYaml,
             )
+            if patch_inference
+            else None
+        )
 
     # Collect pre-quantization (to ONNX) compile jobs & quantize jobs
     if quantize_future is not None:
         if quantize_jobs := quantize_future.result():
-            pre_quantize_compile_jobs = {
-                component_name: cast(
-                    hub.CompileJob,
-                    component_job.model.producer,
-                )
-                for component_name, component_job in quantize_jobs.items()
-            }
+            pre_quantize_compile_jobs = [
+                cast(hub.CompileJob, component_job.job.model.producer)
+                for component_job in quantize_jobs
+            ]
 
             # Don't create a compile patch here yet since we may need to also patch the main compile jobs later.
-            compile_jobs_to_patch.extend(pre_quantize_compile_jobs.values())
-            quantize_jobs_to_patch.extend(quantize_jobs.values())
+            compile_jobs_to_patch.extend(pre_quantize_compile_jobs)
+            quantize_jobs_to_patch.extend([x.job for x in quantize_jobs])
             calibration_datas_to_patch.extend(
-                [x.calibration_dataset for x in quantize_jobs.values()]
+                [x.job.calibration_dataset for x in quantize_jobs]
             )
-        elif precision != Precision.float:
+        elif params.precision != Precision.float:
             raise CachedScorecardJobError("Could not find cached quantize jobs.")
 
     if compile_future is not None:
         if compile_jobs := compile_future.result():
-            compile_jobs_to_patch.extend(compile_jobs.values())
+            compile_jobs_to_patch.extend([x.job for x in compile_jobs])
         else:
             raise CachedScorecardJobError("Could not find cached compile jobs.")
 
     if link_future is not None:
         if link_jobs := link_future.result():
-            link_jobs_to_patch.extend(link_jobs.values())
+            link_jobs_to_patch.extend([x.job for x in link_jobs])
         else:
             raise CachedScorecardJobError("Could not find cached link jobs.")
 
     if profile_future is not None:
         if profile_jobs := profile_future.result():
-            profile_jobs_to_patch.extend(profile_jobs.values())
+            profile_jobs_to_patch.extend([x.job for x in profile_jobs])
         else:
             raise CachedScorecardJobError("Could not find cached profile jobs.")
 
     if inference_future is not None:
         if inference_jobs := inference_future.result():
-            inference_jobs_to_patch.extend(inference_jobs.values())
+            inference_jobs_to_patch.extend([x.job for x in inference_jobs])
         else:
             raise CachedScorecardJobError("Could not find cached inference jobs.")
 
@@ -410,7 +379,9 @@ def patch_hub_with_cached_jobs(
     if not patch_compile and compile_jobs_to_patch:
         compile_side_effect = itertools.chain(
             compile_jobs_to_patch,
-            itertools.repeat(hub.submit_compile_job, len(component_names or [None])),
+            itertools.repeat(
+                hub.submit_compile_job, len(params.component_gn_pairs or [None])
+            ),
             itertools.repeat(_invalid_job_submission),
         )
     else:
@@ -473,33 +444,6 @@ def patch_hub_with_cached_jobs(
     )
 
 
-def _normalize_compile_output(
-    compile_output: hub.Job
-    | Mapping[str, hub.Job]
-    | Mapping[str, Mapping[str, hub.Job]],
-) -> dict[tuple[str | None, str | None], hub.Job]:
-    """Normalize compile_model output to a flat dict.
-
-    Keys are ``(component, graph_name)`` tuples. ``graph_name`` is
-    ``None`` for single-graph components and non-collection models.
-
-    Handles three shapes:
-    - ``dict[str, dict[str, Job]]``: multi-graph collection.
-    - ``dict[str, Job]``: single-graph collection.
-    - ``Job``: single non-collection model.
-    """
-    if isinstance(compile_output, dict):
-        compile_jobs: dict[tuple[str | None, str | None], hub.Job] = {}
-        for component_name, job_or_jobs in compile_output.items():
-            if isinstance(job_or_jobs, dict):
-                for gn, job in job_or_jobs.items():
-                    compile_jobs[(component_name, gn)] = cast(hub.Job, job)
-            else:
-                compile_jobs[(component_name, None)] = cast(hub.Job, job_or_jobs)
-        return compile_jobs
-    return {(None, None): cast(hub.Job, compile_output)}
-
-
 def pre_quantize_compile_via_export(
     compile_model: Callable[
         ...,
@@ -529,30 +473,33 @@ def pre_quantize_compile_via_export(
         Model ID.
     model
         QAIHM instance of the model.
-
     """
+    component_names, graph_names, component_graph_names = _get_component_gn(model)
+    assert component_graph_names is None, (
+        "Auto-quantization of multi-graph models is not supported"
+    )
+    test_params = ScExportTestParams(
+        model_id,
+        path=None,
+        precision=None,
+        component_names=component_names,
+        graph_names=graph_names,
+        component_graph_names=component_graph_names,
+    )
+
     # Run ONNX compile jobs
     compile_output = compile_model(
         model,
         model_id,
-        cs_universal.execution_device,
+        cs_universal.reference_device,
         TargetRuntime.ONNX,
         Precision.float,
     )
-    assert compile_output is not None
-    compile_jobs = _normalize_compile_output(compile_output)
 
     # Verify success or cache job IDs to a file.
-    for (component, graph_name), job in compile_jobs.items():
-        assert_success_or_cache_job(
-            model_id,
-            job,
-            Precision.float,
-            ScorecardCompilePath.ONNX_FOR_QUANTIZATION,
-            cs_universal,
-            component,
-            graph_name,
-        )
+    cache = PreQDQCompileScorecardJobYaml.from_test_artifacts()
+    cache.update_from_export_output(compile_output, test_params)
+    cache.to_file()
 
 
 def quantize_via_export(
@@ -582,34 +529,30 @@ def quantize_via_export(
         QAIHM instance of the model.
     precision
         Model precision.
-
     """
-    # Fetch ONNX compile jobs from pre_quantize_compile_via_export
-    has_components = isinstance(model, CollectionModel)
-    onnx_compile_jobs = fetch_async_test_jobs(
-        hub.JobType.COMPILE,
-        model_id,
-        Precision.float,
-        ScorecardCompilePath.ONNX_FOR_QUANTIZATION,
-        cs_universal,
-        model.component_class_names if isinstance(model, CollectionModel) else None,
-        raise_if_not_successful=True,
+    component_names, graph_names, component_graph_names = _get_component_gn(model)
+    assert component_graph_names is None, (
+        "Auto-quantization of multi-graph models is not supported"
     )
-    if onnx_compile_jobs is None:
-        raise CachedScorecardJobError(
-            str_with_async_test_metadata(
-                "Could not find cached pre-quantization ONNX compile jobs.",
-                model_id,
-                precision,
-                ScorecardCompilePath.ONNX_FOR_QUANTIZATION,
-                cs_universal,
-            )
-        )
+    test_params = ScExportTestParams(
+        model_id,
+        path=None,
+        precision=precision,
+        component_names=component_names,
+        graph_names=graph_names,
+        component_graph_names=component_graph_names,
+    )
 
-    # Extract ONNX models from compile jobs
-    onnx_model_input_map = assert_success_and_get_target_models(onnx_compile_jobs)
-    onnx_model_input = (
-        onnx_model_input_map if has_components else onnx_model_input_map[None]
+    # Fetch ONNX compile jobs + target models from pre_quantize_compile_via_export
+    onnx_compile_jobs = (
+        PreQDQCompileScorecardJobYaml.from_test_artifacts().get_export_output(
+            test_params
+        )
+    )
+    onnx_model_inputs = (
+        assert_success_and_get_target_models(onnx_compile_jobs)
+        if onnx_compile_jobs
+        else None
     )
 
     # Run quantize jobs
@@ -621,21 +564,14 @@ def quantize_via_export(
             precision,
             model,
             model_id,
-            onnx_model_input,
+            onnx_model_inputs,
             None,
-        )
-        assert quantize_output is not None
-        quantize_jobs = (
-            cast(dict[str | None, hub.Job], quantize_output)
-            if isinstance(quantize_output, dict)
-            else {None: quantize_output}
         )
 
     # Verify success or cache job IDs to a file.
-    for component, job in quantize_jobs.items():
-        assert_success_or_cache_job(
-            model_id, job, precision, None, cs_universal, component
-        )
+    cache = QuantizeScorecardJobYaml.from_test_artifacts()
+    cache.update_from_export_output(quantize_output, test_params)
+    cache.to_file()
 
 
 def compile_via_export(
@@ -684,11 +620,20 @@ def compile_via_export(
     is_aimet
         Whether the model uses local aimet encodings during compilation.
     """
-    has_components = isinstance(model, CollectionModel)
-    has_multi_graph = isinstance(model, MultiGraphPretrainedCollectionModel)
+    component_names, graph_names, component_graph_names = _get_component_gn(model)
+    test_params = ScExportTestParams(
+        model_id,
+        scorecard_path,
+        precision,
+        device,
+        component_names,
+        graph_names,
+        component_graph_names,
+    )
+
     if is_aimet:
         with tempfile.TemporaryDirectory() as tmpdir:
-            if has_multi_graph:
+            if component_graph_names is not None:
                 compile_output = compile_model(
                     model,
                     model_id,
@@ -708,35 +653,21 @@ def compile_via_export(
                     extra_options=scorecard_path.get_compile_options(),
                 )
     else:
-        quantize_jobs = fetch_async_test_jobs(
-            hub.JobType.QUANTIZE,
-            model_id,
-            precision,
-            None,
-            device,
-            model.component_class_names if isinstance(model, CollectionModel) else None,
-            raise_if_not_successful=True,
+        quantize_jobs = (
+            QuantizeScorecardJobYaml.from_test_artifacts().get_export_output(
+                test_params,
+                raise_if_jobs_are_missing=precision != Precision.mixed_with_float,
+            )
         )
         if precision != Precision.float and quantize_jobs is None:
             raise CachedScorecardJobError(
-                str_with_async_test_metadata(
-                    "Could not find cached quantize jobs.",
-                    model_id,
-                    precision,
-                    scorecard_path,
-                    device,
-                )
+                test_params.str_with_description("Could not find cached quantize jobs.")
             )
-
-        quantize_job_input: hub.Model | dict[str | None, hub.Model] | None = None
-        if quantize_jobs is not None:
-            # Extract ONNX models from quantize jobs
-            quantize_job_input_map = assert_success_and_get_target_models(quantize_jobs)
-            quantize_job_input = (
-                quantize_job_input_map
-                if has_components
-                else quantize_job_input_map[None]
-            )
+        quantize_job_input = (
+            assert_success_and_get_target_models(quantize_jobs)
+            if quantize_jobs
+            else None
+        )
 
         compile_output = compile_model(
             model,
@@ -748,13 +679,10 @@ def compile_via_export(
             extra_options=scorecard_path.get_compile_options(),
         )
 
-    compile_jobs = _normalize_compile_output(compile_output)
-
     # Verify success or cache job IDs to a file.
-    for (component, graph_name), job in compile_jobs.items():
-        assert_success_or_cache_job(
-            model_id, job, precision, scorecard_path, device, component, graph_name
-        )
+    cache = CompileScorecardJobYaml.from_test_artifacts()
+    cache.update_from_export_output(compile_output, test_params)
+    cache.to_file()
 
 
 def link_via_export(
@@ -793,69 +721,26 @@ def link_via_export(
     device
         Scorecard device.
     """
-    has_components = isinstance(model, CollectionModel)
+    assert scorecard_path.runtime.uses_hub_link
 
-    # Build component_names with graph_name support for multi-graph models
-    component_names: list[str] | dict[str, list[str] | None] | None
-    if isinstance(model, MultiGraphPretrainedCollectionModel):
-        component_names = {
-            comp_name: list(graph_dict.keys())
-            for comp_name, graph_dict in model.get_input_spec().items()
-        }
-    elif isinstance(model, CollectionModel):
-        component_names = model.component_class_names
-    else:
-        component_names = None
-
-    # Fetch compile jobs from cache
-    compile_jobs = fetch_async_test_jobs(
-        hub.JobType.COMPILE,
+    component_names, graph_names, component_graph_names = _get_component_gn(model)
+    test_params = ScExportTestParams(
         model_id,
-        precision,
-        scorecard_path,
-        device,
-        component_names,
-        raise_if_not_successful=True,
-    )
-    if compile_jobs is None:
-        raise CachedScorecardJobError(
-            str_with_async_test_metadata(
-                "Could not find cached compile jobs for linking.",
-                model_id,
-                precision,
-                scorecard_path,
-                device,
-            )
-        )
-
-    # Get compiled models from compile jobs
-    compiled_models_map = assert_success_and_get_target_models(
-        cast(Mapping[str | None, hub.CompileJob], compile_jobs)
+        path=scorecard_path,
+        precision=precision,
+        device=device,
+        component_names=component_names,
+        graph_names=graph_names,
+        component_graph_names=component_graph_names,
     )
 
-    # For MultiGraph models, link_model expects dict[str, dict[str, hub.Model]]
-    # (collection) or dict[str, hub.Model] (single). Restructure the flat map.
-    if isinstance(model, MultiGraphPretrainedCollectionModel):
-        nested_models: dict[str, dict[str, hub.Model]] = {}
-        for comp_name, component in model.components.items():
-            if isinstance(component, MultiGraphBaseModel):
-                graph_names_for_comp = list(component.get_input_spec().keys())
-            else:
-                graph_names_for_comp = [comp_name]
-            nested_models[comp_name] = {}
-            for gn in graph_names_for_comp:
-                flat_key = f"{comp_name}_{gn}"
-                nested_models[comp_name][gn] = compiled_models_map[flat_key]
-        compiled_models: Any = nested_models
-    elif isinstance(model, MultiGraphBaseModel):
-        compiled_models = {
-            gn: compiled_models_map.get(gn, compiled_models_map.get(None))
-            for gn in model.get_input_spec()
-        }
-    elif has_components:
-        compiled_models = compiled_models_map
-    else:
-        compiled_models = compiled_models_map[None]
+    # Fetch ONNX compile jobs + target models from pre_quantize_compile_via_export
+    compile_jobs = CompileScorecardJobYaml.from_test_artifacts().get_export_output(
+        test_params
+    )
+    compiled_models = (
+        assert_success_and_get_target_models(compile_jobs) if compile_jobs else None
+    )
 
     # Call link_model from export script
     link_output = link_model(
@@ -867,18 +752,9 @@ def link_via_export(
         extra_options=scorecard_path.get_link_options(),
     )
 
-    # Normalize to dict format
-    link_jobs = (
-        cast(dict[str | None, hub.Job], link_output)
-        if isinstance(link_output, dict)
-        else {None: link_output}
-    )
-
-    # Verify success or cache job IDs to a file.
-    for comp_key, job in link_jobs.items():
-        assert_success_or_cache_job(
-            model_id, job, precision, scorecard_path, device, comp_key
-        )
+    cache = LinkScorecardJobYaml.from_test_artifacts()
+    cache.update_from_export_output(link_output, test_params)
+    cache.to_file()
 
 
 def run_llm_compile(
@@ -930,6 +806,13 @@ def run_llm_compile(
         Whether to skip downloading. Default is True.
 
     """
+    test_params = ScExportTestParams(
+        model_id,
+        path=scorecard_path,
+        precision=precision,
+        component_names=component_names,
+    )
+
     export_result = _parse_export_result(
         export_model(
             device=device.execution_device,
@@ -947,20 +830,22 @@ def run_llm_compile(
     )
 
     # Verify success or cache job IDs to a file.
-    for component, result in export_result.items():
-        assert_success_or_cache_job(
-            model_id, result.compile_job, precision, scorecard_path, device, component
-        )
+    cache = CompileScorecardJobYaml.from_test_artifacts()
+    cache.update_from_export_output(
+        {
+            x: y.compile_job
+            for x, y in export_result.items()
+            if x is not None and y.compile_job is not None
+        },
+        test_params,
+    )
+    cache.to_file()
 
 
 def fetch_cached_jobs_if_compile_jobs_are_identical(
     job_type_to_fetch_from_cache: (Literal[hub.JobType.PROFILE, hub.JobType.INFERENCE]),
-    model_id: str,
-    precision: Precision,
-    scorecard_path: ScorecardProfilePath,
-    device: ScorecardDevice,
-    component_names: list[str] | None = None,
-) -> Mapping[str | None, hub.Job] | None:
+    params: ScExportTestParams,
+) -> JobTypeVar | dict[str, JobTypeVar] | dict[str, dict[str, JobTypeVar]] | None:
     """
     Checks if the compile jobs are the same, the QAIRT version matches, and the override flag is not set.
     If all conditions are met, returns the cached profile or inference job and saves the job to the YAML cache.
@@ -970,23 +855,16 @@ def fetch_cached_jobs_if_compile_jobs_are_identical(
     ----------
     job_type_to_fetch_from_cache
         Type of job to fetch from cache (PROFILE or INFERENCE).
-    model_id
-        Model ID.
-    precision
-        Model precision.
-    scorecard_path
-        Scorecard path.
-    device
-        Scorecard device.
-    component_names
-        Name of all model components (if applicable), or None of there are no components.
-        Default is None.
+    params
+        Export test parameters.
 
     Returns
     -------
-    cached_result : Mapping[str | None, hub.Job] | None
+    cached_result : JobTypeVar | dict[str, JobTypeVar] | dict[str, dict[str, JobTypeVar]] | None
         The cached Jobs, or None if no cached job is found.
     """
+    assert isinstance(params.path, ScorecardProfilePath)
+
     # Check if the QAIRT version matches the API version and if the override flag is set.
     # Previous scorecard QAIRT version is stored at /scorecard/intermediates/environment.env dump.
     is_override = IgnoreDeviceJobCacheEnvvar.get()
@@ -999,17 +877,18 @@ def fetch_cached_jobs_if_compile_jobs_are_identical(
         or not deployment_is_prod(get_default_hub_deployment() or "")
         #
         # if the tool versions do not match, profiling for all paths must be re-run
-        or scorecard_path.tool_versions
+        or params.path.tool_versions
         != ToolVersionsByPathYaml.from_dir(INTERMEDIATES_DIR).tool_versions.get(
-            scorecard_path, ToolVersions()
+            params.path, ToolVersions()
         )
     ):
         return None
 
+    yaml: ScorecardJobYaml
     if job_type_to_fetch_from_cache == hub.JobType.INFERENCE:
-        yaml = ScorecardArtifact.INFERENCE_YAML.intermediates_path
+        yaml = InferenceScorecardJobYaml.from_intermediates()
     elif job_type_to_fetch_from_cache == hub.JobType.PROFILE:
-        yaml = ScorecardArtifact.PROFILE_YAML.intermediates_path
+        yaml = ProfileScorecardJobYaml.from_intermediates()
     else:
         assert_never(job_type_to_fetch_from_cache)
 
@@ -1019,122 +898,34 @@ def fetch_cached_jobs_if_compile_jobs_are_identical(
     compile_jobs_identical_cache = CompileJobsAreIdenticalCache.from_yaml(
         compile_jobs_identical_cache_file, create_empty_if_no_file=True
     )
-    compile_jobs_are_identical = compile_jobs_identical_cache.is_identical(
-        model_id, precision, scorecard_path, device, component_names
-    )
+    compile_jobs_are_identical = compile_jobs_identical_cache.is_identical(params)
     compile_jobs_identical_cache.to_yaml(compile_jobs_identical_cache_file)
     if not compile_jobs_are_identical:
         return None
 
-    cached_jobs = fetch_async_test_jobs(
-        job_type_to_fetch_from_cache,
-        model_id,
-        precision,
-        scorecard_path,
-        device,
-        component_names,
-        yaml,
-    )
-
-    if cached_jobs is None:
-        # No cached profile jobs for this model.
+    try:
+        return yaml.get_export_output(params)
+    except CachedScorecardJobError:
+        # No cached profile jobs for this model, or the cached jobs failed.
         return None
 
-    for job in cached_jobs.values():
-        if (status_message := job.get_status().message) and (
-            "unexpected device error" in status_message
-            or "Waiting for device timed out" in status_message
-            or "Job timed out" in status_message
-        ):
-            # don't use this cached job if it is a random device or timeout failure
-            return None
 
-    return cached_jobs
+CompileOrLinkT = TypeVar("CompileOrLinkT", hub.CompileJob, hub.LinkJob)
 
 
 def fetch_compile_or_link_jobs(
-    model_id: str,
-    precision: Precision,
-    scorecard_path: ScorecardCompilePath | ScorecardProfilePath,
-    device: ScorecardDevice,
-    component_names: list[str] | None = None,
-) -> Mapping[str | None, hub.CompileJob | hub.LinkJob]:
-    """
-    Fetch cached compile or link jobs depending on runtime type.
-
-    For AOT runtimes (is_aot_compiled=True): fetches link jobs (context binaries).
-    For JIT runtimes: fetches compile jobs.
-
-    Parameters
-    ----------
-    model_id
-        Model ID.
-    precision
-        Model precision.
-    scorecard_path
-        Scorecard path.
-    device
-        Scorecard device.
-    component_names
-        Name of all model components (if applicable), or None if there are no components.
-
-    Returns
-    -------
-    jobs : Mapping[str | None, hub.CompileJob | hub.LinkJob]
-        The cached jobs (link jobs for AOT, compile jobs for JIT).
-
-    Raises
-    ------
-    CachedScorecardJobError
-        If no cached jobs are found.
-    """
-    is_aot = scorecard_path.runtime.uses_hub_link
-
-    jobs: Mapping[str | None, hub.CompileJob | hub.LinkJob] | None
-    if is_aot:
-        # For AOT runtimes, fetch link jobs (context binaries)
-        jobs = fetch_async_test_jobs(
-            hub.JobType.LINK,
-            model_id,
-            precision,
-            scorecard_path,
-            device,
-            component_names,
-            raise_if_not_successful=True,
-        )
-        if not jobs:
-            raise CachedScorecardJobError(
-                str_with_async_test_metadata(
-                    "Could not find cached link jobs.",
-                    model_id,
-                    precision,
-                    scorecard_path,
-                    device,
-                )
-            )
-    else:
-        # For JIT runtimes, fetch compile jobs
-        jobs = fetch_async_test_jobs(
-            hub.JobType.COMPILE,
-            model_id,
-            precision,
-            scorecard_path,
-            device,
-            component_names,
-            raise_if_not_successful=True,
-        )
-        if not jobs:
-            raise CachedScorecardJobError(
-                str_with_async_test_metadata(
-                    "Could not find cached compile jobs.",
-                    model_id,
-                    precision,
-                    scorecard_path,
-                    device,
-                )
-            )
-
-    return jobs
+    test_params: ScExportTestParams,
+) -> (
+    CompileOrLinkT
+    | dict[str, CompileOrLinkT]
+    | dict[str, dict[str, CompileOrLinkT]]
+    | None
+):
+    """Fetch cached compile or link jobs depending on runtime type."""
+    assert test_params.path is not None
+    if test_params.path.runtime.uses_hub_link:
+        return LinkScorecardJobYaml.from_test_artifacts().get_export_output(test_params)
+    return CompileScorecardJobYaml.from_test_artifacts().get_export_output(test_params)
 
 
 def profile_via_export(
@@ -1180,70 +971,43 @@ def profile_via_export(
     device
         Scorecard device.
     """
-    if cached_profile_jobs := fetch_cached_jobs_if_compile_jobs_are_identical(
-        hub.JobType.PROFILE,
+    component_names, graph_names, component_graph_names = _get_component_gn(model)
+    test_params = ScExportTestParams(
         model_id,
-        precision,
-        scorecard_path,
-        device,
+        path=scorecard_path,
+        precision=precision,
+        device=device,
+        component_names=component_names,
+        graph_names=graph_names,
+        component_graph_names=component_graph_names,
+    )
+
+    if profile_output := fetch_cached_jobs_if_compile_jobs_are_identical(
+        hub.JobType.PROFILE, test_params
     ):
         print(
-            str_with_async_test_metadata(
-                f"The compiled assets from the previous scorecard are identical. Copying over profile job(s): {' '.join([job.job_id for job in cached_profile_jobs.values()])}",
-                model_id,
-                precision,
-                scorecard_path,
-                device,
+            test_params.str_with_description(
+                "The compiled assets from the previous scorecard are identical. Copying over profile job(s).",
             )
         )
-        profile_jobs: dict[tuple[str | None, str | None], hub.Job] = {
-            (comp, None): job for comp, job in cached_profile_jobs.items()
-        }
     else:
-        # If there are no cached profile jobs, use the export script to create a new profile job
-        has_components = isinstance(model, CollectionModel)
-        jobs = fetch_compile_or_link_jobs(
-            model_id,
-            precision,
-            scorecard_path,
-            device,
-            model.component_class_names if isinstance(model, CollectionModel) else None,
+        compile_jobs = fetch_compile_or_link_jobs(test_params)
+        target_models = (
+            assert_success_and_get_target_models(compile_jobs) if compile_jobs else None
         )
-
-        # Extract target models from jobs
-        if has_components:
-            target_models_map = assert_success_and_get_target_models(jobs)
-            target_models: hub.Model | dict[str | None, hub.Model] = target_models_map
-        else:
-            job = jobs[None]
-            assert job, "No job found"
-            target_model_single = job.get_target_model()
-            assert target_model_single, f"Job failed: {job}"
-            target_models = target_model_single
-
         profile_options = model.get_hub_profile_options(
             scorecard_path.runtime, scorecard_path.get_profile_options()
         )
-
-        profile_output = profile_model(
+        profile_output = profile_model(  # type: ignore[assignment]
             model_id,
             device.execution_device,
             profile_options,
             target_models,
         )
-        profile_jobs = _normalize_compile_output(profile_output)
 
-    # Verify success or cache job IDs to a file.
-    for (component, graph_name), profile_job in profile_jobs.items():
-        assert_success_or_cache_job(
-            model_id,
-            profile_job,
-            precision,
-            scorecard_path,
-            device,
-            component,
-            graph_name,
-        )
+    cache = ProfileScorecardJobYaml.from_test_artifacts()
+    cache.update_from_export_output(profile_output, test_params)
+    cache.to_file()
 
 
 def inference_via_export(
@@ -1289,35 +1053,30 @@ def inference_via_export(
     device
         Scorecard device.
     """
-    # TODO(#15111): Reenable caching for Inference Jobs. Inference jobs also must check that input datasets are the same, not just the compiled assets.
-    has_components = isinstance(model, CollectionModel)
-    jobs = fetch_compile_or_link_jobs(
+    component_names, graph_names, component_graph_names = _get_component_gn(model)
+    test_params = ScExportTestParams(
         model_id,
-        precision,
-        scorecard_path,
-        device,
-        model.component_class_names if isinstance(model, CollectionModel) else None,
+        path=scorecard_path,
+        precision=precision,
+        device=device,
+        component_names=component_names,
+        graph_names=graph_names,
+        component_graph_names=component_graph_names,
     )
 
-    # Extract target models from jobs
-    if has_components:
-        target_models_map = assert_success_and_get_target_models(jobs)
-        target_models: hub.Model | dict[str | None, hub.Model] = target_models_map
-    else:
-        job = jobs[None]
-        assert job, "No job found"
-        target_model_single = job.get_target_model()
-        assert target_model_single, f"Job failed: {job}"
-        target_models = target_model_single
+    # TODO(#15111): Reenable caching for Inference Jobs. Inference jobs also must check that input datasets are the same, not just the compiled assets.
+    compile_jobs = fetch_compile_or_link_jobs(test_params)
+    target_models = (
+        assert_success_and_get_target_models(compile_jobs) if compile_jobs else None
+    )
 
     runtime = scorecard_path.runtime
-    profile_options_str = scorecard_path.get_profile_options()
-
     inference_inputs = model.sample_inputs(
         use_channel_last_format=runtime.channel_last_native_execution
     )
-    inference_options = model.get_hub_profile_options(runtime, profile_options_str)
-
+    inference_options = model.get_hub_profile_options(
+        scorecard_path.runtime, scorecard_path.get_profile_options()
+    )
     inference_output = inference_model(
         inference_inputs,
         model_id,
@@ -1325,18 +1084,10 @@ def inference_via_export(
         inference_options,
         target_models,
     )
-    inference_jobs = _normalize_compile_output(inference_output)
-    # Verify success or cache job IDs to a file.
-    for (component, graph_name), inference_job in inference_jobs.items():
-        assert_success_or_cache_job(
-            model_id,
-            inference_job,
-            precision,
-            scorecard_path,
-            device,
-            component,
-            graph_name,
-        )
+
+    cache = InferenceScorecardJobYaml.from_test_artifacts()
+    cache.update_from_export_output(inference_output, test_params)
+    cache.to_file()
 
 
 def export_test_e2e(
@@ -1377,13 +1128,18 @@ def export_test_e2e(
         Name of all model components (if applicable), or None of there are no components.
         Default is None.
     """
+    test_params = ScExportTestParams(
+        model_id,
+        path=scorecard_path,
+        precision=precision,
+        device=device,
+        component_names=model_cls.component_class_names
+        if issubclass(model_cls, CollectionModel)
+        else None,
+    )
+
     # Some scorecards will run without the profiling step.
     has_cached_profile_jobs = ScorecardArtifact.PROFILE_YAML.exists()
-
-    # Check for cached link jobs (only relevant for AOT runtimes)
-    has_cached_link_jobs = (
-        scorecard_path.runtime.uses_hub_link and ScorecardArtifact.LINK_YAML.exists()
-    )
 
     # Patch previous jobs
     (
@@ -1395,14 +1151,10 @@ def export_test_e2e(
         profile_job_patch,
         _,
     ) = patch_hub_with_cached_jobs(
-        model_id,
-        precision,
-        scorecard_path,
-        device,
-        component_names,
+        test_params,
         patch_quantization=not QAIHMModelCodeGen.from_model(model_id).is_aimet,
         patch_compile=True,
-        patch_link=has_cached_link_jobs,
+        patch_link=scorecard_path.runtime.uses_hub_link,
         patch_profile=has_cached_profile_jobs,
         patch_inference=False,
     )
@@ -1569,28 +1321,35 @@ def on_device_inference_for_accuracy_validation(
         Scorecard path.
     device
         Scorecard device.
-
     """
-    compile_jobs = fetch_async_test_jobs(
-        hub.JobType.COMPILE,
-        model_id,
-        precision,
-        scorecard_path.compile_path,
-        device,
-        raise_if_not_successful=True,
+    component_names, graph_names, component_graph_names = _get_component_gn(model)
+    assert graph_names is None and component_graph_names is None, (
+        "Graph names are not supported for on-device inference"
     )
-    if not compile_jobs:
-        raise CachedScorecardJobError(
-            str_with_async_test_metadata(
-                "Missing cached compile job",
-                model_id,
-                precision,
-                scorecard_path,
-                device,
-            )
-        )
+    test_params = ScExportTestParams(
+        model_id,
+        path=scorecard_path,
+        precision=precision,
+        device=device,
+        component_names=component_names,
+        graph_names=graph_names,
+        component_graph_names=component_graph_names,
+    )
 
-    for component_name, job in compile_jobs.items():
+    compile_jobs = fetch_compile_or_link_jobs(test_params)
+    raw_target_models = (
+        assert_success_and_get_target_models(compile_jobs) if compile_jobs else None
+    )
+    target_models_dict: dict[str | None, hub.Model]
+    if component_names:
+        target_models_dict = cast(dict[str | None, hub.Model], raw_target_models)
+    else:
+        target_model = cast(hub.Model, raw_target_models)
+        target_models_dict = {None: target_model}
+
+    job: hub.InferenceJob | None = None
+    jobs_dict: dict[str, hub.InferenceJob] = {}
+    for component_name, target_model in target_models_dict.items():
         hub_val_dataset = get_hub_val_dataset(
             dataset_name,
             ScorecardArtifact.DATASET_IDS.touch(),
@@ -1601,12 +1360,18 @@ def on_device_inference_for_accuracy_validation(
         ijob = hub.submit_inference_job(
             device=device.execution_device,
             inputs=hub_val_dataset,
-            model=job.get_target_model(),
+            model=target_model,
             name=model_id,
         )
-        assert_success_or_cache_job(
-            model_id, ijob, precision, scorecard_path, device, component_name
-        )
+
+        if not component_name:
+            job = ijob
+        else:
+            jobs_dict[component_name] = ijob
+
+    cache = InferenceScorecardJobYaml.from_test_artifacts()
+    cache.update_from_export_output(job if job else jobs_dict, test_params)
+    cache.to_file()
 
 
 def torch_inference_for_accuracy_validation(
@@ -1813,8 +1578,20 @@ def accuracy_on_sample_inputs_via_export(
         Name of all model components (if applicable), or None of there are no components.
         Default is None.
     """
-    if isinstance(model, CollectionModel):
-        component_names = component_names or model.component_class_names
+    component_names, graph_names, component_graph_names = _get_component_gn(model)
+    assert graph_names is None and component_graph_names is None, (
+        "Graph names are not supported for on-device inference"
+    )
+    test_params = ScExportTestParams(
+        model_id,
+        path=scorecard_path,
+        precision=precision,
+        device=device,
+        component_names=component_names,
+        graph_names=graph_names,
+        component_graph_names=component_graph_names,
+    )
+
     # Patch previous jobs
     (
         device_patch,
@@ -1825,11 +1602,7 @@ def accuracy_on_sample_inputs_via_export(
         _,  # profile_job_patch
         inference_job_patch,
     ) = patch_hub_with_cached_jobs(
-        model_id,
-        precision,
-        scorecard_path,
-        device,
-        component_names,
+        test_params,
         patch_quantization=not QAIHMModelCodeGen.from_model(model_id).is_aimet,
         patch_compile=True,
         patch_profile=False,
@@ -1944,6 +1717,20 @@ def accuracy_on_dataset_via_evaluate_and_export(
         Scorecard device.
 
     """
+    component_names, graph_names, component_graph_names = _get_component_gn(model)
+    assert graph_names is None and component_graph_names is None, (
+        "Graph names are not supported for on-device inference"
+    )
+    test_params = ScExportTestParams(
+        model_id,
+        path=scorecard_path,
+        precision=precision,
+        device=device,
+        component_names=component_names,
+        graph_names=graph_names,
+        component_graph_names=component_graph_names,
+    )
+
     cache_path_patch = _get_dataset_cache_patch(
         dataset_name, scorecard_path, model.__class__
     )
@@ -1971,24 +1758,9 @@ def accuracy_on_dataset_via_evaluate_and_export(
     try:
         # Get existing inference jobs, then create related patches
         # This will raise a ValueError if any of the jobs failed
-        inference_jobs = fetch_async_test_jobs(
-            hub.JobType.INFERENCE,
-            model_id,
-            precision,
-            scorecard_path,
-            device,
-            raise_if_not_successful=True,
+        inference_sc_jobs = (
+            InferenceScorecardJobYaml.from_test_artifacts().get_all_jobs(test_params)
         )
-        if not inference_jobs:
-            raise CachedScorecardJobError(  # noqa: TRY301
-                str_with_async_test_metadata(
-                    "Missing cached inference job",
-                    model_id,
-                    precision,
-                    scorecard_path,
-                    device,
-                )
-            )
     except (CachedScorecardJobError, ValueError):
         # If no on-device accuracy numbers, we still want to write torch, sim numbers
         write_accuracy(
@@ -2007,7 +1779,8 @@ def accuracy_on_dataset_via_evaluate_and_export(
         )
         raise
 
-    inference_output_datas = [x.download_output_data() for x in inference_jobs.values()]
+    inference_jobs = [x.job for x in inference_sc_jobs.values() if x is not None]
+    inference_output_datas = [x.download_output_data() for x in inference_jobs]
     dataset_download_patch = mock.patch(
         "qai_hub.client.Dataset.download", side_effect=inference_output_datas
     )
@@ -2019,7 +1792,7 @@ def accuracy_on_dataset_via_evaluate_and_export(
         AsyncOnDeviceModel,
         "__call__",
         new=callable_side_effect(
-            iter([mock_on_device_model_call(x) for x in inference_jobs.values()])
+            iter([mock_on_device_model_call(x) for x in inference_jobs])
         ),
     )
     torch_call_patch = mock.patch(
@@ -2039,7 +1812,7 @@ def accuracy_on_dataset_via_evaluate_and_export(
         on_device_call_patch,
         torch_call_patch,
     ):
-        inference_job = inference_jobs[None]
+        inference_job = next(iter(inference_jobs))
         evaluate_result = evaluate_on_dataset(
             evaluator_func=model.get_evaluator,
             compiled_model=inference_job.model,
@@ -2060,10 +1833,7 @@ def accuracy_on_dataset_via_evaluate_and_export(
         _,  # profile_job_patch
         inference_job_patch,
     ) = patch_hub_with_cached_jobs(
-        model_id,
-        precision,
-        scorecard_path,
-        device,
+        params=test_params,
         patch_quantization=not QAIHMModelCodeGen.from_model(model_id).is_aimet,
         patch_compile=True,
         patch_inference=True,
@@ -2189,31 +1959,36 @@ def sim_accuracy_on_dataset(
         Model precision.
 
     """
+    component_names, graph_names, component_graph_names = _get_component_gn(model)
+    assert (
+        component_names is None
+        and graph_names is None
+        and component_graph_names is None
+    )
+    test_params = ScExportTestParams(
+        model_id,
+        path=None,
+        precision=precision,
+        component_names=component_names,
+        graph_names=graph_names,
+        component_graph_names=component_graph_names,
+    )
+
     if precision == Precision.float:
         return
     scorecard_path = ScorecardProfilePath.ONNX
     cache_path_patch = _get_dataset_cache_patch(
         dataset_name, scorecard_path, model.__class__
     )
-    quantize_jobs = fetch_async_test_jobs(
-        hub.JobType.QUANTIZE,
-        model_id,
-        precision,
-        None,
-        cs_universal,
-        raise_if_not_successful=True,
+    quantize_sc_jobs = QuantizeScorecardJobYaml.from_test_artifacts().get_all_jobs(
+        test_params
     )
-    assert quantize_jobs is not None
-    if len(quantize_jobs) != 1:
-        print(
-            f"Expected 1 quantize job for precision {precision} but got {len(quantize_jobs)}."
-        )
-
+    quantize_jobs = [x.job for x in quantize_sc_jobs.values() if x is not None]
     num_samples = get_num_eval_samples(dataset_name)
     with cache_path_patch:
         evaluate_result = evaluate_on_dataset(
             evaluator_func=model.get_evaluator,
-            quantized_model=quantize_jobs[None].get_target_model(),
+            quantized_model=next(iter(quantize_jobs)).get_target_model(),
             dataset_name=dataset_name,
             use_cache=True,
             num_samples=num_samples,

@@ -15,7 +15,7 @@ import qai_hub as hub
 
 from qai_hub_models.models.common import Precision, TargetRuntime
 from qai_hub_models.scorecard import ScorecardCompilePath, ScorecardProfilePath
-from qai_hub_models.scorecard.device import ScorecardDevice, cs_universal
+from qai_hub_models.scorecard.device import ScorecardDevice
 from qai_hub_models.scorecard.envvars import (
     DisableWorkbenchJobTimeoutEnvvar,
     EnabledPrecisionsEnvvar,
@@ -27,6 +27,10 @@ from qai_hub_models.scorecard.static.list_models import (
     get_bench_pytorch_w8a16_models,
 )
 from qai_hub_models.utils.path_helpers import QAIHM_MODELS_ROOT
+
+ScorecardPathTypeVar = TypeVar(
+    "ScorecardPathTypeVar", ScorecardCompilePath, ScorecardProfilePath
+)
 
 
 def wait_for_prerequisite_job(
@@ -189,11 +193,6 @@ def get_model_test_precisions(
         )
 
     return list(enabled_precisions)
-
-
-ScorecardPathTypeVar = TypeVar(
-    "ScorecardPathTypeVar", ScorecardCompilePath, ScorecardProfilePath
-)
 
 
 def get_enabled_paths_for_testing(
@@ -530,47 +529,6 @@ def get_evaluation_parameterized_pytest_config(
         ScorecardProfilePath,
         can_use_quantize_job,
         [device],
-    )
-
-
-def get_async_job_cache_name(
-    path: ScorecardCompilePath | ScorecardProfilePath | TargetRuntime | None,
-    model_id: str,
-    device: ScorecardDevice,
-    precision: Precision = Precision.float,
-    component: str | None = None,
-    graph_name: str | None = None,
-) -> str:
-    """
-    Get the key for this job in the YAML that stores asyncronously-ran scorecard jobs.
-
-    Parameters
-    ----------
-    path
-        Applicable scorecard path
-    model_id
-        The ID of the QAIHM model being tested
-    device
-        The targeted device
-    precision
-        The precision in which this model is running
-    component
-        The name of the model component being tested, if applicable
-    graph_name
-        The name of the graph being executed (for multi-graph models)
-
-    Returns
-    -------
-    cache_key : str
-        The cache key for this job.
-    """
-    return (
-        f"{model_id}"
-        + ("_" + str(precision) if precision != Precision.float else "")
-        + ("_" + path.name if path else "")
-        + ("-" + device.name if device != cs_universal else "")
-        + ("_" + component if component else "")
-        + ("_" + graph_name if graph_name else "")
     )
 
 

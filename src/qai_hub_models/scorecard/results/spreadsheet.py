@@ -8,7 +8,6 @@ from __future__ import annotations
 import csv
 import os
 import re
-from collections.abc import Iterable
 from dataclasses import dataclass, field, fields
 from datetime import datetime
 from typing import cast
@@ -18,13 +17,9 @@ from qai_hub_models.configs.model_disable_reasons import ModelDisableReasonsMapp
 from qai_hub_models.models.common import Precision
 from qai_hub_models.scorecard.device import ScorecardDevice
 from qai_hub_models.scorecard.path_profile import ScorecardProfilePath
-from qai_hub_models.scorecard.results.performance_summary import (
-    ModelCompileSummary,
-    ModelInferenceSummary,
-    ModelPerfSummary,
-    ModelQuantizeSummary,
-    ScorecardJobTypeVar,
-)
+from qai_hub_models.scorecard.results.code_gen import ScorecardExportTestSummary
+from qai_hub_models.scorecard.results.scorecard_job import ScorecardJobTypeVar
+from qai_hub_models.scorecard.results.scorecard_summary import ScorecardJobSummary
 from qai_hub_models.utils.path_helpers import get_git_branch
 
 MAX_ERROR_LENGTH = 250
@@ -203,30 +198,10 @@ class ResultsSpreadsheet(list):
         components: list[str] | None
         quantized: bool
 
-    def append_model_summary_entries(
-        self,
-        model_id: str,
-        paramaterizations: Iterable[
-            tuple[Precision, ScorecardProfilePath, ScorecardDevice]
-        ],
-        components: list[str] | None = None,
-        quantize_summary: ModelQuantizeSummary | None = None,
-        compile_summary: ModelCompileSummary | None = None,
-        link_summary: ModelCompileSummary | None = None,
-        profile_summary: ModelPerfSummary | None = None,
-        inference_summary: ModelInferenceSummary | None = None,
-    ) -> None:
+    def append_export_test_summary(self, summaries: ScorecardExportTestSummary) -> None:
         self.extend(
-            ResultsSpreadsheet.get_model_summary_entries(
-                model_id,
-                paramaterizations,
-                components,
-                quantize_summary,
-                compile_summary,
-                link_summary,
-                profile_summary,
-                inference_summary,
-            )
+            ResultsSpreadsheet.get_device_job_summary_entry(device_job_summary)
+            for device_job_summary in summaries.job_summaries
         )
 
     def set_model_metadata(
@@ -255,115 +230,83 @@ class ResultsSpreadsheet(list):
         self._branchstr = branch
 
     @staticmethod
-    def get_model_summary_entries(
-        model_id: str,
-        paramaterizations: Iterable[
-            tuple[Precision, ScorecardProfilePath, ScorecardDevice]
-        ],
-        components: list[str] | None = None,
-        quantize_summary: ModelQuantizeSummary | None = None,
-        compile_summary: ModelCompileSummary | None = None,
-        link_summary: ModelCompileSummary | None = None,
-        profile_summary: ModelPerfSummary | None = None,
-        inference_summary: ModelInferenceSummary | None = None,
-    ) -> list[ResultsSpreadsheet.Entry]:
-        entries: list[ResultsSpreadsheet.Entry] = []
-        quantize_summary = quantize_summary or ModelQuantizeSummary()
-        compile_summary = compile_summary or ModelCompileSummary()
-        link_summary = link_summary or ModelCompileSummary()
-        profile_summary = profile_summary or ModelPerfSummary()
-        inference_summary = inference_summary or ModelInferenceSummary()
+    def get_device_job_summary_entry(
+        summary: ScorecardJobSummary,
+    ) -> ResultsSpreadsheet.Entry:
+        assert isinstance(summary.params.path, ScorecardProfilePath)
+        assert summary.params.device is not None
+        assert summary.params.precision is not None
 
-        for precision, path, device in paramaterizations:
-            for component_id in components or [model_id]:
-                # Get job for this path + device + component combo
-                quantize_job = quantize_summary.get_run(
-                    precision, device, None, component_id
-                )
-                compile_job = compile_summary.get_run(
-                    precision, device, path.compile_path, component_id
-                )
-                link_job = link_summary.get_run(
-                    precision, device, path.compile_path, component_id
-                )
-                profile_job = profile_summary.get_run(
-                    precision, device, path, component_id
-                )
-                inference_job = inference_summary.get_run(
-                    precision, device, path, component_id
-                )
+        def _get_url_and_status(
+            sjob: ScorecardJobTypeVar | None,
+        ) -> tuple[str, str | None]:
+            # Replace all whitespace with space character
+            if not sjob:
+                return ("skipped", None)
 
-                def _get_url_and_status(
-                    sjob: ScorecardJobTypeVar,
-                ) -> tuple[str, str | None]:
-                    # Replace all whitespace with space character
-                    status = (
-                        re.sub(r"\s+", " ", sjob.status_message[:MAX_ERROR_LENGTH])
-                        if sjob.status_message
-                        else None
-                    )
-                    return (
-                        sjob.job_status
-                        + (f" ({status})" if sjob.status_message else ""),
-                        sjob.job.url if not sjob.skipped else None,
-                    )
+            status = (
+                re.sub(r"\s+", " ", sjob.status_message[:MAX_ERROR_LENGTH])
+                if sjob.status_message
+                else None
+            )
+            return (
+                sjob.job_status + (f" ({status})" if sjob.status_message else ""),
+                sjob.job.url,
+            )
 
-                # Job status
-                quantize_status, quantize_url = _get_url_and_status(quantize_job)
-                compile_status, compile_url = _get_url_and_status(compile_job)
-                link_status, link_url = _get_url_and_status(link_job)
-                profile_status, profile_url = _get_url_and_status(profile_job)
-                inference_status, inference_url = _get_url_and_status(inference_job)
+        # Job status
+        quantize_status, quantize_url = _get_url_and_status(summary.quantize_job)
+        compile_status, compile_url = _get_url_and_status(summary.compile_job)
+        link_status, link_url = _get_url_and_status(summary.link_job)
+        profile_status, profile_url = _get_url_and_status(summary.profile_job)
+        inference_status, inference_url = _get_url_and_status(summary.inference_job)
 
-                # Profile job results
-                if profile_job.success:
-                    inference_time = profile_job.inference_time_milliseconds
-                    first_load_time = profile_job.first_load_time_milliseconds
-                    warm_load_time = profile_job.warm_load_time_milliseconds
-                    NPU = profile_job.layer_counts.npu
-                    GPU = profile_job.layer_counts.gpu
-                    CPU = profile_job.layer_counts.cpu
-                else:
-                    inference_time = None
-                    first_load_time = None
-                    warm_load_time = None
-                    NPU = None
-                    GPU = None
-                    CPU = None
+        # Profile job results
+        if summary.profile_job and summary.profile_job.success:
+            inference_time = summary.profile_job.inference_time_milliseconds
+            first_load_time = summary.profile_job.first_load_time_milliseconds
+            warm_load_time = summary.profile_job.warm_load_time_milliseconds
+            NPU = summary.profile_job.layer_counts.npu
+            GPU = summary.profile_job.layer_counts.gpu
+            CPU = summary.profile_job.layer_counts.cpu
+        else:
+            inference_time = None
+            first_load_time = None
+            warm_load_time = None
+            NPU = None
+            GPU = None
+            CPU = None
 
-                # Create Entry
-                entry = ResultsSpreadsheet.Entry(
-                    model_id=model_id,
-                    component_id=component_id if component_id != model_id else None,
-                    precision=precision,
-                    chipset=device.chipset,
-                    runtime=path,
-                    quantize_status=quantize_status,
-                    quantize_url=quantize_url,
-                    compile_status=compile_status.replace(
-                        ",", "."
-                    ),  # remove commas for CSV compatibliity
-                    compile_url=compile_url,
-                    link_status=link_status.replace(
-                        ",", "."
-                    ),  # remove commas for CSV compatibliity
-                    link_url=link_url,
-                    profile_status=profile_status.replace(
-                        ",", "."
-                    ),  # remove commas for CSV compatibliity
-                    profile_url=profile_url,
-                    inference_time=inference_time,
-                    first_load_time=first_load_time,
-                    warm_load_time=warm_load_time,
-                    NPU=NPU,
-                    GPU=GPU,
-                    CPU=CPU,
-                    inference_status=inference_status,
-                    inference_url=inference_url,
-                )
-                entries.append(entry)
-
-        return entries
+        # Create Entry
+        return ResultsSpreadsheet.Entry(
+            model_id=summary.params.model_id,
+            component_id=summary.params.component,
+            precision=summary.params.precision,
+            chipset=summary.params.device.chipset,
+            runtime=summary.params.path,
+            quantize_status=quantize_status,
+            quantize_url=quantize_url,
+            compile_status=compile_status.replace(
+                ",", "."
+            ),  # remove commas for CSV compatibliity
+            compile_url=compile_url,
+            link_status=link_status.replace(
+                ",", "."
+            ),  # remove commas for CSV compatibliity
+            link_url=link_url,
+            profile_status=profile_status.replace(
+                ",", "."
+            ),  # remove commas for CSV compatibliity
+            profile_url=profile_url,
+            inference_time=inference_time,
+            first_load_time=first_load_time,
+            warm_load_time=warm_load_time,
+            NPU=NPU,
+            GPU=GPU,
+            CPU=CPU,
+            inference_status=inference_status,
+            inference_url=inference_url,
+        )
 
     def combine(self, other: ResultsSpreadsheet) -> None:
         self.extend(other)

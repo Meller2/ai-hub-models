@@ -10,19 +10,15 @@ import datetime
 import multiprocessing
 import os
 import shutil
-from dataclasses import dataclass
 from itertools import cycle
 from pathlib import Path
 
 import ruamel.yaml
-from qai_hub import JobType
 
 from qai_hub_models.configs.code_gen_yaml import QAIHMModelCodeGen
 from qai_hub_models.configs.devices_and_chipsets_yaml import load_similar_devices
 from qai_hub_models.configs.info_yaml import QAIHMModelInfo
 from qai_hub_models.configs.perf_yaml import QAIHMModelPerf
-from qai_hub_models.models.common import Precision
-from qai_hub_models.scorecard import ScorecardProfilePath
 from qai_hub_models.scorecard.artifacts import ScorecardArtifact
 from qai_hub_models.scorecard.device import ScorecardDevice
 from qai_hub_models.scorecard.envvars import (
@@ -37,24 +33,20 @@ from qai_hub_models.scorecard.envvars import (
     SpecialPrecisionSetting,
     StaticModelsDirEnvvar,
 )
-from qai_hub_models.scorecard.execution_helpers import (
-    get_compile_parameterized_pytest_config,
-    get_enabled_paths_for_testing,
-    get_evaluation_parameterized_pytest_config,
-    get_profile_parameterized_pytest_config,
-    get_quantize_parameterized_pytest_config,
-)
-from qai_hub_models.scorecard.path_compile import ScorecardCompilePath
-from qai_hub_models.scorecard.results import PerformanceDiff
 from qai_hub_models.scorecard.results.code_gen import (
     update_code_gen_failure_reasons,
     update_model_publish_status,
+)
+from qai_hub_models.scorecard.results.performance_diff import PerformanceDiff
+from qai_hub_models.scorecard.results.scorecard_summary import (
+    ModelTestConfig,
 )
 from qai_hub_models.scorecard.results.spreadsheet import ResultsSpreadsheet
 from qai_hub_models.scorecard.results.yaml import (
     CompileScorecardJobYaml,
     InferenceScorecardJobYaml,
     LinkScorecardJobYaml,
+    PreQDQCompileScorecardJobYaml,
     ProfileScorecardJobYaml,
     QuantizeScorecardJobYaml,
     ScorecardJobYaml,
@@ -63,10 +55,6 @@ from qai_hub_models.scorecard.static.list_models import (
     validate_and_split_enabled_models,
 )
 from qai_hub_models.scorecard.static.model_config import ScorecardModelConfig
-from qai_hub_models.scorecard.static.model_exec import (
-    get_static_model_test_parameterizations,
-)
-from qai_hub_models.utils.collection_model_helpers import get_components
 from qai_hub_models.utils.hub_clients import (
     default_hub_client_as,
     deployment_is_prod,
@@ -181,6 +169,7 @@ def process_model(
     model_id: str,
     deployment: str,
     static_models_dir: Path,
+    pre_qdq_job_yamls: PreQDQCompileScorecardJobYaml,
     quantize_job_yamls: QuantizeScorecardJobYaml,
     compile_job_yamls: CompileScorecardJobYaml,
     link_job_yamls: LinkScorecardJobYaml,
@@ -202,6 +191,8 @@ def process_model(
         Deployment environment.
     static_models_dir
         Directory containing static model configurations.
+    pre_qdq_job_yamls
+        YAML containing pre qdq compile job information.
     quantize_job_yamls
         YAML containing quantize job information.
     compile_job_yamls
@@ -237,6 +228,7 @@ def process_model(
             # This model has an end to end pyTorch recipe.
             return process_e2e_recipe_model(
                 model_id,
+                pre_qdq_job_yamls,
                 quantize_job_yamls,
                 compile_job_yamls,
                 link_job_yamls,
@@ -253,7 +245,6 @@ def process_model(
                 model_id,
                 deployment,
                 static_models_dir,
-                quantize_job_yamls,
                 compile_job_yamls,
                 link_job_yamls,
                 profile_job_yamls,
@@ -281,108 +272,9 @@ def _get_static_tags(model_info: ScorecardModelConfig) -> list[str]:
     return tags
 
 
-@dataclass
-class ModelTestParameterizations:
-    component_names: list[str] | None
-    precisions: set[Precision]
-    compile_tests: list[tuple[Precision, ScorecardCompilePath, ScorecardDevice]]
-    profile_tests: list[tuple[Precision, ScorecardProfilePath, ScorecardDevice]]
-    inference_tests: list[tuple[Precision, ScorecardProfilePath, ScorecardDevice]]
-    enabled_paths: dict[Precision, list[ScorecardProfilePath]]
-
-    @staticmethod
-    def from_recipe_model(model_info: QAIHMModelInfo) -> ModelTestParameterizations:
-        model_id = model_info.id
-        cj = model_info.code_gen_config
-
-        # Get enabled test paths for this model
-        model_supported_paths = cj.get_supported_paths_for_testing(
-            only_include_passing=False
-        )
-        model_passing_paths = cj.get_supported_paths_for_testing(
-            only_include_passing=True
-        )
-        enabled_paths = get_enabled_paths_for_testing(
-            model_id,
-            model_supported_paths,
-            model_passing_paths,
-            ScorecardProfilePath,
-            cj.can_use_quantize_job,
-        )
-
-        # Get all enabled tests paramaterizations -- (precision + path + device pairings) -- for this model
-        component_names = get_components(model_id)
-        precisions = get_quantize_parameterized_pytest_config(
-            model_id, model_supported_paths, model_passing_paths
-        )
-        compile_tests = get_compile_parameterized_pytest_config(
-            model_id,
-            model_supported_paths,
-            model_passing_paths,
-            cj.can_use_quantize_job,
-            include_mirror_devices=True,
-        )
-        profile_tests = get_profile_parameterized_pytest_config(
-            model_id,
-            model_supported_paths,
-            model_passing_paths,
-            cj.can_use_quantize_job,
-            include_mirror_devices=True,
-        )
-        inference_tests = get_evaluation_parameterized_pytest_config(
-            model_id,
-            ScorecardDevice.get(cj.default_device),
-            model_supported_paths,
-            model_passing_paths,
-            cj.can_use_quantize_job,
-        )
-
-        return ModelTestParameterizations(
-            component_names=component_names,
-            precisions=set(precisions),
-            compile_tests=compile_tests,
-            profile_tests=profile_tests,
-            inference_tests=inference_tests,
-            enabled_paths=enabled_paths,
-        )
-
-    @staticmethod
-    def from_static_model(
-        model_info: ScorecardModelConfig,
-    ) -> ModelTestParameterizations:
-        return ModelTestParameterizations(
-            component_names=None,
-            precisions={model_info.precision},
-            compile_tests=get_static_model_test_parameterizations(
-                model_info.id,
-                JobType.COMPILE,
-                ScorecardCompilePath,
-                model_info.precision,
-                model_info.devices,
-                list({x.compile_path for x in model_info.enabled_profile_runtimes}),
-            ),
-            profile_tests=get_static_model_test_parameterizations(
-                model_info.id,
-                JobType.PROFILE,
-                ScorecardProfilePath,
-                model_info.precision,
-                model_info.devices,
-                model_info.enabled_profile_runtimes,
-            ),
-            inference_tests=get_static_model_test_parameterizations(
-                model_info.id,
-                JobType.INFERENCE,
-                ScorecardProfilePath,
-                model_info.precision,
-                [model_info.eval_device],
-                model_info.enabled_profile_runtimes,
-            ),
-            enabled_paths={},
-        )
-
-
 def process_e2e_recipe_model(
     model_id: str,
+    pre_qdq_job_yamls: PreQDQCompileScorecardJobYaml,
     quantize_job_yamls: QuantizeScorecardJobYaml,
     compile_job_yamls: CompileScorecardJobYaml,
     link_job_yamls: LinkScorecardJobYaml,
@@ -400,6 +292,8 @@ def process_e2e_recipe_model(
     ----------
     model_id
         Model identifier.
+    pre_qdq_job_yamls
+        YAML containing pre qdq compile job information.
     quantize_job_yamls
         YAML containing quantize job information.
     compile_job_yamls
@@ -441,35 +335,17 @@ def process_e2e_recipe_model(
         return ResultsSpreadsheet(), None, None
 
     # Get enabled test paths for this model
-    test_params = ModelTestParameterizations.from_recipe_model(model_info)
+    test_params = ModelTestConfig.from_recipe_model(model_info)
 
     # Get summaries for this model and its components.
-    print_with_id("Loading quantize summary")
-    quantize_summary = (
-        quantize_job_yamls.summary_from_model(
-            model_id,
-            test_params.precisions,
-            test_params.component_names,
-        )
-        if any(p.has_quantized_activations for p in test_params.precisions)
-        and cj.can_use_quantize_job
-        else None
-    )
-    print_with_id("Loading compile summary")
-    compile_summary = compile_job_yamls.summary_from_model(
-        model_id, test_params.compile_tests, test_params.component_names
-    )
-    print_with_id("Loading link summary")
-    link_summary = link_job_yamls.summary_from_model(
-        model_id, test_params.compile_tests, test_params.component_names
-    )
-    print_with_id("Loading profile summary")
-    profile_summary = profile_job_yamls.summary_from_model(
-        model_id, test_params.profile_tests, test_params.component_names
-    )
-    print_with_id("Loading inference summary")
-    inference_summary = inference_job_yamls.summary_from_model(
-        model_id, test_params.inference_tests, test_params.component_names
+    print_with_id("Loading summary")
+    summaries = test_params.get_all_export_test_summaries(
+        pre_qdq_job_yamls,
+        quantize_job_yamls,
+        compile_job_yamls,
+        link_job_yamls,
+        profile_job_yamls,
+        inference_job_yamls,
     )
 
     entries: ResultsSpreadsheet = ResultsSpreadsheet()
@@ -485,27 +361,12 @@ def process_e2e_recipe_model(
     )
     if gen_csv:
         print_with_id("Adding to Spreadsheet")
-        entries.append_model_summary_entries(
-            model_id,
-            test_params.profile_tests,
-            test_params.component_names,
-            quantize_summary,
-            compile_summary,
-            link_summary,
-            profile_summary,
-            inference_summary,
-        )
+        for export_test_summary in summaries:
+            entries.append_export_test_summary(export_test_summary)
 
     if sync_code_gen and not cj.freeze_perf_yaml:
         # Enable or disable runtimes on this model depending on whether the default device has passing jobs
-        update_code_gen_failure_reasons(
-            test_params.enabled_paths,
-            test_params.component_names,
-            compile_summary,
-            link_summary,
-            profile_summary,
-            cj,
-        )
+        update_code_gen_failure_reasons(summaries, test_params.enabled_paths, cj)
         code_gen_path = cj.to_model_yaml(model_id)
         print_with_id(f"Updated Runtime Failure Reasons in {code_gen_path}")
 
@@ -520,23 +381,12 @@ def process_e2e_recipe_model(
         print_with_id("Writing Performance YAML")
 
         # Build model card
-        model_card = profile_summary.get_perf_card(
-            include_failed_jobs=True,
-            include_unpublished_runtimes=False,
-            exclude_form_factors=model_info.private_perf_form_factors or [],
-            model_name=model_info.name,
-        )
-
-        # Dump model card without failed jobs
-        if write_model_card:
-            model_card_without_failures = profile_summary.get_perf_card(
-                include_failed_jobs=False,
-                include_unpublished_runtimes=False,
-                exclude_form_factors=model_info.private_perf_form_factors or [],
-                model_name=model_info.name,
-            )
-        else:
-            model_card_without_failures = None
+        model_card = QAIHMModelPerf()
+        model_card_without_failures = QAIHMModelPerf() if write_model_card else None
+        for summary in summaries:
+            summary.add_to_perf(model_card, include_failures=True)
+            if model_card_without_failures:
+                summary.add_to_perf(model_card_without_failures, include_failures=False)
 
         if model_card_without_failures:
             model_card_without_failures.apply_similar_devices(load_similar_devices())
@@ -554,7 +404,6 @@ def process_static_file_model(
     model_id: str,
     deployment: str,
     models_dir: Path,
-    quantize_job_yamls: QuantizeScorecardJobYaml | None,
     compile_job_yamls: CompileScorecardJobYaml | None,
     link_job_yamls: LinkScorecardJobYaml | None,
     profile_job_yamls: ProfileScorecardJobYaml | None,
@@ -571,51 +420,20 @@ def process_static_file_model(
 
     # Load config
     model_info = ScorecardModelConfig.from_yaml(models_dir / (model_id + ".yaml"))
-    test_params = ModelTestParameterizations.from_static_model(model_info)
+    test_params = ModelTestConfig.from_static_model(model_info)
 
     # Get summaries for this model and its components.
     with default_hub_client_as(
         get_scorecard_client_or_raise(deployment, model_info.restrict_access)
     ):
-        quantize_summary = None
-        if quantize_job_yamls:
-            print_with_id("Loading quantize summary")
-            quantize_summary = quantize_job_yamls.summary_from_model(
-                model_id,
-                test_params.precisions,
-            )
-
-        compile_summary = None
-        if compile_job_yamls:
-            print_with_id("Loading compile summary")
-            compile_summary = compile_job_yamls.summary_from_model(
-                model_id,
-                test_params.compile_tests,
-                test_params.component_names,
-            )
-
-        link_summary = None
-        if link_job_yamls:
-            print_with_id("Loading link summary")
-            link_summary = link_job_yamls.summary_from_model(
-                model_id,
-                test_params.compile_tests,
-                test_params.component_names,
-            )
-
-        profile_summary = None
-        if profile_job_yamls:
-            print_with_id("Loading profile summary")
-            profile_summary = profile_job_yamls.summary_from_model(
-                model_id, test_params.profile_tests, test_params.component_names
-            )
-
-        inference_summary = None
-        if inference_job_yamls:
-            print_with_id("Loading inference summary")
-            inference_summary = inference_job_yamls.summary_from_model(
-                model_id, test_params.inference_tests, test_params.component_names
-            )
+        summaries = test_params.get_all_export_test_summaries(
+            None,
+            None,
+            compile_job_yamls,
+            link_job_yamls,
+            profile_job_yamls,
+            inference_job_yamls,
+        )
 
         print_with_id("Adding to Spreadsheet")
         entries = ResultsSpreadsheet()
@@ -627,16 +445,9 @@ def process_static_file_model(
             default_quantized_precision=None,
             default_device=model_info.devices[0],
         )
-        entries.append_model_summary_entries(
-            model_id,
-            test_params.profile_tests,
-            test_params.component_names,
-            quantize_summary,
-            compile_summary,
-            link_summary,
-            profile_summary,
-            inference_summary,
-        )
+        for export_test_summary in summaries:
+            entries.append_export_test_summary(export_test_summary)
+
         return entries
 
 
@@ -679,6 +490,7 @@ if __name__ == "__main__":
     # Load Base YAMLs
     if using_prod_hub:
         # Load previous scorecard state
+        pre_qdq_job_yamls = PreQDQCompileScorecardJobYaml.from_intermediates()
         quantize_job_yamls = QuantizeScorecardJobYaml.from_intermediates()
         compile_job_yamls = CompileScorecardJobYaml.from_intermediates()
         link_job_yamls = LinkScorecardJobYaml.from_intermediates()
@@ -687,6 +499,7 @@ if __name__ == "__main__":
 
         # Erase jobs for models we're collecting results for, if applicable
         if args.ignore_existing_intermediate_jobs:
+            clear_jobs(pre_qdq_job_yamls, model_list, all_models)
             clear_jobs(quantize_job_yamls, model_list, all_models)
             clear_jobs(compile_job_yamls, model_list, all_models)
             clear_jobs(link_job_yamls, model_list, all_models)
@@ -694,6 +507,7 @@ if __name__ == "__main__":
             clear_jobs(inference_job_yamls, model_list, all_models)
     else:
         # Previous scorecard state is applicable only on prod
+        pre_qdq_job_yamls = PreQDQCompileScorecardJobYaml()
         quantize_job_yamls = QuantizeScorecardJobYaml()
         compile_job_yamls = CompileScorecardJobYaml()
         link_job_yamls = LinkScorecardJobYaml()
@@ -707,10 +521,14 @@ if __name__ == "__main__":
                 quantize_yaml_path, create_empty_if_no_file=True
             )
         )
-
     for compile_yaml_path in args.compile_ids.split(",") if args.compile_ids else []:
         compile_job_yamls.update(
             CompileScorecardJobYaml.from_file(
+                compile_yaml_path, create_empty_if_no_file=True
+            )
+        )
+        pre_qdq_job_yamls.update(
+            PreQDQCompileScorecardJobYaml.from_file(
                 compile_yaml_path, create_empty_if_no_file=True
             )
         )
@@ -743,6 +561,7 @@ if __name__ == "__main__":
                 model_list,
                 cycle([args.deployment]),
                 cycle([static_model_dir]),
+                cycle([pre_qdq_job_yamls]),
                 cycle([quantize_job_yamls]),
                 cycle([compile_job_yamls]),
                 cycle([link_job_yamls]),
@@ -762,6 +581,7 @@ if __name__ == "__main__":
                 model_list[0],
                 args.deployment,
                 static_model_dir,
+                pre_qdq_job_yamls,
                 quantize_job_yamls,
                 compile_job_yamls,
                 link_job_yamls,

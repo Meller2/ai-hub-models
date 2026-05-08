@@ -21,7 +21,7 @@ from qai_hub_models.scorecard.envvars import (
     SpecialModelSetting,
     StaticModelsDirEnvvar,
 )
-from qai_hub_models.scorecard.execution_helpers import get_async_job_cache_name
+from qai_hub_models.scorecard.params import ScJobParams
 from qai_hub_models.scorecard.results.yaml import InferenceScorecardJobYaml
 from qai_hub_models.scorecard.static.list_models import (
     validate_and_split_enabled_models,
@@ -56,25 +56,27 @@ def evaluate_model_accuracy(
 
     device = config.eval_device
     for runtime in config.enabled_profile_runtimes:
+        params = ScJobParams(
+            model_id=model_id,
+            precision=config.precision,
+            path=runtime,
+            device=config.eval_device,
+        )
         job = inference_jobs_yaml.get_job(
-            runtime,
-            model_id,
-            device,
-            config.precision,
-            None,
+            params,
             wait_for_job=True,
         )
 
-        if job.job_id is None:
+        if job is None:
             continue
         device_outputs = job.job.download_output_data()
 
         if device_outputs is None:
-            job_name = f"qaihm::inference | {get_async_job_cache_name(runtime, model_id, device, config.precision)}"
+            job_name = f"qaihm::inference | {params.device_job_id}"
             print(f"{job_name} | Job failed | {job.job.url}")
             continue
         if (batch_size := len(next(iter(dataset.values())))) != 1:
-            job_name = f"qaihm::inference | {get_async_job_cache_name(runtime, model_id, device, config.precision)}"
+            job_name = f"qaihm::inference | {params.device_job_id}"
             print(
                 f"{job_name} | Batch size must be 1, got {batch_size} | {job.job.url}"
             )

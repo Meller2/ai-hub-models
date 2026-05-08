@@ -25,8 +25,8 @@ from tabulate import tabulate
 from qai_hub_models.datasets.common import get_folder_name
 from qai_hub_models.models.common import TargetRuntime
 from qai_hub_models.scorecard import ScorecardDevice
-from qai_hub_models.scorecard.artifacts import ScorecardArtifact, test_artifacts_dir
-from qai_hub_models.scorecard.envvars import DeploymentEnvvar
+from qai_hub_models.scorecard.artifacts import ScorecardArtifact
+from qai_hub_models.scorecard.envvars import ArtifactsDirEnvvar, DeploymentEnvvar
 from qai_hub_models.utils.asset_loaders import (
     always_answer_prompts,
     load_yaml,
@@ -246,7 +246,7 @@ def get_and_sync_datasets_cache_dir(
         folder_name += "_nt"
     assert issubclass(model_cls, BaseModel)
     dataset_folder_name = get_folder_name(dataset_name, model_cls.get_input_spec())
-    dir_path = test_artifacts_dir() / folder_name / dataset_folder_name
+    dir_path = ArtifactsDirEnvvar.get() / folder_name / dataset_folder_name
     if dir_path.exists():
         return dir_path
     with qaihm_temp_dir() as tmp_dir:

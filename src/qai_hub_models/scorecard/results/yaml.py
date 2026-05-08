@@ -6,13 +6,12 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable
 from pathlib import Path
-from typing import ClassVar, Generic, TypeVar
+from typing import Generic, TypeVar
 
-import qai_hub as hub
 import ruamel.yaml
 from pydantic import Field
+from qai_hub import JobType
 from typing_extensions import Self
 
 from qai_hub_models.configs.release_assets_yaml import (
@@ -21,19 +20,10 @@ from qai_hub_models.configs.release_assets_yaml import (
 from qai_hub_models.configs.tool_versions import ToolVersions
 from qai_hub_models.models.common import Precision
 from qai_hub_models.scorecard.artifacts import ScorecardArtifact
-from qai_hub_models.scorecard.device import ScorecardDevice, cs_universal
-from qai_hub_models.scorecard.execution_helpers import (
-    get_async_job_cache_name,
-)
-from qai_hub_models.scorecard.path_compile import ScorecardCompilePath
+from qai_hub_models.scorecard.device import ScorecardDevice
+from qai_hub_models.scorecard.errors import CachedScorecardJobError
+from qai_hub_models.scorecard.params import JobTypeVar, ScExportTestParams, ScJobParams
 from qai_hub_models.scorecard.path_profile import ScorecardProfilePath
-from qai_hub_models.scorecard.results.performance_summary import (
-    ModelCompileSummary,
-    ModelInferenceSummary,
-    ModelPerfSummary,
-    ModelQuantizeSummary,
-    ModelSummaryTypeVar,
-)
 from qai_hub_models.scorecard.results.scorecard_job import (
     CompileScorecardJob,
     InferenceScorecardJob,
@@ -41,7 +31,6 @@ from qai_hub_models.scorecard.results.scorecard_job import (
     ProfileScorecardJob,
     QuantizeScorecardJob,
     ScorecardJobTypeVar,
-    ScorecardPathOrNoneTypeVar,
 )
 from qai_hub_models.utils.base_config import BaseQAIHMConfig
 
@@ -86,24 +75,20 @@ class ToolVersionsByPathYaml(BaseQAIHMConfig):
         return self.to_yaml(Path(dirpath) / filename, write_if_empty=False)
 
 
-class ScorecardJobYaml(
-    Generic[ScorecardJobTypeVar, ScorecardPathOrNoneTypeVar, ModelSummaryTypeVar]
-):
-    ARTIFACT_TYPE: ClassVar[ScorecardArtifact]
-    scorecard_job_type: type[ScorecardJobTypeVar]
-    scorecard_path_type: type[ScorecardPathOrNoneTypeVar]
-    scorecard_model_summary_type: type[ModelSummaryTypeVar]
+class ScorecardJobYaml(Generic[ScorecardJobTypeVar]):
+    ARTIFACT_TYPE: ScorecardArtifact
+    SCORECARD_JOB_TYPE: type[ScorecardJobTypeVar]
 
     def __init__(
         self,
         job_id_mapping: dict[str, str] | None = None,
         path: str | os.PathLike | None = None,
     ) -> None:
-        self.job_id_mapping = job_id_mapping or {}
         self.path = Path(path) if path else None
-        assert hasattr(self, "ARTIFACT_TYPE"), (
-            f"{type(self)} does not define classvar ARTIFACT_TYPE"
-        )
+        self.job_id_mapping = job_id_mapping or {}
+        # ScorecardJob classes are expensive to create
+        # (workbench API calls), so we cache them.
+        self.job_cache: dict[str, ScorecardJobTypeVar] = {}
 
     @classmethod
     def from_file(
@@ -112,7 +97,7 @@ class ScorecardJobYaml(
         """Read yaml files."""
         if not os.path.exists(config_path):
             if create_empty_if_no_file:
-                return cls(path=config_path)
+                return cls({}, config_path)
             raise FileNotFoundError(f"File not found with job ids at {config_path}")
 
         yaml = ruamel.yaml.YAML()
@@ -158,60 +143,10 @@ class ScorecardJobYaml(
             for key in keys_to_delete:
                 del self.job_id_mapping[key]
 
-    def get_job_id(
-        self,
-        path: ScorecardPathOrNoneTypeVar,
-        model_id: str,
-        device: ScorecardDevice,
-        precision: Precision = Precision.float,
-        component: str | None = None,
-        graph_name: str | None = None,
-    ) -> str | None:
-        """
-        Get the ID of this job in the YAML that stores asyncronously-ran scorecard jobs.
-        Returns None if job does not exist.
+    def get_job_key(self, params: ScJobParams) -> str:
+        return params.job_id(self.SCORECARD_JOB_TYPE.job_type)
 
-        Parameters
-        ----------
-        path
-            Applicable scorecard path
-        model_id
-            The ID of the QAIHM model being tested
-        device
-            The targeted device
-        precision
-            The precision in which this model is running
-        component
-            The name of the model component being tested, if applicable
-        graph_name
-            The name of the graph being executed (for multi-graph models)
-
-        Returns
-        -------
-        job_id : str | None
-            The job ID if found, None otherwise.
-        """
-        return self.job_id_mapping.get(
-            get_async_job_cache_name(
-                path,
-                model_id,
-                device.mirror_device or device,
-                precision,
-                component,
-                graph_name,
-            )
-        )
-
-    def set_job_id(
-        self,
-        job_id: str,
-        path: ScorecardPathOrNoneTypeVar,
-        model_id: str,
-        device: ScorecardDevice,
-        precision: Precision = Precision.float,
-        component: str | None = None,
-        graph_name: str | None = None,
-    ) -> None:
+    def set_job_id(self, job_id: str, params: ScJobParams) -> None:
         """
         Set the key for this job in the YAML that stores asyncronously-ran scorecard jobs.
 
@@ -219,24 +154,10 @@ class ScorecardJobYaml(
         ----------
         job_id
             Job ID to associate with the other parameters in the YAML
-        path
-            Applicable scorecard path
-        model_id
-            The ID of the QAIHM model being tested
-        device
-            The targeted device
-        precision
-            The precision in which this model is running
-        component
-            The name of the model component being tested, if applicable
-        graph_name
-            The name of the graph being executed (for multi-graph models)
+        params
+            Job identification parameters
         """
-        self.job_id_mapping[
-            get_async_job_cache_name(
-                path, model_id, device, precision, component, graph_name
-            )
-        ] = job_id
+        self.job_id_mapping[self.get_job_key(params)] = job_id
 
     def update(self, other: ScorecardJobYaml) -> None:
         """Merge the other YAML into this YAML, overwriting any existing jobs with the same job name"""
@@ -248,267 +169,207 @@ class ScorecardJobYaml(
 
     def get_job(
         self,
-        path: ScorecardPathOrNoneTypeVar,
-        model_id: str,
-        device: ScorecardDevice,
-        precision: Precision = Precision.float,
-        component: str | None = None,
-        graph_name: str | None = None,
+        params: ScJobParams,
         wait_for_job: bool = True,
-        wait_for_max_job_duration: int | None = None,
-    ) -> ScorecardJobTypeVar:
+        wait_for_job_max_seconds: int | None = None,
+        raise_if_not_successful: bool = False,
+    ) -> ScorecardJobTypeVar | None:
         """
         Get the scorecard job from the YAML associated with these parameters.
 
         Parameters
         ----------
-        path
-            Applicable scorecard path
-        model_id
-            The ID of the QAIHM model being tested
-        device
-            The targeted device
-        precision
-            The precision in which this model is running
-        component
-            The name of the model component being tested, if applicable
-        graph_name
-            The name of the graph being executed (for multi-graph models)
+        params
+            Job identification parameters
         wait_for_job
             If false, running jobs are treated like they were "skipped"
-        wait_for_max_job_duration
+        wait_for_job_max_seconds
             Allow the job this many seconds after creation to complete
+        raise_if_not_successful
+            If true, raise an error if the job is not successful
 
         Returns
         -------
-        job : ScorecardJobTypeVar
-            The scorecard job matching these parameters.
+        job : ScorecardJobTypeVar | None
+            The scorecard job matching these parameters, or None if the job does not exist.
         """
-        job_id = self.get_job_id(
-            path,
-            model_id,
-            device,
-            precision,
-            component,
-            graph_name,
-        )
-        jn = component or model_id
-        return self.scorecard_job_type(
-            f"{jn}_{graph_name}" if graph_name else jn,
-            precision,
-            job_id,
-            device,
-            wait_for_job,
-            wait_for_max_job_duration,
-            path,  # type: ignore[arg-type]
-        )
+        # Get the job.
+        key = self.get_job_key(params)
+        job = self.job_cache.get(key)
+        if job is None:
+            if job_id := self.job_id_mapping.get(key):
+                job = self.SCORECARD_JOB_TYPE(job_id)
+                # ScorecardJob classes are expensive to create
+                # (workbench API calls), so we cache them.
+                self.job_cache[key] = job
+            else:
+                return None
 
-    def get_all_jobs(
-        self,
-        model_id: str,
-        test_paramaterizations: Iterable[
-            tuple[Precision, ScorecardPathOrNoneTypeVar, ScorecardDevice]
-        ],
-        components: Iterable[str] | None = None,
-    ) -> list[ScorecardJobTypeVar]:
-        """Get all jobs in this YAML related to the provided model."""
-        return [
-            self.get_job(path, model_id, device, precision, component or None)
-            for precision, path, device in test_paramaterizations
-            for component in components or [None]  # type: ignore[list-item]
-        ]
+        # Wait for the job to finish and cache the results.
+        if wait_for_job:
+            job.wait(wait_for_job_max_seconds)
+        else:
+            job.cache_results()
 
-    def summary_from_model(
-        self,
-        model_id: str,
-        test_paramaterizations: Iterable[
-            tuple[Precision, ScorecardPathOrNoneTypeVar, ScorecardDevice]
-        ],
-        components: Iterable[str] | None = None,
-    ) -> ModelSummaryTypeVar:
-        """Creates a summary of all jobs related to the given model."""
-        runs = self.get_all_jobs(model_id, test_paramaterizations, components)
-        return self.scorecard_model_summary_type.from_runs(model_id, runs, components)  # type: ignore[arg-type,return-value]
+        # Verify the job succeeded.
+        if raise_if_not_successful and not job.success:
+            if job.running:
+                error_str = f"still running after max allowed job duration of {wait_for_job_max_seconds / 60 if wait_for_job_max_seconds else '__'} minutes"
+            else:
+                error_str = job.job_status
 
-
-class QuantizeScorecardJobYaml(
-    ScorecardJobYaml[QuantizeScorecardJob, None, ModelQuantizeSummary]
-):
-    ARTIFACT_TYPE = ScorecardArtifact.QUANTIZE_YAML
-    scorecard_job_type = QuantizeScorecardJob
-    scorecard_path_type = type(None)
-    scorecard_model_summary_type = ModelQuantizeSummary
-
-    def get_job_id(
-        self,
-        path: ScorecardPathOrNoneTypeVar,
-        model_id: str,
-        device: ScorecardDevice,
-        precision: Precision = Precision.float,
-        component: str | None = None,
-        graph_name: str | None = None,
-    ) -> str | None:
-        return self.job_id_mapping.get(
-            get_async_job_cache_name(
-                None, model_id, cs_universal, precision, component, graph_name
-            )
-        )
-
-    def set_job_id(
-        self,
-        job_id: str,
-        path: ScorecardPathOrNoneTypeVar,
-        model_id: str,
-        device: ScorecardDevice,
-        precision: Precision = Precision.float,
-        component: str | None = None,
-        graph_name: str | None = None,
-    ) -> None:
-        self.job_id_mapping[
-            get_async_job_cache_name(
-                None, model_id, cs_universal, precision, component, graph_name
-            )
-        ] = job_id
-
-    def get_all_jobs(
-        self,
-        model_id: str,
-        precisions: Iterable[Precision],
-        components: Iterable[str] | None = None,
-    ) -> list[QuantizeScorecardJob]:
-        return [
-            self.get_job(None, model_id, cs_universal, precision, component or None)
-            for precision in precisions
-            for component in components or [None]  # type: ignore[list-item]
-        ]
-
-    def summary_from_model(
-        self,
-        model_id: str,
-        precisions: Iterable[Precision],
-        components: Iterable[str] | None = None,
-    ) -> ModelQuantizeSummary:
-        """Creates a summary of all jobs related to the given model."""
-        runs = self.get_all_jobs(model_id, precisions, components)
-        return self.scorecard_model_summary_type.from_runs(model_id, runs, components)  # type: ignore[arg-type,return-value]
-
-
-class CompileScorecardJobYaml(
-    ScorecardJobYaml[CompileScorecardJob, ScorecardCompilePath, ModelCompileSummary]
-):
-    ARTIFACT_TYPE = ScorecardArtifact.COMPILE_YAML
-    scorecard_job_type = CompileScorecardJob
-    scorecard_path_type = ScorecardCompilePath
-    scorecard_model_summary_type = ModelCompileSummary
-
-    def get_job_id(
-        self,
-        path: ScorecardCompilePath | ScorecardProfilePath,
-        model_id: str,
-        device: ScorecardDevice,
-        precision: Precision = Precision.float,
-        component: str | None = None,
-        graph_name: str | None = None,
-    ) -> str | None:
-        """
-        Get the ID of this job in the YAML that stores asyncronously-ran scorecard jobs.
-        Returns None if job does not exist.
-
-        Parameters
-        ----------
-        path
-            Applicable scorecard path
-        model_id
-            The ID of the QAIHM model being tested
-        device
-            The targeted device
-        precision
-            The precision in which this model is running
-        component
-            The name of the model component being tested, if applicable
-        graph_name
-            The name of the graph being executed (for multi-graph models)
-
-        Returns
-        -------
-        job_id : str | None
-            The job ID if found, None otherwise.
-        """
-        if isinstance(path, ScorecardProfilePath):
-            # Get the compile job used with this profile path.
-            path = path.compile_path
-
-        if x := super().get_job_id(
-            path, model_id, device, precision, component, graph_name
-        ):
-            return x
-
-        # For compilation, fallback to the "universal" device if no path is found.
-        if path and path.is_universal:
-            return self.job_id_mapping.get(
-                get_async_job_cache_name(
-                    path,
-                    model_id,
-                    cs_universal,
-                    precision,
-                    component,
-                    graph_name,
+            raise CachedScorecardJobError(
+                params.str_with_description(
+                    f"Prerequisite {job.job._job_type.display_name.title()} job {error_str}: {job.job.url}"
                 )
             )
 
-        return None
+        return job
+
+    def _get_all_job_params(self, params: ScExportTestParams) -> list[ScJobParams]:
+        return params.all_job_params(self.SCORECARD_JOB_TYPE.job_type)
+
+    def get_all_jobs(
+        self,
+        params: ScExportTestParams,
+        wait_for_job: bool = True,
+        wait_for_job_max_seconds: int | None = None,
+        raise_if_not_successful: bool = False,
+        raise_if_jobs_are_missing: bool = False,
+    ) -> dict[ScJobParams, ScorecardJobTypeVar | None]:
+        """Get all cached jobs that should exist for the given test paramaters. If a job should exist but is not in the cache, it is returned as None."""
+        all_jobs = {
+            pp: self.get_job(
+                pp, wait_for_job, wait_for_job_max_seconds, raise_if_not_successful
+            )
+            for pp in self._get_all_job_params(params)
+        }
+
+        if raise_if_jobs_are_missing and sum(
+            x is not None for x in all_jobs.values()
+        ) != len(all_jobs):
+            raise CachedScorecardJobError(
+                params.str_with_description(
+                    f"Could not find all cached {self.SCORECARD_JOB_TYPE.job_type.name} jobs."
+                )
+            )
+
+        return all_jobs
+
+    def update_from_export_output(
+        self,
+        export_output: None
+        | JobTypeVar
+        | dict[str, dict[str, JobTypeVar]]
+        | dict[str, JobTypeVar],
+        test_params: ScExportTestParams,
+    ) -> None:
+        """From the output of a step in export.py, populate this cache."""
+        if export_output is None:
+            raise ValueError("Export output is missing.")
+        for job_params, job in ScJobParams.from_export_output(
+            export_output, test_params
+        ).items():
+            self.set_job_id(job.job_id, job_params)
+
+    def get_export_output(
+        self,
+        test_params: ScExportTestParams,
+        wait_for_job: bool = True,
+        wait_for_job_max_seconds: int | None = None,
+        raise_if_not_successful: bool = True,
+        raise_if_jobs_are_missing: bool = True,
+    ) -> JobTypeVar | dict[str, JobTypeVar] | dict[str, dict[str, JobTypeVar]] | None:
+        """Load the output of a step in export.py that would have generated this cache."""
+        all_jobs = self.get_all_jobs(
+            test_params,
+            wait_for_job,
+            wait_for_job_max_seconds,
+            raise_if_not_successful,
+            raise_if_jobs_are_missing,
+        )
+        has_components = test_params.component_names is not None
+        has_graph_names = (
+            self.SCORECARD_JOB_TYPE.job_type not in {JobType.QUANTIZE, JobType.LINK}
+            and test_params.graph_names is not None
+        ) or test_params.component_graph_names is not None
+
+        if has_graph_names:
+            if has_components:
+                out_gn_comps: dict[str, dict[str, JobTypeVar]] = {}
+                for job_params, sc_job in all_jobs.items():
+                    assert (
+                        job_params.component is not None
+                        and job_params.graph_name is not None
+                    )
+                    if sc_job is not None:
+                        if job_params.component not in out_gn_comps:
+                            out_gn_comps[job_params.component] = {}
+                        out_gn_comps[job_params.component][job_params.graph_name] = (
+                            sc_job.job
+                        )
+                return out_gn_comps
+            out_gn: dict[str, JobTypeVar] = {}
+            for job_params, sc_job in all_jobs.items():
+                assert (
+                    job_params.component is None and job_params.graph_name is not None
+                )
+                if sc_job is not None:
+                    out_gn[job_params.graph_name] = sc_job.job
+            return out_gn
+
+        if has_components:
+            out_comp: dict[str, JobTypeVar] = {}
+            for job_params, sc_job in all_jobs.items():
+                assert (
+                    job_params.component is not None and job_params.graph_name is None
+                )
+                if sc_job is not None:
+                    out_comp[job_params.component] = sc_job.job
+            return out_comp
+
+        if len(all_jobs) == 0:
+            return None
+        assert len(all_jobs) == 1
+        sc_job = next(iter(all_jobs.values()))
+        assert sc_job is not None
+        return sc_job.job
 
 
-class LinkScorecardJobYaml(
-    ScorecardJobYaml[LinkScorecardJob, ScorecardCompilePath, ModelCompileSummary]
-):
-    """
-    YAML cache for link jobs.
+class PreQDQCompileScorecardJobYaml(ScorecardJobYaml[CompileScorecardJob]):
+    ARTIFACT_TYPE = ScorecardArtifact.COMPILE_YAML
+    SCORECARD_JOB_TYPE = CompileScorecardJob
 
-    Note: Reuses ModelCompileSummary since link jobs are similar to compile jobs
-    (both produce compiled assets). A dedicated ModelLinkSummary can be added
-    later if needed.
-    """
+    def get_job_key(self, params: ScJobParams) -> str:
+        return params.pre_quantize_compile_job_id
 
+    def _get_all_job_params(self, params: ScExportTestParams) -> list[ScJobParams]:
+        return params.all_pre_qdq_compile_job_params
+
+
+class QuantizeScorecardJobYaml(ScorecardJobYaml[QuantizeScorecardJob]):
+    ARTIFACT_TYPE = ScorecardArtifact.QUANTIZE_YAML
+    SCORECARD_JOB_TYPE = QuantizeScorecardJob
+
+
+class CompileScorecardJobYaml(ScorecardJobYaml[CompileScorecardJob]):
+    ARTIFACT_TYPE = ScorecardArtifact.COMPILE_YAML
+    SCORECARD_JOB_TYPE = CompileScorecardJob
+
+
+class LinkScorecardJobYaml(ScorecardJobYaml[LinkScorecardJob]):
     ARTIFACT_TYPE = ScorecardArtifact.LINK_YAML
-    scorecard_job_type = LinkScorecardJob
-    scorecard_path_type = ScorecardCompilePath
-    scorecard_model_summary_type = ModelCompileSummary
+    SCORECARD_JOB_TYPE = LinkScorecardJob
 
 
-class ProfileScorecardJobYaml(
-    ScorecardJobYaml[ProfileScorecardJob, ScorecardProfilePath, ModelPerfSummary]
-):
+class ProfileScorecardJobYaml(ScorecardJobYaml[ProfileScorecardJob]):
     ARTIFACT_TYPE = ScorecardArtifact.PROFILE_YAML
-    scorecard_job_type = ProfileScorecardJob
-    scorecard_path_type = ScorecardProfilePath
-    scorecard_model_summary_type = ModelPerfSummary
+    SCORECARD_JOB_TYPE = ProfileScorecardJob
 
 
-class InferenceScorecardJobYaml(
-    ScorecardJobYaml[InferenceScorecardJob, ScorecardProfilePath, ModelInferenceSummary]
-):
+class InferenceScorecardJobYaml(ScorecardJobYaml[InferenceScorecardJob]):
     ARTIFACT_TYPE = ScorecardArtifact.INFERENCE_YAML
-    scorecard_job_type = InferenceScorecardJob
-    scorecard_path_type = ScorecardProfilePath
-    scorecard_model_summary_type = ModelInferenceSummary
-
-
-def get_scorecard_job_yaml_type(job_type: hub.JobType) -> type[ScorecardJobYaml]:
-    """Get the ScorecardJobYaml subclass for a given job type."""
-    if job_type == hub.JobType.COMPILE:
-        return CompileScorecardJobYaml
-    if job_type == hub.JobType.PROFILE:
-        return ProfileScorecardJobYaml
-    if job_type == hub.JobType.INFERENCE:
-        return InferenceScorecardJobYaml
-    if job_type == hub.JobType.QUANTIZE:
-        return QuantizeScorecardJobYaml
-    if job_type == hub.JobType.LINK:
-        return LinkScorecardJobYaml
-    raise NotImplementedError(
-        f"No file for storing test jobs of type {job_type.display_name}"
-    )
+    SCORECARD_JOB_TYPE = InferenceScorecardJob
 
 
 class ScorecardAssetYaml(BaseQAIHMConfig):

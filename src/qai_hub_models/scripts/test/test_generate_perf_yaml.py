@@ -11,10 +11,12 @@ from qai_hub_models.configs.devices_and_chipsets_yaml import load_similar_device
 from qai_hub_models.configs.info_yaml import QAIHMModelInfo
 from qai_hub_models.configs.perf_yaml import QAIHMModelPerf
 from qai_hub_models.models.common import Precision
-from qai_hub_models.scorecard.device import ScorecardDevice
+from qai_hub_models.scorecard.device import cs_8_gen_3
 from qai_hub_models.scorecard.path_profile import ScorecardProfilePath
+from qai_hub_models.scorecard.results.scorecard_summary import (
+    ModelTestConfig,
+)
 from qai_hub_models.scorecard.results.yaml import ProfileScorecardJobYaml
-from qai_hub_models.utils.collection_model_helpers import get_components
 from qai_hub_models.utils.hub_clients import deployment_is_prod
 
 EXPECTED_MODEL_CARD = QAIHMModelPerf.from_yaml(
@@ -32,26 +34,35 @@ def test_generate_perf(hub_test_deployment: str) -> None:
     job_ids = ProfileScorecardJobYaml.from_file(
         os.path.join(os.path.dirname(__file__), "profile_job_ids.yaml")
     )
-    model_info = QAIHMModelInfo.from_model("trocr")
-    component_names = get_components(model_info.id)
 
-    paramaterizations: list[
-        tuple[Precision, ScorecardProfilePath, ScorecardDevice]
-    ] = []
-    for device in ScorecardDevice.all_devices():
-        for path in ScorecardProfilePath:
-            for precision in model_info.code_gen_config.supported_precisions:
-                if path.supports_precision(precision) and device.npu_supports_precision(
-                    precision
-                ):
-                    paramaterizations.append((precision, path, device))  # noqa: PERF401
-
-    model_perf = job_ids.summary_from_model(
-        model_info.id,
-        paramaterizations,
-        component_names,
+    # Create enabled paramaterizations for this test
+    test_params = ModelTestConfig(
+        model_id="trocr",
+        component_names=["encoder", "decoder"],
+        graph_names=None,
+        component_graph_names=None,
+        profile_tests=[
+            (Precision.float, ScorecardProfilePath.TFLITE, cs_8_gen_3),
+            (Precision.float, ScorecardProfilePath.ONNX, cs_8_gen_3),
+        ],
+        inference_tests=[],
+        enabled_paths={},
     )
-    model_card = model_perf.get_perf_card()
+
+    # Get summaries for this model and its components.
+    summaries = test_params.get_all_export_test_summaries(
+        None,
+        None,
+        None,
+        None,
+        job_ids,
+        None,
+    )
+
+    model_card = QAIHMModelPerf()
+    for summary in summaries:
+        summary.add_to_perf(model_card)
+
     assert model_card == EXPECTED_MODEL_CARD
 
 
@@ -59,30 +70,19 @@ def _build_perf_card(model_id: str) -> QAIHMModelPerf:
     """Build a perf card from the checked-in intermediate job IDs."""
     job_ids = ProfileScorecardJobYaml.from_intermediates()
     model_info = QAIHMModelInfo.from_model(model_id)
-    component_names = get_components(model_info.id)
-
-    parameterizations: list[
-        tuple[Precision, ScorecardProfilePath, ScorecardDevice]
-    ] = []
-    for device in ScorecardDevice.all_devices():
-        for path in ScorecardProfilePath:
-            for precision in model_info.code_gen_config.supported_precisions:
-                if path.supports_precision(precision) and device.npu_supports_precision(
-                    precision
-                ):
-                    parameterizations.append((precision, path, device))  # noqa: PERF401
-
-    model_perf = job_ids.summary_from_model(
-        model_info.id,
-        parameterizations,
-        component_names,
+    test_params = ModelTestConfig.from_recipe_model(model_info)
+    summaries = test_params.get_all_export_test_summaries(
+        None,
+        None,
+        None,
+        None,
+        job_ids,
+        None,
     )
-    model_card = model_perf.get_perf_card(
-        include_failed_jobs=False,
-        include_unpublished_runtimes=False,
-        exclude_form_factors=model_info.private_perf_form_factors or [],
-        model_name=model_info.name,
-    )
+
+    model_card = QAIHMModelPerf()
+    for summary in summaries:
+        summary.add_to_perf(model_card, include_failures=False)
     model_card.apply_similar_devices(load_similar_devices())
     return model_card
 
