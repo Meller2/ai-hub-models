@@ -46,7 +46,6 @@ from qai_hub_models.scorecard.static.model_config import ScorecardModelConfig
 from qai_hub_models.scorecard.static.model_exec import (
     get_static_model_test_parameterizations,
 )
-from qai_hub_models.utils.collection_model_helpers import get_components
 
 # Maximum acceptable inference time (milliseconds).
 # Above this inference time, a model will not be published.
@@ -295,7 +294,12 @@ class ModelTestConfig:
     enabled_paths: dict[Precision, list[ScorecardProfilePath]]
 
     @staticmethod
-    def from_recipe_model(model_info: QAIHMModelInfo) -> ModelTestConfig:
+    def from_recipe_model(
+        model_info: QAIHMModelInfo,
+        component_names: list[str] | None = None,
+        graph_names: list[str] | None = None,
+        component_graph_names: dict[str, list[str]] | None = None,
+    ) -> ModelTestConfig:
         """Load the test configuration for the given PyTorch recipe model."""
         model_id = model_info.id
         cj = model_info.code_gen_config
@@ -314,8 +318,7 @@ class ModelTestConfig:
             ScorecardProfilePath,
             cj.can_use_quantize_job,
         )
-        # Get all enabled tests paramaterizations -- (precision + path + device pairings) -- for this model
-        component_names = get_components(model_id)
+
         profile_tests = get_profile_parameterized_pytest_config(
             model_id,
             model_supported_paths,
@@ -334,8 +337,8 @@ class ModelTestConfig:
         return ModelTestConfig(
             model_id=model_id,
             component_names=component_names,
-            graph_names=None,
-            component_graph_names=None,
+            graph_names=graph_names,
+            component_graph_names=component_graph_names,
             profile_tests=profile_tests,
             inference_tests=inference_tests,
             enabled_paths=enabled_paths,

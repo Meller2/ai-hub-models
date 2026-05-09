@@ -300,7 +300,7 @@ def main() -> None:
     # Prepare arguments for parallel processing
     args_list = [
         (hub_client, job_key, job_id, test_mode, wait_for_jobs)
-        for job_key, job_id in profile_yaml.job_id_mapping.items()
+        for job_key, job_id in profile_yaml.mapping.items()
     ]
 
     # Process jobs in parallel
@@ -316,7 +316,7 @@ def main() -> None:
         # Prepare arguments for parallel processing - job IDs and wait_for_jobs flag
         failure_args_list = [
             (hub_client, job_id, wait_for_jobs)
-            for job_id in profile_yaml.job_id_mapping.values()
+            for job_id in profile_yaml.mapping.values()
         ]
 
         # Process jobs in parallel to get all failure reasons
@@ -328,8 +328,8 @@ def main() -> None:
         # Process results
         for i, failure_reason in enumerate(failure_results):
             if failure_reason:
-                job_id = list(profile_yaml.job_id_mapping.values())[i]
-                job_key = list(profile_yaml.job_id_mapping.keys())[i]
+                job_id = list(profile_yaml.mapping.values())[i]
+                job_key = list(profile_yaml.mapping.keys())[i]
 
                 formatted_reason = f"Failed ({failure_reason})"
                 # Add to the dictionary or increment the count
@@ -473,7 +473,7 @@ def main() -> None:
 
     # Process results
     for job_key, new_job_id, _ in results:
-        profile_yaml.job_id_mapping[job_key] = new_job_id
+        profile_yaml.mapping[job_key] = new_job_id
         # Update flaky jobs info with new job ID
         if job_key in flaky_jobs_info.flaky_jobs:
             flaky_jobs_info.flaky_jobs[job_key].new_job_id = new_job_id

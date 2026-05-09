@@ -16,6 +16,8 @@ from qai_hub_models.scorecard.envvars import EnabledModelsEnvvar, SpecialModelSe
 
 # YAML files that should be merged by combining their key-value pairs
 MERGE_YAML_FILES = [
+    "component-names.yaml",
+    "graph-names.yaml",
     "compile-jobs.yaml",
     "link-jobs.yaml",
     "profile-jobs.yaml",

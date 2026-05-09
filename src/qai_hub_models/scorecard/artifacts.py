@@ -2,11 +2,20 @@
 # Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: BSD-3-Clause
 # ---------------------------------------------------------------------
+from __future__ import annotations
+
+import os
 from enum import Enum
 from pathlib import Path
+from typing import Generic, TypeVar
+
+import ruamel.yaml
+from typing_extensions import Self
 
 from qai_hub_models.scorecard.envvars import ArtifactsDirEnvvar
 from qai_hub_models.utils.path_helpers import QAIHM_PACKAGE_ROOT
+
+ValT = TypeVar("ValT")
 
 INTERMEDIATES_DIR = QAIHM_PACKAGE_ROOT / "scorecard" / "intermediates"
 
@@ -26,6 +35,8 @@ class ScorecardArtifact(Enum):
     DATE = "date.txt"
     ENVIRONMENT_FILE = "environment.env"
     TOOL_VERSIONS = "tool-versions.yaml"
+    COMPONENT_NAMES = "component-names.yaml"
+    GRAPH_NAMES = "graph-names.yaml"
     QUANTIZE_YAML = "quantize-jobs.yaml"
     COMPILE_YAML = "compile-jobs.yaml"
     COMPILE_JOBS_IDENTICAL_CACHE = "compile-jobs-are-identical-cache.yaml"
@@ -57,3 +68,61 @@ class ScorecardArtifact(Enum):
     def intermediates_path(self) -> Path:
         """Get the path for this artifact in the checked-in scorecard intermediates."""
         return INTERMEDIATES_DIR / self.value
+
+
+class ScorecardYamlFile(Generic[ValT]):
+    """Base class for YAML files backed by a dict[str, ValT] mapping."""
+
+    ARTIFACT_TYPE: ScorecardArtifact
+
+    def __init__(
+        self,
+        mapping: dict[str, ValT] | None = None,
+        path: str | os.PathLike | None = None,
+    ) -> None:
+        self.path = Path(path) if path else None
+        self.mapping: dict[str, ValT] = mapping or {}
+
+    @classmethod
+    def from_file(
+        cls, config_path: str | os.PathLike, create_empty_if_no_file: bool = False
+    ) -> Self:
+        if not os.path.exists(config_path):
+            if create_empty_if_no_file:
+                return cls({}, config_path)
+            raise FileNotFoundError(f"File not found: {config_path}")
+        yaml = ruamel.yaml.YAML()
+        with open(config_path) as f:
+            data = yaml.load(f) or {}
+        return cls(data, config_path)
+
+    @classmethod
+    def from_intermediates(cls) -> Self:
+        return cls.from_file(
+            cls.ARTIFACT_TYPE.intermediates_path, create_empty_if_no_file=True
+        )
+
+    @classmethod
+    def from_test_artifacts(cls) -> Self:
+        return cls.from_file(cls.ARTIFACT_TYPE.path, create_empty_if_no_file=True)
+
+    def clear(self, model_id: str | None = None) -> None:
+        if not model_id:
+            self.mapping.clear()
+        else:
+            keys_to_delete = [
+                key
+                for key in self.mapping
+                if key == model_id or key.startswith(f"{model_id}_")
+            ]
+            for key in keys_to_delete:
+                del self.mapping[key]
+
+    def to_file(self, path: str | Path | None = None) -> None:
+        path = path or self.path
+        assert path is not None
+        if self.mapping:
+            with open(path, "w") as f:
+                ruamel.yaml.YAML().dump(self.mapping, f)
+        else:
+            Path(path).touch()

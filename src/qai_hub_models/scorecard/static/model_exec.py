@@ -68,7 +68,7 @@ def _get_successful_compile_job_or_failure_message(
     params: ScJobParams,
     cache: dict[str, tuple[CompileJob, JobStatus]],
 ) -> CompileJob | str:
-    compile_job_id = compile_results.job_id_mapping.get(params.compile_job_id)
+    compile_job_id = compile_results.mapping.get(params.compile_job_id)
     if not compile_job_id:
         return "Associated Compile Job Not Found"
 

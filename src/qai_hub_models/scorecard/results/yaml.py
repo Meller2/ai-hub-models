@@ -12,14 +12,13 @@ from typing import Generic, TypeVar
 import ruamel.yaml
 from pydantic import Field
 from qai_hub import JobType
-from typing_extensions import Self
 
 from qai_hub_models.configs.release_assets_yaml import (
     QAIHMModelReleaseAssets,
 )
 from qai_hub_models.configs.tool_versions import ToolVersions
 from qai_hub_models.models.common import Precision
-from qai_hub_models.scorecard.artifacts import ScorecardArtifact
+from qai_hub_models.scorecard.artifacts import ScorecardArtifact, ScorecardYamlFile
 from qai_hub_models.scorecard.device import ScorecardDevice
 from qai_hub_models.scorecard.errors import CachedScorecardJobError
 from qai_hub_models.scorecard.params import JobTypeVar, ScExportTestParams, ScJobParams
@@ -80,73 +79,27 @@ class ToolVersionsByPathYaml(BaseQAIHMConfig):
         return self.to_yaml(Path(dirpath) / filename, write_if_empty=False)
 
 
-class ScorecardJobYaml(Generic[ScorecardJobTypeVar]):
-    ARTIFACT_TYPE: ScorecardArtifact
+class ScorecardJobYaml(ScorecardYamlFile[str], Generic[ScorecardJobTypeVar]):
     SCORECARD_JOB_TYPE: type[ScorecardJobTypeVar]
 
     def __init__(
         self,
-        job_id_mapping: dict[str, str] | None = None,
+        mapping: dict[str, str] | None = None,
         path: str | os.PathLike | None = None,
     ) -> None:
-        self.path = Path(path) if path else None
-        self.job_id_mapping = job_id_mapping or {}
+        super().__init__(mapping, path)
         # ScorecardJob classes are expensive to create
         # (workbench API calls), so we cache them.
         self.job_cache: dict[str, ScorecardJobTypeVar] = {}
 
-    @classmethod
-    def from_file(
-        cls, config_path: str | os.PathLike, create_empty_if_no_file: bool = False
-    ) -> Self:
-        """Read yaml files."""
-        if not os.path.exists(config_path):
-            if create_empty_if_no_file:
-                return cls({}, config_path)
-            raise FileNotFoundError(f"File not found with job ids at {config_path}")
-
-        yaml = ruamel.yaml.YAML()
-        with open(config_path) as file:
-            return cls(yaml.load(file), config_path)
-
-    @classmethod
-    def from_intermediates(cls) -> Self:
-        return cls.from_file(
-            cls.ARTIFACT_TYPE.intermediates_path, create_empty_if_no_file=True
-        )
-
-    @classmethod
-    def from_test_artifacts(cls) -> Self:
-        return cls.from_file(cls.ARTIFACT_TYPE.path, create_empty_if_no_file=True)
-
     def to_file(self, path: str | Path | None = None, append: bool = False) -> None:
         path = path or self.path
         assert path is not None
-        if len(self.job_id_mapping) > 0:
+        if len(self.mapping) > 0:
             with open(path, "a" if append else "w") as yaml_file:
-                ruamel.yaml.YAML().dump(self.job_id_mapping, yaml_file)
+                ruamel.yaml.YAML().dump(self.mapping, yaml_file)
         elif not append:
-            # If the dict is empty, ruamel dumps "{}" (which is not YAML) and breaks the file
             Path(path).touch()
-
-    def clear_jobs(self, model_id: str | None = None) -> None:
-        if not model_id:
-            self.job_id_mapping.clear()
-        else:
-            # find jobs to delete
-            # catch "model", ignore "model_quantized"
-            keys_to_delete = [
-                key
-                for key in self.job_id_mapping
-                if (
-                    key.startswith(f"{model_id}_")
-                    and not key.startswith(f"{model_id}_quantized_")
-                )
-            ]
-
-            # Delete keys
-            for key in keys_to_delete:
-                del self.job_id_mapping[key]
 
     def get_job_key(self, params: ScJobParams) -> str:
         return params.job_id(self.SCORECARD_JOB_TYPE.job_type)
@@ -162,7 +115,7 @@ class ScorecardJobYaml(Generic[ScorecardJobTypeVar]):
         params
             Job identification parameters
         """
-        self.job_id_mapping[self.get_job_key(params)] = job_id
+        self.mapping[self.get_job_key(params)] = job_id
 
     def update(self, other: ScorecardJobYaml) -> None:
         """Merge the other YAML into this YAML, overwriting any existing jobs with the same job name"""
@@ -170,7 +123,7 @@ class ScorecardJobYaml(Generic[ScorecardJobTypeVar]):
             raise ValueError(
                 f"Cannot merge scorecard YAMLS of types {type(other)} and {type(self)}"
             )
-        self.job_id_mapping.update(other.job_id_mapping)
+        self.mapping.update(other.mapping)
 
     def get_job(
         self,
@@ -202,7 +155,7 @@ class ScorecardJobYaml(Generic[ScorecardJobTypeVar]):
         key = self.get_job_key(params)
         job = self.job_cache.get(key)
         if job is None:
-            if job_id := self.job_id_mapping.get(key):
+            if job_id := self.mapping.get(key):
                 job = self.SCORECARD_JOB_TYPE(job_id)
                 # ScorecardJob classes are expensive to create
                 # (workbench API calls), so we cache them.
@@ -429,6 +382,76 @@ class ProfileScorecardJobYaml(ScorecardJobYaml[ProfileScorecardJob]):
 class InferenceScorecardJobYaml(ScorecardJobYaml[InferenceScorecardJob]):
     ARTIFACT_TYPE = ScorecardArtifact.INFERENCE_YAML
     SCORECARD_JOB_TYPE = InferenceScorecardJob
+
+
+class ComponentNamesYaml(ScorecardYamlFile[list[str]]):
+    """Maps model_id -> list of component names."""
+
+    ARTIFACT_TYPE = ScorecardArtifact.COMPONENT_NAMES
+
+    def set(self, model_id: str, component_names: list[str]) -> None:
+        self.mapping[model_id] = component_names
+
+    def get(self, model_id: str) -> list[str] | None:
+        return self.mapping.get(model_id)
+
+
+class GraphNamesYaml(ScorecardYamlFile[list[str]]):
+    """Maps model_id_component_name -> list of graph names."""
+
+    ARTIFACT_TYPE = ScorecardArtifact.GRAPH_NAMES
+
+    @staticmethod
+    def _key(model_id: str, component_name: str) -> str:
+        return f"{model_id}_{component_name}"
+
+    def set(self, model_id: str, component_name: str, graph_names: list[str]) -> None:
+        self.mapping[self._key(model_id, component_name)] = graph_names
+
+    def get(self, model_id: str, component_name: str) -> list[str] | None:
+        return self.mapping.get(self._key(model_id, component_name))
+
+
+def get_model_component_and_graph_names(
+    model_id: str,
+    component_names_yaml: ComponentNamesYaml,
+    graph_names_yaml: GraphNamesYaml,
+) -> tuple[list[str] | None, list[str] | None, dict[str, list[str]] | None]:
+    """
+    Extract component names, graph names, and component-graph-names mapping for a model.
+
+    Parameters
+    ----------
+    model_id
+        Model identifier.
+    component_names_yaml
+        YAML containing component names for each model.
+    graph_names_yaml
+        YAML containing graph names for each model component.
+
+    Returns
+    -------
+    component_names : list[str] | None
+        List of component names, or None if this model has no components.
+    graph_names : list[str] | None
+        List of graph names for a single-component model, or None.
+    component_graph_names : dict[str, list[str]] | None
+        Mapping of component name to graph names for multi-component models, or None.
+    """
+    component_names = component_names_yaml.get(model_id)
+
+    graph_names: list[str] | None = None
+    component_graph_names: dict[str, list[str]] | None = None
+    if component_names is not None:
+        for comp_name in component_names:
+            gn = graph_names_yaml.get(model_id, comp_name)
+            if gn is not None:
+                component_graph_names = component_graph_names or {}
+                component_graph_names[comp_name] = gn
+    else:
+        graph_names = graph_names_yaml.get(model_id, model_id)
+
+    return component_names, graph_names, component_graph_names
 
 
 class ScorecardAssetYaml(BaseQAIHMConfig):

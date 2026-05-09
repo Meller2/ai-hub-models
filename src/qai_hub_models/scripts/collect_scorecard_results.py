@@ -44,12 +44,14 @@ from qai_hub_models.scorecard.results.scorecard_summary import (
 from qai_hub_models.scorecard.results.spreadsheet import ResultsSpreadsheet
 from qai_hub_models.scorecard.results.yaml import (
     CompileScorecardJobYaml,
+    ComponentNamesYaml,
+    GraphNamesYaml,
     InferenceScorecardJobYaml,
     LinkScorecardJobYaml,
     PreQDQCompileScorecardJobYaml,
     ProfileScorecardJobYaml,
     QuantizeScorecardJobYaml,
-    ScorecardJobYaml,
+    get_model_component_and_graph_names,
 )
 from qai_hub_models.scorecard.static.list_models import (
     validate_and_split_enabled_models,
@@ -83,18 +85,6 @@ def write_jobs_config(config: dict, path: str) -> None:
         yaml.dump(config, file)
 
 
-def clear_jobs(
-    yamls: ScorecardJobYaml,
-    model_list: list[str],
-    all_models: bool,
-) -> None:
-    if all_models:
-        yamls.clear_jobs()
-    else:
-        for model in model_list:
-            yamls.clear_jobs(model)
-
-
 def remove_failed_jobs(config: dict) -> None:
     """
     Failed jobs need to be in the config to get their job ids for summary but
@@ -115,31 +105,6 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     EnabledModelsEnvvar.add_arg(parser)
-    parser.add_argument(
-        "--quantize-ids",
-        type=str,
-        help="Comma-separated list of paths to additional quantize job yamls. Jobs in these YAMLS will be added to or override jobs in the existing quantize job intermediates YAML. YAML specified later in the list will override identical jobs in previous YAML.",
-    )
-    parser.add_argument(
-        "--profile-ids",
-        type=str,
-        help="Comma-separated list of paths to additional profile job yamls. Jobs in these YAMLS will be added to or override jobs in the existing profile job intermediates YAML. YAML specified later in the list will override identical jobs in previous YAML.",
-    )
-    parser.add_argument(
-        "--compile-ids",
-        type=str,
-        help="Comma-separated list of paths to additional compile job yamls. Jobs in these YAMLS will be added to or override jobs in the existing compile job intermediates YAML. YAML specified later in the list will override identical jobs in previous YAML.",
-    )
-    parser.add_argument(
-        "--link-ids",
-        type=str,
-        help="Comma-separated list of paths to additional link job yamls. Jobs in these YAMLS will be added to or override jobs in the existing link job intermediates YAML. YAML specified later in the list will override identical jobs in previous YAML.",
-    )
-    parser.add_argument(
-        "--inference-ids",
-        type=str,
-        help="Comma-separated list of paths to additional inference job yamls. Jobs in these YAMLS will be added to or override jobs in the existing inference job intermediates YAML. YAML specified later in the list will override identical jobs in previous YAML.",
-    )
     IgnoreExistingIntermediateJobsDuringCollectionEnvvar.add_arg(parser)
     StaticModelsDirEnvvar.add_arg(parser)
     parser.add_argument(
@@ -169,6 +134,8 @@ def process_model(
     model_id: str,
     deployment: str,
     static_models_dir: Path,
+    component_names_yaml: ComponentNamesYaml,
+    graph_names_yaml: GraphNamesYaml,
     pre_qdq_job_yamls: PreQDQCompileScorecardJobYaml,
     quantize_job_yamls: QuantizeScorecardJobYaml,
     compile_job_yamls: CompileScorecardJobYaml,
@@ -191,6 +158,10 @@ def process_model(
         Deployment environment.
     static_models_dir
         Directory containing static model configurations.
+    component_names_yaml
+        YAML containing component names for each model.
+    graph_names_yaml
+        YAML containing graph names for each model component.
     pre_qdq_job_yamls
         YAML containing pre qdq compile job information.
     quantize_job_yamls
@@ -228,6 +199,8 @@ def process_model(
             # This model has an end to end pyTorch recipe.
             return process_e2e_recipe_model(
                 model_id,
+                component_names_yaml,
+                graph_names_yaml,
                 pre_qdq_job_yamls,
                 quantize_job_yamls,
                 compile_job_yamls,
@@ -274,6 +247,8 @@ def _get_static_tags(model_info: ScorecardModelConfig) -> list[str]:
 
 def process_e2e_recipe_model(
     model_id: str,
+    component_names_yaml: ComponentNamesYaml,
+    graph_names_yaml: GraphNamesYaml,
     pre_qdq_job_yamls: PreQDQCompileScorecardJobYaml,
     quantize_job_yamls: QuantizeScorecardJobYaml,
     compile_job_yamls: CompileScorecardJobYaml,
@@ -292,6 +267,10 @@ def process_e2e_recipe_model(
     ----------
     model_id
         Model identifier.
+    component_names_yaml
+        YAML containing component names for each model.
+    graph_names_yaml
+        YAML containing graph names for each model component.
     pre_qdq_job_yamls
         YAML containing pre qdq compile job information.
     quantize_job_yamls
@@ -335,7 +314,14 @@ def process_e2e_recipe_model(
         return ResultsSpreadsheet(), None, None
 
     # Get enabled test paths for this model
-    test_params = ModelTestConfig.from_recipe_model(model_info)
+    component_names, graph_names, component_graph_names = (
+        get_model_component_and_graph_names(
+            model_id, component_names_yaml, graph_names_yaml
+        )
+    )
+    test_params = ModelTestConfig.from_recipe_model(
+        model_info, component_names, graph_names, component_graph_names
+    )
 
     # Get summaries for this model and its components.
     print_with_id("Loading summary")
@@ -461,16 +447,6 @@ if __name__ == "__main__":
         print("Warning: Can't sync code gen if deployment is not prod.")
         args.sync_code_gen = False
 
-    # If job ids file isn't specified, check the artifacts dir in CI
-    # Or the scorecard intermediates if being run locally.
-    args.quantize_ids = args.quantize_ids or str(ScorecardArtifact.QUANTIZE_YAML.path)
-    args.compile_ids = args.compile_ids or str(ScorecardArtifact.COMPILE_YAML.path)
-    args.link_ids = args.link_ids or str(ScorecardArtifact.LINK_YAML.path)
-    args.profile_ids = args.profile_ids or str(ScorecardArtifact.PROFILE_YAML.path)
-    args.inference_ids = args.inference_ids or str(
-        ScorecardArtifact.INFERENCE_YAML.path
-    )
-
     os.makedirs(args.artifacts_dir, exist_ok=True)
     now_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
@@ -490,6 +466,8 @@ if __name__ == "__main__":
     # Load Base YAMLs
     if using_prod_hub:
         # Load previous scorecard state
+        component_names_yaml = ComponentNamesYaml.from_intermediates()
+        graph_names_yaml = GraphNamesYaml.from_intermediates()
         pre_qdq_job_yamls = PreQDQCompileScorecardJobYaml.from_intermediates()
         quantize_job_yamls = QuantizeScorecardJobYaml.from_intermediates()
         compile_job_yamls = CompileScorecardJobYaml.from_intermediates()
@@ -499,14 +477,29 @@ if __name__ == "__main__":
 
         # Erase jobs for models we're collecting results for, if applicable
         if args.ignore_existing_intermediate_jobs:
-            clear_jobs(pre_qdq_job_yamls, model_list, all_models)
-            clear_jobs(quantize_job_yamls, model_list, all_models)
-            clear_jobs(compile_job_yamls, model_list, all_models)
-            clear_jobs(link_job_yamls, model_list, all_models)
-            clear_jobs(profile_job_yamls, model_list, all_models)
-            clear_jobs(inference_job_yamls, model_list, all_models)
+            if all_models:
+                component_names_yaml.clear()
+                graph_names_yaml.clear()
+                pre_qdq_job_yamls.clear()
+                quantize_job_yamls.clear()
+                compile_job_yamls.clear()
+                link_job_yamls.clear()
+                profile_job_yamls.clear()
+                inference_job_yamls.clear()
+            else:
+                for model in model_list:
+                    component_names_yaml.clear(model)
+                    graph_names_yaml.clear(model)
+                    pre_qdq_job_yamls.clear(model)
+                    quantize_job_yamls.clear(model)
+                    compile_job_yamls.clear(model)
+                    link_job_yamls.clear(model)
+                    profile_job_yamls.clear(model)
+                    inference_job_yamls.clear(model)
     else:
         # Previous scorecard state is applicable only on prod
+        component_names_yaml = ComponentNamesYaml()
+        graph_names_yaml = GraphNamesYaml()
         pre_qdq_job_yamls = PreQDQCompileScorecardJobYaml()
         quantize_job_yamls = QuantizeScorecardJobYaml()
         compile_job_yamls = CompileScorecardJobYaml()
@@ -514,42 +507,17 @@ if __name__ == "__main__":
         profile_job_yamls = ProfileScorecardJobYaml()
         inference_job_yamls = InferenceScorecardJobYaml()
 
-    # Append additional YAMLs
-    for quantize_yaml_path in args.quantize_ids.split(",") if args.quantize_ids else []:
-        quantize_job_yamls.update(
-            QuantizeScorecardJobYaml.from_file(
-                quantize_yaml_path, create_empty_if_no_file=True
-            )
-        )
-    for compile_yaml_path in args.compile_ids.split(",") if args.compile_ids else []:
-        compile_job_yamls.update(
-            CompileScorecardJobYaml.from_file(
-                compile_yaml_path, create_empty_if_no_file=True
-            )
-        )
-        pre_qdq_job_yamls.update(
-            PreQDQCompileScorecardJobYaml.from_file(
-                compile_yaml_path, create_empty_if_no_file=True
-            )
-        )
-    for link_yaml_path in args.link_ids.split(",") if args.link_ids else []:
-        link_job_yamls.update(
-            LinkScorecardJobYaml.from_file(link_yaml_path, create_empty_if_no_file=True)
-        )
-    for profile_yaml_path in args.profile_ids.split(",") if args.profile_ids else []:
-        profile_job_yamls.update(
-            ProfileScorecardJobYaml.from_file(
-                profile_yaml_path, create_empty_if_no_file=True
-            )
-        )
-    for inference_yaml_path in (
-        args.inference_ids.split(",") if args.inference_ids else []
-    ):
-        inference_job_yamls.update(
-            InferenceScorecardJobYaml.from_file(
-                inference_yaml_path, create_empty_if_no_file=True
-            )
-        )
+    # Append job results from test artifacts
+    component_names_yaml.mapping.update(
+        ComponentNamesYaml.from_test_artifacts().mapping
+    )
+    graph_names_yaml.mapping.update(GraphNamesYaml.from_test_artifacts().mapping)
+    pre_qdq_job_yamls.update(PreQDQCompileScorecardJobYaml.from_test_artifacts())
+    quantize_job_yamls.update(QuantizeScorecardJobYaml.from_test_artifacts())
+    compile_job_yamls.update(CompileScorecardJobYaml.from_test_artifacts())
+    link_job_yamls.update(LinkScorecardJobYaml.from_test_artifacts())
+    profile_job_yamls.update(ProfileScorecardJobYaml.from_test_artifacts())
+    inference_job_yamls.update(InferenceScorecardJobYaml.from_test_artifacts())
 
     # Extract Data from Models
     if len(model_list) > 1:
@@ -561,6 +529,8 @@ if __name__ == "__main__":
                 model_list,
                 cycle([args.deployment]),
                 cycle([static_model_dir]),
+                cycle([component_names_yaml]),
+                cycle([graph_names_yaml]),
                 cycle([pre_qdq_job_yamls]),
                 cycle([quantize_job_yamls]),
                 cycle([compile_job_yamls]),
@@ -581,6 +551,8 @@ if __name__ == "__main__":
                 model_list[0],
                 args.deployment,
                 static_model_dir,
+                component_names_yaml,
+                graph_names_yaml,
                 pre_qdq_job_yamls,
                 quantize_job_yamls,
                 compile_job_yamls,
@@ -647,11 +619,15 @@ if __name__ == "__main__":
 
     # Write jobs and environment to intermediates folder
     if using_prod_hub:
+        component_names_yaml.to_file()
+        graph_names_yaml.to_file()
         quantize_job_yamls.to_file()
         compile_job_yamls.to_file()
         link_job_yamls.to_file()
         profile_job_yamls.to_file()
         inference_job_yamls.to_file()
+        print(f"Component Names written to {component_names_yaml.path}")
+        print(f"Graph Names written to {graph_names_yaml.path}")
         print(f"Quantize Job IDs written to {quantize_job_yamls.path}")
         print(f"Compile Job IDs written to {compile_job_yamls.path}")
         print(f"Link Job IDs written to {link_job_yamls.path}")

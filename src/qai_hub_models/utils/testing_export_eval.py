@@ -47,6 +47,8 @@ from qai_hub_models.scorecard.params import (
 )
 from qai_hub_models.scorecard.results.yaml import (
     CompileScorecardJobYaml,
+    ComponentNamesYaml,
+    GraphNamesYaml,
     InferenceScorecardJobYaml,
     LinkScorecardJobYaml,
     PreQDQCompileScorecardJobYaml,
@@ -121,8 +123,9 @@ ExportFunc = Callable[
 JobFunc = Callable[..., hub.Job | dict[str, hub.Job]]
 
 
-def _get_components_and_graph_names(
+def _get_componens_and_graph_names(
     model: Any,
+    model_id: str | None = None,
 ) -> tuple[list[str] | None, list[str] | None, dict[str, list[str]] | None]:
     components: list[str] | None = None
     graph_names: list[str] | None = None
@@ -139,7 +142,35 @@ def _get_components_and_graph_names(
     elif isinstance(model, MultiGraphBaseModel):
         graph_names = list(model.get_input_spec().keys())
 
+    if model_id is not None:
+        _stash_component_graph_names(
+            model_id, components, graph_names, component_graph_names
+        )
+
     return components, graph_names, component_graph_names
+
+
+def _stash_component_graph_names(
+    model_id: str,
+    components: list[str] | None,
+    graph_names: list[str] | None,
+    component_graph_names: dict[str, list[str]] | None,
+) -> None:
+    """Write component and graph names to scorecard artifact YAMLs."""
+    if components is not None:
+        comp_cache = ComponentNamesYaml.from_test_artifacts()
+        comp_cache.set(model_id, components)
+        comp_cache.to_file(ScorecardArtifact.COMPONENT_NAMES.touch())
+
+    if component_graph_names is not None:
+        gn_cache = GraphNamesYaml.from_test_artifacts()
+        for comp_name, gn_list in component_graph_names.items():
+            gn_cache.set(model_id, comp_name, gn_list)
+        gn_cache.to_file(ScorecardArtifact.GRAPH_NAMES.touch())
+    elif graph_names is not None:
+        gn_cache = GraphNamesYaml.from_test_artifacts()
+        gn_cache.set(model_id, model_id, graph_names)
+        gn_cache.to_file(ScorecardArtifact.GRAPH_NAMES.touch())
 
 
 def _invalid_job_submission(*args: Any, **kwargs: Any) -> None:
@@ -469,7 +500,7 @@ def pre_quantize_compile_via_export(
         QAIHM instance of the model.
     """
     component_names, graph_names, component_graph_names = (
-        _get_components_and_graph_names(model)
+        _get_componens_and_graph_names(model, model_id)
     )
     assert component_graph_names is None, (
         "Auto-quantization of multi-graph models is not supported"
@@ -529,7 +560,7 @@ def quantize_via_export(
         Model precision.
     """
     component_names, graph_names, component_graph_names = (
-        _get_components_and_graph_names(model)
+        _get_componens_and_graph_names(model, model_id)
     )
     assert component_graph_names is None, (
         "Auto-quantization of multi-graph models is not supported"
@@ -621,7 +652,7 @@ def compile_via_export(
         Whether the model uses local aimet encodings during compilation.
     """
     component_names, graph_names, component_graph_names = (
-        _get_components_and_graph_names(model)
+        _get_componens_and_graph_names(model, model_id)
     )
     test_params = ScExportTestParams(
         model_id,
@@ -726,7 +757,7 @@ def link_via_export(
     assert scorecard_path.runtime.uses_hub_link
 
     component_names, graph_names, component_graph_names = (
-        _get_components_and_graph_names(model)
+        _get_componens_and_graph_names(model, model_id)
     )
     test_params = ScExportTestParams(
         model_id,
@@ -986,7 +1017,7 @@ def profile_via_export(
         Scorecard device.
     """
     component_names, graph_names, component_graph_names = (
-        _get_components_and_graph_names(model)
+        _get_componens_and_graph_names(model, model_id)
     )
     test_params = ScExportTestParams(
         model_id,
@@ -1070,7 +1101,7 @@ def inference_via_export(
         Scorecard device.
     """
     component_names, graph_names, component_graph_names = (
-        _get_components_and_graph_names(model)
+        _get_componens_and_graph_names(model, model_id)
     )
     test_params = ScExportTestParams(
         model_id,
@@ -1341,7 +1372,7 @@ def on_device_inference_for_accuracy_validation(
         Scorecard device.
     """
     component_names, graph_names, component_graph_names = (
-        _get_components_and_graph_names(model)
+        _get_componens_and_graph_names(model, model_id)
     )
     assert graph_names is None and component_graph_names is None, (
         "Graph names are not supported for on-device inference"
@@ -1601,7 +1632,7 @@ def accuracy_on_sample_inputs_via_export(
         Default is None.
     """
     component_names, graph_names, component_graph_names = (
-        _get_components_and_graph_names(model)
+        _get_componens_and_graph_names(model, model_id)
     )
     assert graph_names is None and component_graph_names is None, (
         "Graph names are not supported for on-device inference"
@@ -1742,7 +1773,7 @@ def accuracy_on_dataset_via_evaluate_and_export(
 
     """
     component_names, graph_names, component_graph_names = (
-        _get_components_and_graph_names(model)
+        _get_componens_and_graph_names(model, model_id)
     )
     assert graph_names is None and component_graph_names is None, (
         "Graph names are not supported for on-device inference"
@@ -1986,7 +2017,7 @@ def sim_accuracy_on_dataset(
 
     """
     component_names, graph_names, component_graph_names = (
-        _get_components_and_graph_names(model)
+        _get_componens_and_graph_names(model, model_id)
     )
     assert (
         component_names is None

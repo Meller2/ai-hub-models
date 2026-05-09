@@ -16,7 +16,12 @@ from qai_hub_models.scorecard.path_profile import ScorecardProfilePath
 from qai_hub_models.scorecard.results.scorecard_summary import (
     ModelTestConfig,
 )
-from qai_hub_models.scorecard.results.yaml import ProfileScorecardJobYaml
+from qai_hub_models.scorecard.results.yaml import (
+    ComponentNamesYaml,
+    GraphNamesYaml,
+    ProfileScorecardJobYaml,
+    get_model_component_and_graph_names,
+)
 from qai_hub_models.utils.hub_clients import deployment_is_prod
 
 EXPECTED_MODEL_CARD = QAIHMModelPerf.from_yaml(
@@ -70,7 +75,17 @@ def _build_perf_card(model_id: str) -> QAIHMModelPerf:
     """Build a perf card from the checked-in intermediate job IDs."""
     job_ids = ProfileScorecardJobYaml.from_intermediates()
     model_info = QAIHMModelInfo.from_model(model_id)
-    test_params = ModelTestConfig.from_recipe_model(model_info)
+
+    component_names, graph_names, component_graph_names = (
+        get_model_component_and_graph_names(
+            model_id,
+            ComponentNamesYaml.from_test_artifacts(),
+            GraphNamesYaml.from_test_artifacts(),
+        )
+    )
+    test_params = ModelTestConfig.from_recipe_model(
+        model_info, component_names, graph_names, component_graph_names
+    )
     summaries = test_params.get_all_export_test_summaries(
         None,
         None,
