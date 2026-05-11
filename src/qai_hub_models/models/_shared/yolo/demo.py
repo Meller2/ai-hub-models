@@ -11,6 +11,7 @@ from PIL import Image
 
 from qai_hub_models.models._shared.yolo.app import (
     YoloObjectDetectionApp,
+    YoloPoseApp,
     YoloSegmentationApp,
 )
 from qai_hub_models.utils.args import (
@@ -129,3 +130,38 @@ def yolo_segmentation_demo(
 
     if not is_test:
         display_or_save_image(image_annotated, args.output_dir)
+
+
+def yolo_pose_estimation_demo(
+    model_type: type[BaseModel],
+    model_id: str,
+    app_type: Callable[..., YoloPoseApp],
+    default_image: str | CachedWebAsset,
+    output_filename: str = "yolo_pose_demo_output.png",
+    is_test: bool = False,
+) -> None:
+    # Demo parameters
+    parser = get_model_cli_parser(model_type)
+    parser = get_on_device_demo_parser(parser, add_output_dir=True)
+    parser.add_argument(
+        "--image",
+        type=str,
+        default=default_image,
+        help="image file path or URL",
+    )
+    args = parser.parse_args([] if is_test else None)
+    validate_on_device_demo_args(args, model_id)
+
+    model = demo_model_from_cli_args(model_type, model_id, args)
+    print("Model Loaded")
+    image = load_image(args.image)
+
+    app = app_type(model)
+    keypoint_images = app.predict_pose_keypoints(image)
+    if not is_test:
+        display_or_save_image(
+            keypoint_images[0],
+            args.output_dir,
+            output_filename,
+            "keypoints",
+        )

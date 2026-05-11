@@ -14,9 +14,15 @@ import torch.nn.functional as F
 from PIL import Image
 from torchvision.transforms import Resize
 
+from qai_hub_models.datasets.coco_keypoints import COCO_SKELETON
 from qai_hub_models.models._shared.yolo.utils import detect_postprocess
 from qai_hub_models.utils.bounding_box_processing import batched_nms
-from qai_hub_models.utils.draw import create_color_map, draw_box_from_xyxy
+from qai_hub_models.utils.draw import (
+    create_color_map,
+    draw_box_from_xyxy,
+    draw_connections,
+    draw_points,
+)
 from qai_hub_models.utils.image_processing import app_to_net_image_inputs
 
 
@@ -458,3 +464,175 @@ class YoloSegmentationApp:
                 )
             )
         return out
+
+
+class YoloPoseApp:
+    """
+    Light-weight app for end-to-end inference with YOLO pose estimation models.
+
+    For a given image input, the app will:
+        * pre-process the image (convert to range [0, 1])
+        * Run YOLO pose inference
+        * Post-process the output using NMS to extract confident detections
+        * Optionally draw keypoints and skeleton on the image
+    """
+
+    def __init__(
+        self,
+        model: Callable[
+            [torch.Tensor], tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        ],
+        nms_score_threshold: float = 0.45,
+        nms_iou_threshold: float = 0.7,
+        input_height: int = 640,
+        input_width: int = 640,
+    ) -> None:
+        """
+        Initialize a YoloPoseApp application.
+
+        Parameters
+        ----------
+        model
+            YOLO pose estimation model.
+
+            Inputs:
+                Tensor of shape (N, 3, H, W) with range [0, 1] and RGB channel layout.
+
+            Outputs:
+                boxes: Tensor of shape [batch, num_preds, 4] where 4 == (x1, y1, x2, y2).
+                scores: Tensor of shape [batch, num_preds].
+                keypoints: Tensor of shape [batch, num_preds, num_keypoints, 3]
+                          where 3 == (x, y, visibility).
+
+        nms_score_threshold
+            Confidence score threshold for NMS; detections below this are discarded.
+
+        nms_iou_threshold
+            IoU threshold for NMS duplicate suppression.
+
+        input_height
+            Input height for the model.
+
+        input_width
+            Input width for the model.
+        """
+        self.model = model
+        self.nms_score_threshold = nms_score_threshold
+        self.nms_iou_threshold = nms_iou_threshold
+        self.input_height = input_height
+        self.input_width = input_width
+
+    def check_image_size(self, pixel_values: torch.Tensor) -> None:
+        """Verify image size is valid model input."""
+        if not all(s % 32 == 0 for s in pixel_values.shape[-2:]):
+            raise ValueError(
+                f"Image dimensions must be divisible by 32. Got {pixel_values.shape[-2:]}"
+            )
+
+    def preprocess_input(self, pixel_values: torch.Tensor) -> torch.Tensor:
+        """Resize or otherwise prepare the input tensor before inference."""
+        img_size = (self.input_height, self.input_width)
+        return Resize(img_size)(pixel_values)
+
+    def predict(self, *args: Any, **kwargs: Any) -> np.ndarray | list[Image.Image]:
+        # See predict_pose_keypoints.
+        return self.predict_pose_keypoints(*args, **kwargs)
+
+    def predict_pose_keypoints(
+        self,
+        pixel_values_or_image: torch.Tensor
+        | np.ndarray
+        | Image.Image
+        | list[Image.Image],
+        raw_output: bool = False,
+    ) -> np.ndarray | list[Image.Image]:
+        """
+        Predicts pose keypoints for persons in the image.
+
+        Parameters
+        ----------
+        pixel_values_or_image
+            PIL image(s)
+            or
+            numpy array (N H W C x uint8) or (H W C x uint8) -- both RGB channel layout
+            or
+            pyTorch tensor (N C H W x fp32, value range is [0, 1]), RGB channel layout
+
+        raw_output
+            See "returns" doc section for details.
+
+        Returns
+        -------
+        result : np.ndarray | list[Image.Image]
+            If raw_output is True, returns:
+            keypoints
+                List of numpy arrays (one per batch image), each of shape
+                [num_detections, num_keypoints, 3].
+                Each keypoint is an (x, y, visibility) tuple within the image.
+
+            If raw_output is False, returns:
+            predicted_images
+                Images with keypoints and skeleton drawn.
+        """
+        # Input Prep
+        NHWC_int_numpy_frames, NCHW_fp32_torch_frames = app_to_net_image_inputs(
+            pixel_values_or_image
+        )
+        NCHW_fp32_torch_frames = self.preprocess_input(NCHW_fp32_torch_frames)
+        self.check_image_size(NCHW_fp32_torch_frames)
+
+        # Rebuild NHWC uint8 frames from the (possibly resized) tensor so that
+        # keypoints, which are in the preprocessed coordinate space, are drawn
+        # on an image of the same spatial dimensions.
+        NHWC_int_numpy_frames = [
+            (NCHW_fp32_torch_frames[i].permute(1, 2, 0).numpy() * 255)
+            .clip(0, 255)
+            .astype(np.uint8)
+            for i in range(NCHW_fp32_torch_frames.shape[0])
+        ]
+
+        # Run inference
+        boxes, scores, keypoints = self.model(NCHW_fp32_torch_frames)
+
+        # Apply NMS to filter low-confidence and duplicate detections.
+        # keypoints shape [B, N, num_kpts, 3] is passed as an additional gather arg
+        # so it is filtered in lock-step with boxes/scores.
+        _post_nms_boxes, _post_nms_scores, post_nms_keypoints = batched_nms(
+            self.nms_iou_threshold,
+            self.nms_score_threshold,
+            boxes,
+            scores,
+            None,  # no class indices for single-class (person) detector
+            keypoints,  # gathered alongside boxes/scores
+        )
+
+        if raw_output:
+            return np.array([kpts.numpy() for kpts in post_nms_keypoints])
+
+        # Draw keypoints and skeleton on images
+        predicted_images = []
+        for batch_idx in range(len(NHWC_int_numpy_frames)):
+            img = NHWC_int_numpy_frames[batch_idx].copy()
+            batch_keypoints = post_nms_keypoints[batch_idx].numpy()  # [D, num_kpts, 3]
+
+            for kpts in batch_keypoints:  # kpts: [num_kpts, 3]
+                visible = kpts[:, 2] > 0.5  # visibility threshold
+
+                # Draw skeleton connections (only between visible keypoints)
+                for i, j in COCO_SKELETON:
+                    if visible[i] and visible[j]:
+                        draw_connections(
+                            img,
+                            np.array([[kpts[i, :2], kpts[j, :2]]]),
+                            color=(0, 255, 0),
+                            size=2,
+                        )
+
+                # Draw keypoint dots
+                visible_pts = kpts[visible, :2]
+                if len(visible_pts) > 0:
+                    draw_points(img, visible_pts, color=(255, 0, 0), size=6)
+
+            predicted_images.append(Image.fromarray(img))
+
+        return predicted_images

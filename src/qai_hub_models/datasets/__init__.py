@@ -169,6 +169,7 @@ _try_import_dataset(
 _try_import_dataset(".audioset", "AudioSetDataset")
 _try_import_dataset(".hagrid", "PalmDetectorDataset", name="hagrid_palmdetector")
 _try_import_dataset(".hpatches", "HPatchesDataset")
+_try_import_dataset(".coco_keypoints", "CocoKeypointsDataset")
 
 
 def get_dataset_from_name(
