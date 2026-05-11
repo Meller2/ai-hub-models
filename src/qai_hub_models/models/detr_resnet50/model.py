@@ -18,4 +18,4 @@ class DETRResNet50(DETR):
     @staticmethod
     def get_hub_litemp_percentage(_: Precision) -> float:
         """Returns the Lite-MP percentage value for the specified mixed precision quantization."""
-        return 25
+        return 10

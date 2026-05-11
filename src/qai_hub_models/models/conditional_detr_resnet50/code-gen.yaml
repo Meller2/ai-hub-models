@@ -1,6 +1,6 @@
 supported_precisions:
 - float
-- w8a16
+- w8a16_mixed_fp16
 has_on_target_demo: true
 disabled_paths:
   w8a16:
