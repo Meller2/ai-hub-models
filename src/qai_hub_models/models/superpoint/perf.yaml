@@ -4,6 +4,7 @@ supported_devices:
 - Dragonwing Q-8750
 - Samsung Galaxy S25 Ultra
 - Samsung Galaxy S25+
+- Snapdragon 8 Elite QRD
 - Snapdragon X2 Elite CRD
 - Snapdragon X Elite CRD
 - Dragonwing IQ-X7181
@@ -42,13 +43,13 @@ precisions:
     components:
       SuperPoint:
         performance_metrics:
-          Dragonwing IQ-9075 EVK:
+          Snapdragon X Elite CRD:
             onnx:
-              job_id: jp1q4ld2g
+              job_id: j56qyj10g
               job_status: Passed
-              inference_time_milliseconds: 410.195
+              inference_time_milliseconds: 455.885
               estimated_peak_memory_range_mb:
-                min: 4
+                min: 7
                 max: 7
               primary_compute_unit: NPU
               layer_counts:
@@ -72,29 +73,14 @@ precisions:
               tool_versions:
                 qairt: 2.42.0.251225135753_193295
                 onnx_runtime: 1.24.3
-          Samsung Galaxy S24:
+          Snapdragon X2 Elite CRD:
             onnx:
-              job_id: jp23k6m4g
+              job_id: jpvz6owjg
               job_status: Passed
-              inference_time_milliseconds: 310.836
+              inference_time_milliseconds: 242.64
               estimated_peak_memory_range_mb:
-                min: 7
-                max: 270
-              primary_compute_unit: NPU
-              layer_counts:
-                total: 117
-                npu: 117
-              tool_versions:
-                qairt: 2.42.0.251225135753_193295
-                onnx_runtime: 1.24.3
-          Samsung Galaxy S25:
-            onnx:
-              job_id: jp0ezqr65
-              job_status: Passed
-              inference_time_milliseconds: 252.439
-              estimated_peak_memory_range_mb:
-                min: 5
-                max: 201
+                min: 3
+                max: 3
               primary_compute_unit: NPU
               layer_counts:
                 total: 117
@@ -117,13 +103,28 @@ precisions:
               tool_versions:
                 qairt: 2.42.0.251225135753_193295
                 onnx_runtime: 1.24.3
-          Snapdragon X Elite CRD:
+          Samsung Galaxy S25:
             onnx:
-              job_id: j56qyj10g
+              job_id: jp0ezqr65
               job_status: Passed
-              inference_time_milliseconds: 455.885
+              inference_time_milliseconds: 252.439
               estimated_peak_memory_range_mb:
-                min: 7
+                min: 5
+                max: 201
+              primary_compute_unit: NPU
+              layer_counts:
+                total: 117
+                npu: 117
+              tool_versions:
+                qairt: 2.42.0.251225135753_193295
+                onnx_runtime: 1.24.3
+          Dragonwing IQ-9075 EVK:
+            onnx:
+              job_id: jp1q4ld2g
+              job_status: Passed
+              inference_time_milliseconds: 410.195
+              estimated_peak_memory_range_mb:
+                min: 4
                 max: 7
               primary_compute_unit: NPU
               layer_counts:
@@ -132,14 +133,14 @@ precisions:
               tool_versions:
                 qairt: 2.42.0.251225135753_193295
                 onnx_runtime: 1.24.3
-          Snapdragon X2 Elite CRD:
+          Samsung Galaxy S24:
             onnx:
-              job_id: jpvz6owjg
+              job_id: jp23k6m4g
               job_status: Passed
-              inference_time_milliseconds: 242.64
+              inference_time_milliseconds: 310.836
               estimated_peak_memory_range_mb:
-                min: 3
-                max: 3
+                min: 7
+                max: 270
               primary_compute_unit: NPU
               layer_counts:
                 total: 117

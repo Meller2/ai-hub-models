@@ -4,7 +4,9 @@ supported_precisions:
 disabled_paths:
   mixed:
     qnn_context_binary:
-      scorecard_failure: 'Link Failure(s): encoder:jp4jl1l8p'
+      scorecard_failure: 'Failing jobs: jp239ddmg'
+    precompiled_qnn_onnx:
+      scorecard_failure: 'Failing jobs: j5wm371zg'
 is_collection_model: true
 requires_aot_prepare: true
 global_requirements_incompatible: true

@@ -631,9 +631,6 @@ def main() -> None:
     if not check_unpublished_model_warning():
         return
     supported_precision_runtimes: dict[Precision, list[TargetRuntime]] = {
-        Precision.mixed_with_float: [
-            TargetRuntime.VOICE_AI,
-        ],
         Precision.float: [
             TargetRuntime.VOICE_AI,
         ],

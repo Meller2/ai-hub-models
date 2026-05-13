@@ -8,10 +8,10 @@ disabled_paths:
     tflite:
       issue: Revisit based on scorecard results. https://github.com/qcom-ai-hub/tetracode/issues/17039
     qnn_dlc:
-      scorecard_failure: No profile jobs found with default device Samsung Galaxy S25
+      scorecard_failure: 'Failing jobs: j5mv6dlw5'
       issue: Revisit based on scorecard results. https://github.com/qcom-ai-hub/tetracode/issues/17039
     onnx:
-      scorecard_failure: No profile jobs found with default device Samsung Galaxy S25
+      scorecard_failure: 'Failing jobs: j5mv6dlw5'
       issue: Revisit based on scorecard results. https://github.com/qcom-ai-hub/tetracode/issues/17039
   w8a16:
     onnx:

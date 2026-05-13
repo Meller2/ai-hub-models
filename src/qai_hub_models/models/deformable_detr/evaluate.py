@@ -31,7 +31,17 @@ def main() -> None:
     if not query_yes_no("Continue?"):
         return
     eval_datasets = Model.eval_datasets()
-    supported_precision_runtimes: dict[Precision, list[TargetRuntime]] = {}
+    supported_precision_runtimes: dict[Precision, list[TargetRuntime]] = {
+        Precision.float: [
+            TargetRuntime.QNN_DLC,
+            TargetRuntime.QNN_CONTEXT_BINARY,
+            TargetRuntime.ONNX,
+            TargetRuntime.PRECOMPILED_QNN_ONNX,
+        ],
+        Precision.w8a16: [
+            TargetRuntime.ONNX,
+        ],
+    }
 
     parser = evaluate_parser(
         model_cls=Model,

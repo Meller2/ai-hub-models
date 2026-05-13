@@ -1,0 +1,70 @@
+supported_devices:
+- Dragonwing RB3 Gen 2 Vision Kit
+- Dragonwing Q-6690 MTP
+- Snapdragon 7 Gen 4 QRD
+- Dragonwing Q-7790
+supported_chipsets:
+- qualcomm-qcs6490
+- qualcomm-qcm6690
+- qualcomm-snapdragon-7gen4
+precisions:
+  w8a16:
+    components:
+      DeformableDETR:
+        performance_metrics:
+          Snapdragon 7 Gen 4 QRD:
+            onnx:
+              job_id: jg990808g
+              job_status: Passed
+              inference_time_milliseconds: 3801.957
+              estimated_peak_memory_range_mb:
+                min: 1035
+                max: 1060
+              primary_compute_unit: CPU
+              layer_counts:
+                total: 3951
+                cpu: 3951
+              tool_versions:
+                onnx_runtime: 1.24.3
+          Dragonwing Q-6690 MTP:
+            onnx:
+              job_id: jp1q232ng
+              job_status: Passed
+              inference_time_milliseconds: 4228.648
+              estimated_peak_memory_range_mb:
+                min: 1035
+                max: 1059
+              primary_compute_unit: CPU
+              layer_counts:
+                total: 3951
+                cpu: 3951
+              tool_versions:
+                onnx_runtime: 1.24.3
+          Dragonwing RB3 Gen 2 Vision Kit:
+            onnx:
+              job_id: jg99080mg
+              job_status: Passed
+              inference_time_milliseconds: 7600.365
+              estimated_peak_memory_range_mb:
+                min: 1056
+                max: 1063
+              primary_compute_unit: CPU
+              layer_counts:
+                total: 3951
+                cpu: 3951
+              tool_versions:
+                onnx_runtime: 1.24.3
+          Dragonwing Q-7790:
+            onnx:
+              job_id: jg990808g
+              job_status: Passed
+              inference_time_milliseconds: 3801.957
+              estimated_peak_memory_range_mb:
+                min: 1035
+                max: 1060
+              primary_compute_unit: CPU
+              layer_counts:
+                total: 3951
+                cpu: 3951
+              tool_versions:
+                onnx_runtime: 1.24.3

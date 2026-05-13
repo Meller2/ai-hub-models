@@ -1,5 +1,5 @@
 has_on_target_demo: true
 disabled_paths:
   float:
-    onnx:
-      scorecard_failure: 'Profiling Failure(s): jp1q2d08g'
+    qnn_dlc:
+      scorecard_failure: 'Failing jobs: jp3q19qm5'

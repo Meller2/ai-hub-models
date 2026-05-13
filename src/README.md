@@ -211,7 +211,6 @@ and many more.
 | [FastSam-X](https://aihub.qualcomm.com/models/fastsam_x) | `qai_hub_models.models.fastsam_x` |
 | [HRNet-W48-OCR](https://aihub.qualcomm.com/models/hrnet_w48_ocr) | `qai_hub_models.models.hrnet_w48_ocr` |
 | [Mask2Former](https://aihub.qualcomm.com/models/mask2former) | `qai_hub_models.models.mask2former` |
-| [MaskRCNN](https://aihub.qualcomm.com/models/maskrcnn) | `qai_hub_models.models.maskrcnn` |
 | [MediaPipe-Selfie-Segmentation](https://aihub.qualcomm.com/models/mediapipe_selfie) | `qai_hub_models.models.mediapipe_selfie` |
 | [MobileSam](https://aihub.qualcomm.com/models/mobilesam) | `qai_hub_models.models.mobilesam` |
 | [PSPNet](https://aihub.qualcomm.com/models/pspnet) | `qai_hub_models.models.pspnet` |
@@ -296,7 +295,6 @@ and many more.
 | [BEVDet](https://aihub.qualcomm.com/models/bevdet) | `qai_hub_models.models.bevdet` |
 | [BEVFusion](https://aihub.qualcomm.com/models/bevfusion_det) | `qai_hub_models.models.bevfusion_det` |
 | [CVT](https://aihub.qualcomm.com/models/cvt) | `qai_hub_models.models.cvt` |
-| [CenterNet-3D](https://aihub.qualcomm.com/models/centernet_3d) | `qai_hub_models.models.centernet_3d` |
 | [CenterPoint](https://aihub.qualcomm.com/models/centerpoint) | `qai_hub_models.models.centerpoint` |
 | [GKT](https://aihub.qualcomm.com/models/gkt) | `qai_hub_models.models.gkt` |
 | [RangeNet-Plus-Plus](https://aihub.qualcomm.com/models/rangenet_plus_plus) | `qai_hub_models.models.rangenet_plus_plus` |
@@ -331,7 +329,6 @@ and many more.
 | [Whisper-Large-V3-Turbo](https://aihub.qualcomm.com/models/whisper_large_v3_turbo) | `qai_hub_models.models.whisper_large_v3_turbo` |
 | [Whisper-Medium](https://aihub.qualcomm.com/models/whisper_medium) | `qai_hub_models.models.whisper_medium` |
 | [Whisper-Small](https://aihub.qualcomm.com/models/whisper_small) | `qai_hub_models.models.whisper_small` |
-| [Whisper-Small-Quantized](https://aihub.qualcomm.com/models/whisper_small_quantized) | `qai_hub_models.models.whisper_small_quantized` |
 | [Whisper-Tiny](https://aihub.qualcomm.com/models/whisper_tiny) | `qai_hub_models.models.whisper_tiny` |
 | [Zipformer](https://aihub.qualcomm.com/models/zipformer) | `qai_hub_models.models.zipformer` |
 | | |

@@ -211,7 +211,6 @@ and many more.
 | [FastSam-X](https://aihub.qualcomm.com/models/fastsam_x) | [qai_hub_models.models.fastsam_x](src/qai_hub_models/models/fastsam_x/README.md) |
 | [HRNet-W48-OCR](https://aihub.qualcomm.com/models/hrnet_w48_ocr) | [qai_hub_models.models.hrnet_w48_ocr](src/qai_hub_models/models/hrnet_w48_ocr/README.md) |
 | [Mask2Former](https://aihub.qualcomm.com/models/mask2former) | [qai_hub_models.models.mask2former](src/qai_hub_models/models/mask2former/README.md) |
-| [MaskRCNN](https://aihub.qualcomm.com/models/maskrcnn) | [qai_hub_models.models.maskrcnn](src/qai_hub_models/models/maskrcnn/README.md) |
 | [MediaPipe-Selfie-Segmentation](https://aihub.qualcomm.com/models/mediapipe_selfie) | [qai_hub_models.models.mediapipe_selfie](src/qai_hub_models/models/mediapipe_selfie/README.md) |
 | [MobileSam](https://aihub.qualcomm.com/models/mobilesam) | [qai_hub_models.models.mobilesam](src/qai_hub_models/models/mobilesam/README.md) |
 | [PSPNet](https://aihub.qualcomm.com/models/pspnet) | [qai_hub_models.models.pspnet](src/qai_hub_models/models/pspnet/README.md) |
@@ -296,7 +295,6 @@ and many more.
 | [BEVDet](https://aihub.qualcomm.com/models/bevdet) | [qai_hub_models.models.bevdet](src/qai_hub_models/models/bevdet/README.md) |
 | [BEVFusion](https://aihub.qualcomm.com/models/bevfusion_det) | [qai_hub_models.models.bevfusion_det](src/qai_hub_models/models/bevfusion_det/README.md) |
 | [CVT](https://aihub.qualcomm.com/models/cvt) | [qai_hub_models.models.cvt](src/qai_hub_models/models/cvt/README.md) |
-| [CenterNet-3D](https://aihub.qualcomm.com/models/centernet_3d) | [qai_hub_models.models.centernet_3d](src/qai_hub_models/models/centernet_3d/README.md) |
 | [CenterPoint](https://aihub.qualcomm.com/models/centerpoint) | [qai_hub_models.models.centerpoint](src/qai_hub_models/models/centerpoint/README.md) |
 | [GKT](https://aihub.qualcomm.com/models/gkt) | [qai_hub_models.models.gkt](src/qai_hub_models/models/gkt/README.md) |
 | [RangeNet-Plus-Plus](https://aihub.qualcomm.com/models/rangenet_plus_plus) | [qai_hub_models.models.rangenet_plus_plus](src/qai_hub_models/models/rangenet_plus_plus/README.md) |
@@ -331,7 +329,6 @@ and many more.
 | [Whisper-Large-V3-Turbo](https://aihub.qualcomm.com/models/whisper_large_v3_turbo) | [qai_hub_models.models.whisper_large_v3_turbo](src/qai_hub_models/models/whisper_large_v3_turbo/README.md) |
 | [Whisper-Medium](https://aihub.qualcomm.com/models/whisper_medium) | [qai_hub_models.models.whisper_medium](src/qai_hub_models/models/whisper_medium/README.md) |
 | [Whisper-Small](https://aihub.qualcomm.com/models/whisper_small) | [qai_hub_models.models.whisper_small](src/qai_hub_models/models/whisper_small/README.md) |
-| [Whisper-Small-Quantized](https://aihub.qualcomm.com/models/whisper_small_quantized) | [qai_hub_models.models.whisper_small_quantized](src/qai_hub_models/models/whisper_small_quantized/README.md) |
 | [Whisper-Tiny](https://aihub.qualcomm.com/models/whisper_tiny) | [qai_hub_models.models.whisper_tiny](src/qai_hub_models/models/whisper_tiny/README.md) |
 | [Zipformer](https://aihub.qualcomm.com/models/zipformer) | [qai_hub_models.models.zipformer](src/qai_hub_models/models/zipformer/README.md) |
 | | |

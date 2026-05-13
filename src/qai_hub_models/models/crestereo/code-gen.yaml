@@ -1,5 +1,2 @@
 has_on_target_demo: true
-disabled_paths:
-  float:
-    onnx:
-      scorecard_failure: 'Profiling jobs slower than 4000ms: jpvzqzw7g'
+disabled_paths: {}

@@ -35,7 +35,10 @@ from qai_hub_models.utils.args import (
     get_input_spec_kwargs,
     get_model_kwargs,
 )
-from qai_hub_models.utils.asset_loaders import ASSET_CONFIG
+from qai_hub_models.utils.asset_loaders import (
+    ASSET_CONFIG,
+    check_unpublished_model_warning,
+)
 from qai_hub_models.utils.base_model import BaseModel
 from qai_hub_models.utils.compare import torch_inference
 from qai_hub_models.utils.export_result import ExportResult
@@ -527,12 +530,9 @@ def export_model(
 
 def main() -> None:
     warnings.filterwarnings("ignore")
-    supported_precision_runtimes: dict[Precision, list[TargetRuntime]] = {
-        Precision.w8a16: [
-            TargetRuntime.QNN_CONTEXT_BINARY,
-            TargetRuntime.PRECOMPILED_QNN_ONNX,
-        ],
-    }
+    if not check_unpublished_model_warning():
+        return
+    supported_precision_runtimes: dict[Precision, list[TargetRuntime]] = {}
 
     parser = export_parser(
         model_cls=Model,

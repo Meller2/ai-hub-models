@@ -2,7 +2,4 @@ supported_precisions:
 - float
 - w8a16
 has_on_target_demo: true
-disabled_paths:
-  float:
-    tflite:
-      scorecard_failure: 'Poor numerical value(s): j5q7r9zmg'
+disabled_paths: {}
