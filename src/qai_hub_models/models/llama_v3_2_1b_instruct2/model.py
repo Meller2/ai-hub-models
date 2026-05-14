@@ -197,7 +197,23 @@ class Llama3_2_1B_PreSplit(
         context_length: int = DEFAULT_CONTEXT_LENGTH,
         llm_io_type: LLMIOType = LLMIOType.genie_input_ids,
     ) -> InputSpec:
-        """Get input spec for the model."""
+        """
+        Parameters
+        ----------
+        llm_config
+            Model configuration dictionary.
+        sequence_length
+            Sequence length for the model.
+        context_length
+            Context length for the model.
+        llm_io_type
+            Input/output type for the LLM.
+
+        Returns
+        -------
+        InputSpec
+            Input specification for the model.
+        """
         if llm_config is None:
             llm_config = {
                 "num_hidden_layers": NUM_LAYERS,
@@ -272,7 +288,23 @@ class Llama3_2_1B_QuantizablePreSplit(  # type: ignore[misc]
         context_length: int = DEFAULT_CONTEXT_LENGTH,
         llm_io_type: LLMIOType = LLMIOType.genie_input_ids,
     ) -> InputSpec:
-        """Get input spec for the model."""
+        """
+        Parameters
+        ----------
+        llm_config
+            Model configuration dictionary.
+        sequence_length
+            Sequence length for the model.
+        context_length
+            Context length for the model.
+        llm_io_type
+            Input/output type for the LLM.
+
+        Returns
+        -------
+        InputSpec
+            Input specification for the model.
+        """
         return cls.FPModel.get_input_spec(
             llm_config=llm_config,
             sequence_length=sequence_length,
@@ -638,6 +670,19 @@ class Llama3_2_1B_PartBase(MultiGraphBaseModel):
         context_length: list[int] = DEFAULT_EXPORT_CONTEXT_LENGTHS,
         sequence_length: list[int] = DEFAULT_EXPORT_SEQUENCE_LENGTHS,
     ) -> MultiGraphGroup[InputSpec]:
+        """
+        Parameters
+        ----------
+        context_length
+            Context length for the model.
+        sequence_length
+            Sequence length for the model.
+
+        Returns
+        -------
+        MultiGraphGroup[InputSpec]
+            Input specifications for each graph.
+        """
         specs: MultiGraphGroup[InputSpec] = MultiGraphGroup()
         for ctx_len in context_length:
             for seq_len in sequence_length:

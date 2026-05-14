@@ -218,6 +218,23 @@ class Gemma_3n_E2B(LLMBase):
         context_length: int = DEFAULT_CONTEXT_LENGTH,
         llm_io_type: LLMIOType = LLMIOType.genie_input_ids,
     ) -> InputSpec:
+        """
+        Parameters
+        ----------
+        llm_config
+            Model configuration dictionary.
+        sequence_length
+            Sequence length for the model.
+        context_length
+            Context length for the model.
+        llm_io_type
+            Input/output type for the LLM.
+
+        Returns
+        -------
+        InputSpec
+            Input specification for the model.
+        """
         return LLMBase._get_input_spec(
             num_hidden_layers=llm_config["num_hidden_layers"],
             sequence_length=sequence_length,
@@ -309,6 +326,23 @@ class Gemma_3n_E2B_AIMETOnnx(LLM_AIMETOnnx):
         context_length: int = DEFAULT_CONTEXT_LENGTH,
         llm_io_type: LLMIOType = LLMIOType.genie_input_ids,
     ) -> InputSpec:
+        """
+        Parameters
+        ----------
+        llm_config
+            Model configuration dictionary.
+        sequence_length
+            Sequence length for the model.
+        context_length
+            Context length for the model.
+        llm_io_type
+            Input/output type for the LLM.
+
+        Returns
+        -------
+        InputSpec
+            Input specification for the model.
+        """
         return LLMBase._get_input_spec(
             num_hidden_layers=NUM_LAYERS,
             sequence_length=sequence_length,

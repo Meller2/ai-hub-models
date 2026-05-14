@@ -148,6 +148,23 @@ class Qwen2_5_7B_Instruct(LlamaMixin):
         context_length: int = DEFAULT_CONTEXT_LENGTH,
         llm_io_type: LLMIOType = LLMIOType.genie_input_ids,
     ) -> InputSpec:
+        """
+        Parameters
+        ----------
+        llm_config
+            Model configuration dictionary.
+        sequence_length
+            Sequence length for the model.
+        context_length
+            Context length for the model.
+        llm_io_type
+            Input/output type for the LLM.
+
+        Returns
+        -------
+        InputSpec
+            Input specification for the model.
+        """
         if llm_config is None:
             llm_config = dict(
                 num_hidden_layers=NUM_LAYERS,

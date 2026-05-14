@@ -1189,6 +1189,23 @@ class LLMBase(BaseModel, LLMConfigEditor, ABC):
         context_length: int,
         llm_io_type: LLMIOType = LLMIOType.genie_input_ids,
     ) -> InputSpec:
+        """
+        Parameters
+        ----------
+        llm_config
+            Model configuration dictionary.
+        sequence_length
+            Sequence length for the model.
+        context_length
+            Context length for the model.
+        llm_io_type
+            Input/output type for the LLM.
+
+        Returns
+        -------
+        InputSpec
+            Input specification for the model.
+        """
         raise NotImplementedError
 
     @staticmethod
@@ -1551,6 +1568,23 @@ class LLM_AIMETOnnx(AIMETOnnxQuantizableMixin, LLMConfigEditor, BaseModel, ABC):
         context_length: int,
         llm_io_type: LLMIOType = LLMIOType.genie_input_ids,
     ) -> InputSpec:
+        """
+        Parameters
+        ----------
+        llm_config
+            Model configuration dictionary.
+        sequence_length
+            Sequence length for the model.
+        context_length
+            Context length for the model.
+        llm_io_type
+            Input/output type for the LLM.
+
+        Returns
+        -------
+        InputSpec
+            Input specification for the model.
+        """
         raise NotImplementedError
 
     @property
@@ -2439,6 +2473,23 @@ class LLM_QNN(LLMConfigEditor, BaseModel, ABC):
         context_length: int,
         llm_io_type: LLMIOType = LLMIOType.genie_input_ids,
     ) -> InputSpec:
+        """
+        Parameters
+        ----------
+        llm_config
+            Model configuration dictionary.
+        sequence_length
+            Sequence length for the model.
+        context_length
+            Context length for the model.
+        llm_io_type
+            Input/output type for the LLM.
+
+        Returns
+        -------
+        InputSpec
+            Input specification for the model.
+        """
         raise NotImplementedError
 
     def _sample_inputs_impl(

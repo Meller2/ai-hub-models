@@ -155,8 +155,19 @@ class NomicEmbedText(BaseModel):
         batch_size: int = 1,
         sequence_length: int = 128,
     ) -> InputSpec:
-        # This can be used with the qai_hub python API to declare
-        # the model input specification upon submitting a profile job.
+        """
+        Parameters
+        ----------
+        batch_size
+            Batch size for inference.
+        sequence_length
+            Sequence length for the model.
+
+        Returns
+        -------
+        InputSpec
+            Input specification for the model.
+        """
         return {
             "input_tokens": TensorSpec(
                 shape=(batch_size, sequence_length),

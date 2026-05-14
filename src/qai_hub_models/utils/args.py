@@ -635,7 +635,7 @@ def get_model_cli_parser(
     cls: type[FromPretrainedTypeVar],
     parser: QAIHMArgumentParser | None = None,
     suppress_help_arguments: list | None = None,
-    allow_dupe_args: bool = False,
+    allow_dupe_args: bool = True,
 ) -> QAIHMArgumentParser:
     """
     Generate the argument parser to create this model from an argparse namespace.
@@ -935,13 +935,15 @@ def get_model_input_spec_parser(
 
     for name, param in _get_input_spec_params(model_cls).items():
         resolved_type = _resolve_param_type(param, model_cls)
+        help_str = input_spec_docs.get(
+            name,
+            f"For documentation, see {model_cls.__name__}::get_input_spec.",
+        )
         parser.add_argument(
             f"--{name.replace('_', '-')}",
             type=resolved_type,
             default=param.default,
-            help=input_spec_docs.get(
-                name, f"For documentation, see {model_cls.__name__}::get_input_spec."
-            ),
+            help=help_str,
         )
     return parser
 

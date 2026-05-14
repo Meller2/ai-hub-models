@@ -218,6 +218,23 @@ class Qwen2_5_VL_7B_PreSplit(SingleSlotCacheMixin, Qwen2VLTextBase):
         context_length: int = DEFAULT_CONTEXT_LENGTH,
         llm_io_type: LLMIOType = LLMIOType.genie_input_embeds,
     ) -> InputSpec:
+        """
+        Parameters
+        ----------
+        llm_config
+            Model configuration dictionary.
+        sequence_length
+            Sequence length for the model.
+        context_length
+            Context length for the model.
+        llm_io_type
+            Input/output type for the LLM.
+
+        Returns
+        -------
+        InputSpec
+            Input specification for the model.
+        """
         if llm_config is None:
             llm_config = {
                 "num_hidden_layers": NUM_LAYERS,
@@ -352,6 +369,23 @@ class Qwen2_5_VL_7B_QuantizablePreSplit(  # type: ignore[misc]
         context_length: int = DEFAULT_CONTEXT_LENGTH,
         llm_io_type: LLMIOType = LLMIOType.genie_input_embeds,
     ) -> InputSpec:
+        """
+        Parameters
+        ----------
+        llm_config
+            Model configuration dictionary.
+        sequence_length
+            Sequence length for the model.
+        context_length
+            Context length for the model.
+        llm_io_type
+            Input/output type for the LLM.
+
+        Returns
+        -------
+        InputSpec
+            Input specification for the model.
+        """
         return Qwen2_5_VL_7B_PreSplit.get_input_spec(
             llm_config=llm_config,
             sequence_length=sequence_length,
