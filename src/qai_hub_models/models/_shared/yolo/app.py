@@ -338,6 +338,145 @@ class YoloSegmentationApp:
         # See predict_boxes_from_image.
         return self.predict_segmentation_from_image(*args, **kwargs)
 
+    def filter_predictions(
+        self,
+        pred_post_nms_boxes: list[torch.Tensor],
+        pred_post_nms_scores: list[torch.Tensor],
+        pred_post_nms_class_idx: list[torch.Tensor],
+        pred_post_nms_masks: list[torch.Tensor],
+    ) -> tuple[
+        list[torch.Tensor],
+        list[torch.Tensor],
+        list[torch.Tensor],
+        list[torch.Tensor],
+    ]:
+        """
+        Filter post-NMS predictions before mask processing.
+
+        Override in a subclass to apply custom filtering (e.g. class-based).
+        The base implementation is a no-op and returns all inputs unchanged.
+
+        Parameters
+        ----------
+        pred_post_nms_boxes
+            Per-batch bounding-box tensors, each of shape [num_boxes, 4].
+        pred_post_nms_scores
+            Per-batch score tensors, each of shape [num_boxes].
+        pred_post_nms_class_idx
+            Per-batch class-index tensors, each of shape [num_boxes].
+        pred_post_nms_masks
+            Per-batch mask-coefficient tensors, each of shape [num_boxes, 32].
+
+        Returns
+        -------
+        pred_post_nms_boxes : list[torch.Tensor]
+            Filtered per-batch bounding-box tensors.
+        pred_post_nms_scores : list[torch.Tensor]
+            Filtered per-batch score tensors.
+        pred_post_nms_class_idx : list[torch.Tensor]
+            Filtered per-batch class-index tensors.
+        pred_post_nms_masks : list[torch.Tensor]
+            Filtered per-batch mask-coefficient tensors.
+        """
+        return (
+            pred_post_nms_boxes,
+            pred_post_nms_scores,
+            pred_post_nms_class_idx,
+            pred_post_nms_masks,
+        )
+
+    def process_and_resize_masks(
+        self,
+        pred_post_nms_masks: list[torch.Tensor],
+        pred_post_nms_boxes: list[torch.Tensor],
+        proto: torch.Tensor,
+        input_h: int,
+        input_w: int,
+    ) -> list[np.ndarray]:
+        """
+        Apply proto coefficients to mask predictions, upsample to model input
+        size, then resize to the original image dimensions.
+
+        Override in a subclass to change mask processing behaviour (e.g. to
+        handle variable-length batches or use a different interpolation path).
+
+        Parameters
+        ----------
+        pred_post_nms_masks
+            Per-batch mask-coefficient tensors, each of shape [num_boxes, 32].
+        pred_post_nms_boxes
+            Per-batch bounding-box tensors, each of shape [num_boxes, 4].
+        proto
+            Proto tensor of shape [batch, 32, mask_h, mask_w].
+        input_h
+            Original image height (resize target).
+        input_w
+            Original image width (resize target).
+
+        Returns
+        -------
+        list[np.ndarray]
+            Per-batch float32 mask arrays of shape [num_boxes, input_h, input_w].
+        """
+        from ultralytics.utils.ops import process_mask
+
+        processed = [
+            process_mask(
+                proto[batch_idx],
+                pred_post_nms_masks[batch_idx],
+                pred_post_nms_boxes[batch_idx],
+                (self.input_height, self.input_width),
+                upsample=True,
+            ).numpy()
+            for batch_idx in range(len(pred_post_nms_masks))
+        ]
+
+        resized: torch.Tensor = F.interpolate(
+            input=torch.Tensor(processed),
+            size=(input_h, input_w),
+            mode="bilinear",
+            align_corners=False,
+        )
+        return list(resized.numpy())
+
+    def create_output_images(
+        self,
+        NHWC_int_numpy_frames: list[np.ndarray],
+        resized_masks: list[np.ndarray],
+    ) -> list[Image.Image]:
+        """
+        Overlay segmentation masks on the input images and return annotated PIL images.
+
+        Override in a subclass to change the visualisation strategy (e.g. to
+        use per-instance threshold-based colouring instead of argmax).
+
+        Parameters
+        ----------
+        NHWC_int_numpy_frames
+            Per-batch uint8 RGB image arrays of shape [H, W, 3].
+        resized_masks
+            Per-batch float32 mask arrays of shape [num_boxes, H, W].
+
+        Returns
+        -------
+        list[Image.Image]
+            Annotated PIL images, one per batch element.
+        """
+        pred_post_nms_resized_masks = torch.from_numpy(np.stack(resized_masks))
+        pred_mask_img = torch.argmax(pred_post_nms_resized_masks, 1)
+
+        color_map = create_color_map(int(pred_mask_img.max().item()) + 1)
+        out = []
+        for i, img_tensor in enumerate(NHWC_int_numpy_frames):
+            out.append(
+                Image.blend(
+                    Image.fromarray(img_tensor),
+                    Image.fromarray(color_map[pred_mask_img[i]]),
+                    alpha=0.5,
+                )
+            )
+        return out
+
     def predict_segmentation_from_image(
         self,
         pixel_values_or_image: (
@@ -380,7 +519,7 @@ class YoloSegmentationApp:
                     Each pred_score is of shape [num_boxes].
                 pred_masks : list[torch.Tensor]
                     List of predicted masks for all the batches.
-                    Each pred_mask is of shape [num_boxes, 32].
+                    Each pred_mask is of shape [num_boxes, input_h, input_w].
                 pred_classes : list[torch.Tensor]
                     List of predicted class for all the batches.
                     Each pred_class is of shape [num_boxes].
@@ -420,24 +559,27 @@ class YoloSegmentationApp:
             pred_masks,
         )
 
-        # Process mask and upsample to input shape
-        from ultralytics.utils.ops import process_mask
+        # Filter predictions (override filter_predictions to customise)
+        (
+            pred_post_nms_boxes,
+            pred_post_nms_scores,
+            pred_post_nms_class_idx,
+            pred_post_nms_masks,
+        ) = self.filter_predictions(
+            pred_post_nms_boxes,
+            pred_post_nms_scores,
+            pred_post_nms_class_idx,
+            pred_post_nms_masks,
+        )
 
-        for batch_idx in range(len(pred_post_nms_masks)):
-            pred_post_nms_masks[batch_idx] = process_mask(
-                proto[batch_idx],
-                pred_post_nms_masks[batch_idx],
-                pred_post_nms_boxes[batch_idx],
-                (self.input_height, self.input_width),
-                upsample=True,
-            ).numpy()
-
-        # Resize masks to match with input image shape
-        pred_post_nms_resized_masks: torch.Tensor = F.interpolate(
-            input=torch.Tensor(pred_post_nms_masks),
-            size=(input_h, input_w),
-            mode="bilinear",
-            align_corners=False,
+        # Process masks and resize to original image dimensions
+        # (override process_and_resize_masks to customise)
+        resized_masks: list[np.ndarray] = self.process_and_resize_masks(
+            pred_post_nms_masks,
+            pred_post_nms_boxes,
+            proto,
+            input_h,
+            input_w,
         )
 
         # Return raw output if requested
@@ -445,25 +587,12 @@ class YoloSegmentationApp:
             return (
                 pred_post_nms_boxes,
                 pred_post_nms_scores,
-                list(pred_post_nms_resized_masks),
+                [torch.from_numpy(m) for m in resized_masks],
                 pred_post_nms_class_idx,
             )
 
-        # Create color map and convert segmentation mask to RGB image
-        pred_mask_img = torch.argmax(pred_post_nms_resized_masks, 1)
-
-        # Overlay the segmentation masks on the image.
-        color_map = create_color_map(int(pred_mask_img.max().item()) + 1)
-        out = []
-        for i, img_tensor in enumerate(NHWC_int_numpy_frames):
-            out.append(
-                Image.blend(
-                    Image.fromarray(img_tensor),
-                    Image.fromarray(color_map[pred_mask_img[i]]),
-                    alpha=0.5,
-                )
-            )
-        return out
+        # Overlay masks on images (override create_output_images to customise)
+        return self.create_output_images(NHWC_int_numpy_frames, resized_masks)
 
 
 class YoloPoseApp:

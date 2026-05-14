@@ -5,12 +5,13 @@
 from __future__ import annotations
 
 import torch
-from ultralytics.nn.modules.head import Segment, Segment26
+from ultralytics.nn.modules.head import Segment, Segment26, YOLOESegment
 from ultralytics.nn.tasks import SegmentationModel
 
 from qai_hub_models.models._shared.ultralytics.segment_patches import (
     patch_ultralytics_segmentation_head,
     patch_ultralytics_segmentation_head_26,
+    patch_ultralytics_yoloe_segmentation_head,
 )
 from qai_hub_models.models._shared.yolo.utils import (
     get_most_likely_score,
@@ -129,6 +130,8 @@ class UltralyticsMulticlassSegmentor(BaseModel):
             patch_ultralytics_segmentation_head_26(model)
         elif isinstance(model.model[-1], Segment):
             patch_ultralytics_segmentation_head(model)
+        elif isinstance(model.model[-1], YOLOESegment):
+            patch_ultralytics_yoloe_segmentation_head(model)
         else:
             raise NotImplementedError()
 
