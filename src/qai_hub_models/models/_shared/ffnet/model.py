@@ -59,12 +59,13 @@ FFNET_SUBPATH_NAME_LOOKUP = {
         "ffnet122NS_CCC_cityscapes_state_dict_quarts.pth",
     ),
 }
-
 FFNetType = TypeVar("FFNetType", bound="FFNet")
 
 
 class FFNet(CityscapesSegmentor):
     """Exportable FFNet fuss-free Cityscapes segmentation model."""
+
+    model: torch.nn.Module  # narrows BaseModel's Tensor | Module to nn.Module
 
     @classmethod
     def from_pretrained(cls, variant_name: str) -> Self:
@@ -123,6 +124,16 @@ def _load_ffnet_source_model(variant_name: str) -> torch.nn.Module:
 
 
 class FFNetLowRes(FFNet):
+    @classmethod
+    def from_pretrained(cls, variant_name: str) -> Self:
+        instance = super().from_pretrained(variant_name)
+        # The _pre_down variants were trained with an internal Gaussian
+        # downsample (1024x2048 -> 512x1024). For deployment we feed
+        # 512x1024 directly, so disable the pre-downsampling layer so
+        # the input is not halved a second time.
+        instance.model.pre_downsampling = False  # type: ignore[assignment]
+        return instance
+
     @staticmethod
     def get_input_spec(
         batch_size: int = 1,

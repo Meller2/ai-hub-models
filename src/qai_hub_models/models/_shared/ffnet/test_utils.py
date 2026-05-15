@@ -21,14 +21,19 @@ from qai_hub_models.utils.image_processing import (
 
 
 def run_test_off_target_numerical(
-    ffnet_cls: type[BaseModel], variant_name: str, relax_numerics: bool = False
+    ffnet_cls: type[BaseModel],
+    variant_name: str,
+    relax_numerics: bool = False,
 ) -> None:
     """Verify that raw (numeric) outputs of both (qaism and non-qaism) networks are the same."""
-    processed_sample_image = preprocess_PIL_image(
-        load_image(TEST_CITYSCAPES_LIKE_IMAGE_ASSET)
-    )
+    pil_image = load_image(TEST_CITYSCAPES_LIKE_IMAGE_ASSET)
+    input_spec = ffnet_cls.get_input_spec()
+    _, _, h, w = input_spec["image"][0]
+    processed_sample_image = preprocess_PIL_image(pil_image.resize((w, h)))
     normalized_image = normalize_image_torchvision(processed_sample_image)
     source_model = _load_ffnet_source_model(variant_name)
+    if "_pre_down" in variant_name:
+        source_model.pre_downsampling = False  # type: ignore[assignment]
     qaism_model = ffnet_cls.from_pretrained()
 
     with torch.no_grad():

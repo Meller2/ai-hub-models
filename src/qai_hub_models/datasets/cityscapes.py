@@ -102,7 +102,6 @@ class CityscapesDataset(BaseDataset):
         if self.make_lowres:
             new_size = (WIDTH // 2, HEIGHT // 2)
             image = image.resize(new_size)
-            gt_img = gt_img.resize(new_size)
         gt = np.vectorize(class_map_lookup)(np.array(gt_img))
         image_tensor = app_to_net_image_inputs(image)[1].squeeze(0)
         return image_tensor, torch.tensor(gt)
