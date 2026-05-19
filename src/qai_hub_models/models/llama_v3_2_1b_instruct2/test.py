@@ -14,6 +14,7 @@ import pytest
 import torch
 from transformers import AutoConfig
 
+from qai_hub_models.configs.model_metadata import ModelMetadata
 from qai_hub_models.models._shared.llm import test
 from qai_hub_models.models._shared.llm.evaluate import evaluate
 from qai_hub_models.models._shared.llm.model import LLM_QNN
@@ -49,6 +50,7 @@ from qai_hub_models.scorecard import (
 from qai_hub_models.scorecard.device import cs_8_elite_qrd, cs_x_elite
 from qai_hub_models.utils.asset_loaders import ASSET_CONFIG
 from qai_hub_models.utils.checkpoint import CheckpointSpec
+from qai_hub_models.utils.export_result import MultiGraphCollectionExportResult
 from qai_hub_models.utils.llm_helpers import (
     create_genie_config,
     log_evaluate_test_result,
@@ -275,7 +277,7 @@ def test_compile(
     # Pass both prompt (ar128) and token (ar1) sequence lengths so the
     # genie bundle includes both model types. Without ar1, Genie must use
     # the ar128 model for token generation, halving TPS on-device.
-    run_llm_compile(
+    result = run_llm_compile(
         export_model,
         MODEL_ID,
         precision,
@@ -301,6 +303,15 @@ def test_compile(
     assert (genie_bundle_path / "genie_config.json").exists()
     assert (genie_bundle_path / "htp_backend_ext_config.json").exists()
     assert (genie_bundle_path / "sample_prompt.txt").exists()
+
+    # TODO(https://github.com/qcom-ai-hub/tetracode/issues/19349): remove once
+    # the QDC w4/w4a16 mix-up is resolved.
+    assert isinstance(result, MultiGraphCollectionExportResult)
+    print(f"[provenance] precision={precision} bundle={genie_bundle_path}")
+    for compile_key, compile_job in (result.compile_jobs or {}).items():
+        print(f"[provenance] compile_job[{compile_key}]={compile_job.job_id}")
+    for link_key, link_job in (result.link_jobs or {}).items():
+        print(f"[provenance] link_job[{link_key}]={link_job.job_id}")
 
 
 @pytest.mark.nightly
@@ -337,6 +348,12 @@ def test_qdc(
         pytest.fail("The genie bundle does not exist.")
 
     from qai_hub_models.utils.qdc.genie_jobs import submit_genie_bundle_to_qdc_device
+
+    # TODO(https://github.com/qcom-ai-hub/tetracode/issues/19349): remove once
+    # the QDC w4/w4a16 mix-up is resolved.
+    metadata = ModelMetadata.from_json(genie_bundle_path / "metadata.json")
+    print(f"[provenance] precision={precision} bundle={genie_bundle_path}")
+    print(f"[provenance] metadata.json precision={metadata.precision}")
 
     qdc_job_name = f"Genie {MODEL_ID} {precision}"
     tps, min_ttft = submit_genie_bundle_to_qdc_device(

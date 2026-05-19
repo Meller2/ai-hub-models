@@ -823,7 +823,7 @@ def run_llm_compile(
     skip_compile_options: bool = False,
     extra_model_arguments: dict[str, Any] | None = None,
     skip_downloading: bool = True,
-) -> None:
+) -> MultiGraphCollectionExportResult | LegacyCollectionExportResult:
     """
     Use the provided export script function to submit compile jobs for llm tests.
 
@@ -861,6 +861,11 @@ def run_llm_compile(
     skip_downloading
         Whether to skip downloading. Default is True.
 
+    Returns
+    -------
+    result : MultiGraphCollectionExportResult | LegacyCollectionExportResult
+        The export result returned by ``export_model``. Callers can inspect
+        compile/link job IDs and the downloaded bundle path via this object.
     """
     test_params = ScExportTestParams(
         model_id,
@@ -900,6 +905,7 @@ def run_llm_compile(
             test_params,
         )
     cache.to_file()
+    return result
 
 
 def fetch_cached_jobs_if_compile_jobs_are_identical(
