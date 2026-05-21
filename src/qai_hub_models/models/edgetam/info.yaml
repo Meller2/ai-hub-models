@@ -26,8 +26,10 @@ technical_details:
   Input resolution (Encoder): 1024x1024
   Number of parameters (encoder): 8.3M
   Model size (encoder) (float): 33 MB
-  Number of parameters (decoder): 6.22M
-  Model size (decoder) (float): 23.7 MB
+  Number of parameters (memory_encoder): 1.2M
+  Model size (memory_encoder) (float): 4.6 MB
+  Number of parameters (video_decoder): 6.22M
+  Model size (video_decoder) (float): 23.7 MB
 license_type: apache-2.0
 research_paper: https://arxiv.org/abs/2501.07256
 research_paper_title: 'EdgeTAM: On-Device Track Anything Model'

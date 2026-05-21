@@ -1,9 +1,9 @@
 supported_precisions:
 - float
 - w8a8
-disabled_paths: {}
 is_collection_model: true
 global_requirements_incompatible: true
+has_on_target_demo: true
 pip_install_flags: git+https://github.com/facebookresearch/EdgeTAM.git@a1209a454c9950d531498074a95ecf3a3ba02dfd
 external_repos:
   edgetam:

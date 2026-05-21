@@ -36,6 +36,7 @@ from qai_hub_models.utils.base_model import (
     CollectionModel,
     PretrainedCollectionModel,
 )
+from qai_hub_models.utils.input_spec import InputSpec
 from qai_hub_models.utils.path_helpers import QAIHM_MODELS_ROOT
 
 BASE_PLUS_MODEL_TYPE = "base_plus"
@@ -63,6 +64,22 @@ CONFIG_REGISTERY = {
 
 class SAM2Encoder(SAM2EncoderBase):
     """Exportable SAM2 encoder that can be split into several parts."""
+
+    @staticmethod
+    def get_input_spec(
+        batch_size: int = 1,
+        num_points: int = 2,
+        encoder_img_height: int = 1024,
+        encoder_img_width: int = 1024,
+    ) -> InputSpec:
+        return {
+            "image": (
+                (batch_size, 3, encoder_img_height, encoder_img_width),
+                "float32",
+            ),
+            "unnorm_coords": ((1, num_points, 2), "float32"),
+            "labels": ((1, num_points), "float32"),
+        }
 
     @classmethod
     def from_pretrained(cls, model_type: str = DEFAULT_MODEL_TYPE) -> Self:

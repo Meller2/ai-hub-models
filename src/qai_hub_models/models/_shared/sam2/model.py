@@ -9,7 +9,7 @@ from __future__ import annotations
 import functools
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import torch
 from hydra import initialize_config_dir
@@ -19,6 +19,7 @@ from sam2.modeling.backbones.hieradet import MultiScaleBlock as SAM2_Encoder_Blo
 from sam2.modeling.sam.transformer import TwoWayAttentionBlock, TwoWayTransformer
 from sam2.modeling.sam2_base import SAM2Base as Sam2
 from sam2.modeling.sam2_utils import MLP as SAM2MaskDecoderMLP
+from sam2.modeling.sam2_utils import LayerNorm2d
 
 from qai_hub_models.models._shared.sam.model_patches import (
     Conv2DInplaceLinearSAMMaskDecoderMLP,
@@ -26,6 +27,7 @@ from qai_hub_models.models._shared.sam.model_patches import (
 )
 from qai_hub_models.models._shared.sam2.model_patches import (
     Conv2DInplaceLinearSAMTransformerMLPBlock,
+    SAM2LayerNorm2d,
     SplitHeadSAMEncoderAttention,
     sam_decoder_predict_masks,
     sam_prompt_encoder_embed_points,
@@ -80,27 +82,28 @@ class SAM2Encoder(BaseModel, ABC):
 
     def forward(
         self,
-        Image: torch.Tensor,
+        image: torch.Tensor,
         norm_coords: torch.Tensor,  # [num_labels,num_points,2]
         labels: torch.Tensor,  # [num_labels,num_points]
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Run SAM Image encoder and returns image_embeddings,
-        high_res_features1, high_res_features2, sparse_embeddings
+        high_res_features1, high_res_features2, sparse_embeddings, pix_feat
 
         Parameters
         ----------
-        Image
+        image
             Raw floating point pixel values for encoder consumption.
             3-channel Color Space: RGB, range [0, 1]
         norm_coords
             Point coordinates from input image for segmentation,
-            mapped to the resized image with shape [1, N, 2]
+            mapped to the resized image with shape [1, N, 2].
+            For tracking frames with no prompt, pass zeros and set
+            ``labels`` to -1
         labels
-            Point Labels to select/de-select given point for segmentation
-            with shape shape [1, N], e.g. Corresponding value is 1
-            if this point is to be included, otherwise 0
-
+            Point labels with shape [1, N].
+            Use 1 for positive, 0 for negative, -1 for "no prompt"
+            (tracking frames).
 
         Returns
         -------
@@ -112,13 +115,14 @@ class SAM2Encoder(BaseModel, ABC):
             Shape (1, 64, 128, 128).
         sparse_embeddings : torch.Tensor
             Shape (1, N+1, 256).
+        pix_feat : torch.Tensor
+            image_embeddings with no_mem_embed added. Shape (1, 256, 64, 64).
+            Use this as the decoder's image_embeddings input for the conditioning
+            frame. For tracking frames, discard and use memory-conditioned features.
         """
-        x = self.normalize(Image)
+        x = self.normalize(image)
         backbone_out = self.sam2.forward_image(x)
         _, vision_feats, _, _ = self.sam2._prepare_backbone_features(backbone_out)
-        # Add no_mem_embed, which is added to the lowest rest feat. map during training on videos
-        if self.sam2.directly_add_no_mem_embed:
-            vision_feats[-1] = vision_feats[-1] + self.sam2.no_mem_embed
         feats = [
             feat.permute(1, 2, 0).view(1, -1, *feat_size)
             for feat, feat_size in zip(
@@ -131,12 +135,15 @@ class SAM2Encoder(BaseModel, ABC):
         sparse_embedding = self.sam2.sam_prompt_encoder._embed_points(
             norm_coords, labels, pad=True
         )
+        no_mem = self.sam2.no_mem_embed.permute(0, 2, 1).view(1, -1, 1, 1)
+        pix_feat = image_embeddings + no_mem
 
         return (
             image_embeddings,
             high_res_features1,
             high_res_features2,
             sparse_embedding,
+            pix_feat,
         )
 
     def get_input_spec(self, batch_size: int = 1, num_points: int = 2) -> InputSpec:
@@ -160,11 +167,24 @@ class SAM2Encoder(BaseModel, ABC):
             ),
         }
 
-    def get_channel_last_inputs(self) -> list[str]:
+    def _get_input_spec_for_instance(
+        self, batch_size: int = 1, num_points: int = 2, **kwargs: Any
+    ) -> InputSpec:
+        """Override for model.get_input_spec() when called on instances of this class."""
+        return self.get_input_spec(batch_size, num_points)
+
+    @staticmethod
+    def get_channel_last_inputs() -> list[str]:
         return ["image"]
 
-    def get_channel_last_outputs(self) -> list[str]:
-        return ["image_embeddings", "high_res_features1", "high_res_features2"]
+    @staticmethod
+    def get_channel_last_outputs() -> list[str]:
+        return [
+            "image_embeddings",
+            "high_res_features1",
+            "high_res_features2",
+            "pix_feat",
+        ]
 
     def get_output_names(self) -> list[str]:
         return [
@@ -172,6 +192,7 @@ class SAM2Encoder(BaseModel, ABC):
             "high_res_features1",
             "high_res_features2",
             "sparse_embedding",
+            "pix_feat",
         ]
 
     def get_hub_litemp_percentage(self, _: Precision) -> float:
@@ -198,6 +219,7 @@ class SAM2Decoder(BaseModel, ABC):
         self._bb_feat_sizes = BB_FEAT_SIZES
         self.high_res_features1_dim = 32
         self.high_res_features2_dim = 64
+        self.mask_decoder.dynamic_multimask_via_stability = False
 
     def forward(
         self,
@@ -231,9 +253,21 @@ class SAM2Decoder(BaseModel, ABC):
         scores : torch.Tensor
             IoU predictions of shape [1, 1].
         """
+        low_res_masks, iou_predictions, _, _ = self._run_mask_decoder(
+            image_embeddings, high_res_features1, high_res_features2, sparse_embedding
+        )
+        return low_res_masks, iou_predictions
+
+    def _run_mask_decoder(
+        self,
+        image_embeddings: torch.Tensor,
+        high_res_features1: torch.Tensor,
+        high_res_features2: torch.Tensor,
+        sparse_embedding: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Shared mask decoder call used by SAM2Decoder and SAM2VideoDecoder."""
         dense_embedding = self.prompt_encoder.no_mask_embed.weight.reshape(1, -1, 1, 1)
-        self.mask_decoder.dynamic_multimask_via_stability = False
-        low_res_masks, iou_predictions, _, _ = self.mask_decoder(
+        return self.mask_decoder(
             image_embeddings=image_embeddings,
             image_pe=self.prompt_encoder.get_dense_pe(),
             sparse_prompt_embeddings=sparse_embedding,
@@ -242,10 +276,30 @@ class SAM2Decoder(BaseModel, ABC):
             repeat_image=False,
             high_res_features=[high_res_features1, high_res_features2],
         )
-        return low_res_masks, iou_predictions
 
-    def get_input_spec(
+    def _get_input_spec_for_instance(
         self,
+        num_points: int = 2,
+        **kwargs: Any,
+    ) -> InputSpec:
+        """
+        Override for model.get_input_spec() when called on instances of this class.
+
+        The initializer for BaseModel will automatically override get_input_spec
+        with this function when the class is instantiated.
+        """
+        return self.__class__.get_input_spec(
+            num_points=num_points,
+            embed_dim=self.prompt_encoder_embed_dim,
+            image_embedding=self._bb_feat_sizes[2],
+            high_res_features2=self._bb_feat_sizes[1],
+            high_res_features1=self._bb_feat_sizes[0],
+            high_res_features1_dim=self.high_res_features1_dim,
+            high_res_features2_dim=self.high_res_features2_dim,
+        )
+
+    @staticmethod
+    def get_input_spec(
         num_points: int = 2,
         embed_dim: int = 256,
         image_embedding: tuple = (64, 64),
@@ -291,6 +345,75 @@ class SAM2Decoder(BaseModel, ABC):
     def get_hub_litemp_percentage(self, _: Precision) -> float:
         """Returns the Lite-MP percentage value for the specified mixed precision quantization."""
         return 10
+
+
+class SAM2VideoDecoder(SAM2Decoder):
+    """
+    Video-capable decoder that also returns obj_ptr for memory tracking.
+
+    Extends SAM2Decoder to capture the SAM output token and produce
+    an object pointer vector used for temporal tracking in video.
+    """
+
+    def __init__(self, sam2: Sam2) -> None:
+        super().__init__(sam2)
+        self.obj_ptr_proj = self.model.obj_ptr_proj
+        # Fall back to best multi-mask output when single-mask is unstable.
+        self.mask_decoder.dynamic_multimask_via_stability = True
+
+    def forward(
+        self,
+        image_embeddings: torch.Tensor,
+        high_res_features1: torch.Tensor,
+        high_res_features2: torch.Tensor,
+        sparse_embedding: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Run SAM decoder and return masks, scores, object pointer, and object score logits.
+
+        Parameters
+        ----------
+        image_embeddings
+          Image embeddings generated by the encoder.
+          Shape: [1, 256, 64, 64].
+        high_res_features1
+          First set of high-resolution features.
+          Shape: [1, 32, 256, 256].
+        high_res_features2
+          Second set of high-resolution features.
+          Shape: [1, 64, 128, 128].
+        sparse_embedding
+          Sparse prompt embeddings from the prompt encoder.
+          Shape: [1, N+1, 256].
+
+        Returns
+        -------
+        torch.Tensor
+          Low-resolution masks of shape [1, 1, 256, 256].
+        torch.Tensor
+          IoU predictions of shape [1, 1].
+        torch.Tensor
+          Object pointer of shape [1, 256] for memory tracking.
+        torch.Tensor
+          Object score logits of shape [1, 1] for CPU-side object-score gating in the app.
+        """
+        low_res_masks, iou_predictions, sam_output_tokens, object_score_logits = (
+            self._run_mask_decoder(
+                image_embeddings,
+                high_res_features1,
+                high_res_features2,
+                sparse_embedding,
+            )
+        )
+
+        sam_output_token = sam_output_tokens[:, 0]
+        obj_ptr = self.obj_ptr_proj(sam_output_token)
+
+        return low_res_masks, iou_predictions, obj_ptr, object_score_logits
+
+    @staticmethod
+    def get_output_names() -> list[str]:
+        return ["masks", "scores", "obj_ptr", "object_score_logits"]
 
 
 class SAM2Loader(ABC):
@@ -352,6 +475,11 @@ class SAM2Loader(ABC):
         sam2.sam_prompt_encoder._embed_points = functools.partial(
             sam_prompt_encoder_embed_points, sam2.sam_prompt_encoder
         )
+
+        for parent in sam2.modules():
+            for name, child in parent.named_children():
+                if isinstance(child, LayerNorm2d):
+                    setattr(parent, name, SAM2LayerNorm2d(child))
 
     @classmethod
     def _initialize_hydra_config(

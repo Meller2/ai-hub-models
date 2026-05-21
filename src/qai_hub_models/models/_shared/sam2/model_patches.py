@@ -9,6 +9,7 @@ from typing import cast
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from sam2.modeling.backbones.hieradet import MLP as SAM2MaskDecoderMLP
 from sam2.modeling.backbones.hieradet import (
     MultiScaleBlock as SAMEncoderAttentionBlock,
@@ -16,9 +17,32 @@ from sam2.modeling.backbones.hieradet import (
 from sam2.modeling.backbones.hieradet import do_pool
 from sam2.modeling.sam.mask_decoder import MaskDecoder
 from sam2.modeling.sam.prompt_encoder import PromptEncoder
+from sam2.modeling.sam2_utils import LayerNorm2d
 from torch import nn
 
 from qai_hub_models.models._shared.sam.model_patches import Conv2DInplaceLinear
+
+
+class SAM2LayerNorm2d(nn.Module):
+    """
+    LayerNorm2d re-implemented via F.layer_norm for correct QNN export.
+
+    The original uses manual mean/var arithmetic which ONNX traces as ~10 ops;
+    the Hub IR rewriter fuses them back but collapses per-channel gamma to a
+    scalar, which QNN rejects. F.layer_norm exports as a single
+    LayerNormalization node with the correct normalized_shape=[C].
+    """
+
+    def __init__(self, layer_norm: LayerNorm2d) -> None:
+        super().__init__()
+        self.weight = layer_norm.weight
+        self.bias = layer_norm.bias
+        self.eps = layer_norm.eps
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x.permute(0, 2, 3, 1)
+        x = F.layer_norm(x, self.weight.shape, self.weight, self.bias, self.eps)
+        return x.permute(0, 3, 1, 2)
 
 
 class Conv2DInplaceLinearSAMTransformerMLPBlock(nn.Module):

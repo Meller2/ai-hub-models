@@ -19,7 +19,7 @@ from torchvision.transforms.functional import resize
 from qai_hub_models.datasets import get_dataset_from_name
 from qai_hub_models.datasets.common import DatasetSplit
 from qai_hub_models.models._shared.sam2.model_patches import mask_postprocessing
-from qai_hub_models.utils.base_model import PretrainedCollectionModel
+from qai_hub_models.utils.base_model import BaseModel, PretrainedCollectionModel
 from qai_hub_models.utils.evaluate import sample_dataset
 from qai_hub_models.utils.image_processing import (
     numpy_image_to_torch,
@@ -50,7 +50,7 @@ class SAM2App:
         input_image_channel_layout: SAM2InputImageLayout,
         sam2_encoder: Callable[
             [torch.Tensor, torch.Tensor, torch.Tensor],
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
         ],
         sam2_decoder: Callable[
             [torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
@@ -236,9 +236,20 @@ class SAM2App:
         point_coords[..., 0] = point_coords[..., 0] / w
         point_coords[..., 1] = point_coords[..., 1] / h
 
-        image_embeddings, high_res_features1, high_res_features2, sparse_embedding = (
-            self.sam2_encoder(image, point_coords, point_labels.float())
-        )
+        (
+            image_embeddings,
+            high_res_features1,
+            high_res_features2,
+            sparse_embedding,
+            pix_feat,
+        ) = self.sam2_encoder(image, point_coords, point_labels.float())
+
+        # Use pix_feat (image_embeddings + no_mem_embed) when the model uses it,
+        # so downstream code and tests see the same embeddings as
+        # SAM2ImagePredictor.set_image.
+        sam2 = getattr(self.sam2_encoder, "sam2", None)
+        if sam2 is not None and getattr(sam2, "directly_add_no_mem_embed", False):
+            image_embeddings = pix_feat.detach()
 
         return (
             image_embeddings,
@@ -323,18 +334,30 @@ class SAM2App:
         )
         batch_size = get_batch_size(input_spec) or 1
 
-        if "encoder" not in collection_model.components:
-            raise ValueError(
-                "SAM2App.get_calibration_data requires a component named 'encoder'. "
-                f"Available components: {list(collection_model.components)}"
+        encoder: BaseModel | None = None
+        if "decoder" in model._get_name().lower():
+            # Use the component explicitly named "encoder" when present.
+            # Fall back to the first component whose name contains "encoder".
+            components = collection_model.components
+            encoder_name = next(
+                (name for name in ("encoder", "image_encoder") if name in components),
+                next(
+                    (name for name in components if "encoder" in name.lower()),
+                    None,
+                ),
             )
-        encoder = collection_model.components["encoder"]
-        encoder_spec = (input_specs or {}).get("encoder", encoder.get_input_spec())
+            if not encoder_name:
+                raise ValueError(
+                    "Could not find encoder component in collection model."
+                )
+            _enc = components[encoder_name]
+            assert isinstance(_enc, BaseModel)
+            encoder = _enc
 
         dataset = get_dataset_from_name(
             cls.calibration_dataset_name(),
             split=DatasetSplit.TRAIN,
-            input_spec=encoder_spec,
+            input_spec=encoder.get_input_spec() if encoder else input_spec,
         )
         num_samples = num_samples or dataset.default_num_calibration_samples()
         num_samples = (num_samples // batch_size) * batch_size
@@ -345,8 +368,21 @@ class SAM2App:
             [] for _ in range(len(input_spec))
         ]
         for sample_input, _ in dataloader:
-            if component_name == "decoder":
-                sample_input = encoder(*sample_input)
+            if encoder is not None:
+                n = len(encoder.get_input_spec())
+                sample_input = encoder(
+                    *(
+                        sample_input[:n]
+                        if isinstance(sample_input, (list, tuple))
+                        else [sample_input]
+                    )
+                )
+                if isinstance(sample_input, (tuple, list)):
+                    sample_input = sample_input[: len(input_spec)]
+            elif isinstance(sample_input, (list, tuple)):
+                sample_input = sample_input[: len(input_spec)]
+                if len(input_spec) == 1:
+                    sample_input = sample_input[0]
             if isinstance(sample_input, (tuple, list)):
                 for i, tensor in enumerate(sample_input):
                     inputs[i].append(tensor)
