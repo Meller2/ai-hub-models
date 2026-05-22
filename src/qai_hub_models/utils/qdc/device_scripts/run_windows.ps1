@@ -10,9 +10,10 @@ $env:ADSP_LIBRARY_PATH = "$env:QAIRT_HOME\lib\hexagon-{HEXAGON_VERSION}\unsigned
 
 genie-t2t-run.exe -c genie_config.json --prompt_file sample_prompt.txt | Out-File -FilePath "C:/Temp/QDC_logs/genie.log"
 
-for ($i = 1; $i -le 10; $i++) {
+for ($i = 1; $i -le {NUM_TRIALS}; $i++) {
     $profileName = "profile$($i).txt"
     $outputPath = "C:/Temp/QDC_logs/$profileName"
+    (Get-Content genie_config.json) -replace '"seed": \d+', "`"seed`": $i" | Set-Content genie_config.json
     genie-t2t-run.exe -c genie_config.json --prompt_file sample_prompt.txt --profile $outputPath
 }
 

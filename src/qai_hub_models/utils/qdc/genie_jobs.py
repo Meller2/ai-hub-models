@@ -11,6 +11,7 @@ import os
 import pathlib
 import re
 import shutil
+import statistics
 import tempfile
 import time
 import zipfile
@@ -101,6 +102,7 @@ class GenieArtifactHandler(ABC):
         dest_dir: os.PathLike | str,
         hexagon_version: str,
         qairt_version: str,
+        num_trials: int = 25,
     ) -> str:
         """Create artifact bundle and return path to the zip file."""
         raise NotImplementedError
@@ -126,6 +128,7 @@ class GenieAndroidArtifactHandler(GenieArtifactHandler):
         dest_dir: os.PathLike | str,
         hexagon_version: str,
         qairt_version: str,
+        num_trials: int = 25,
     ) -> str:
         # Copy the test script
         test_folder = os.path.join(dest_dir, "tests")
@@ -143,9 +146,9 @@ class GenieAndroidArtifactHandler(GenieArtifactHandler):
             file_content = f.read()
         with open(test_appium_path, "w", encoding="utf-8") as f:
             f.write(
-                file_content.replace("<<HEXAGON_VERSION>>", hexagon_version).replace(
-                    "<<QAIRT_VERSION>>", qairt_version
-                )
+                file_content.replace("<<HEXAGON_VERSION>>", hexagon_version)
+                .replace("<<QAIRT_VERSION>>", qairt_version)
+                .replace("<<NUM_TRIALS>>", str(num_trials))
             )
 
         # Requirements
@@ -197,10 +200,16 @@ class GenieAutoArtifactHandler(GenieAndroidArtifactHandler):
         dest_dir: os.PathLike | str,
         hexagon_version: str,
         qairt_version: str,
+        num_trials: int = 25,
     ) -> str:
         # Build the standard Android artifact first
         zip_path = super().create_artifact(
-            curr_dirname, genie_bundle_path, dest_dir, hexagon_version, qairt_version
+            curr_dirname,
+            genie_bundle_path,
+            dest_dir,
+            hexagon_version,
+            qairt_version,
+            num_trials,
         )
 
         # Append the QAIRT SDK into the artifact zip under genie_bundle/
@@ -233,6 +242,7 @@ class GenieLinuxArtifactHandler(GenieArtifactHandler):
         dest_dir: os.PathLike | str,
         hexagon_version: str,
         qairt_version: str,
+        num_trials: int = 25,
     ) -> str:
         script_name = "run_linux.sh"
         # Copy the bash script directly into dest_dir
@@ -247,9 +257,9 @@ class GenieLinuxArtifactHandler(GenieArtifactHandler):
             file_content = f.read()
         with open(script_dest, "w", encoding="utf-8") as f:
             f.write(
-                file_content.replace("{HEXAGON_VERSION}", hexagon_version).replace(
-                    "{QAIRT_VERSION}", qairt_version
-                )
+                file_content.replace("{HEXAGON_VERSION}", hexagon_version)
+                .replace("{QAIRT_VERSION}", qairt_version)
+                .replace("{NUM_TRIALS}", str(num_trials))
             )
 
         # Bundle the Genie test content
@@ -275,6 +285,7 @@ class GenieWindowsArtifactHandler(GenieArtifactHandler):
         dest_dir: os.PathLike | str,
         hexagon_version: str,
         qairt_version: str,
+        num_trials: int = 25,
     ) -> str:
         script_name = "run_windows.ps1"
         shutil.copy(
@@ -287,9 +298,9 @@ class GenieWindowsArtifactHandler(GenieArtifactHandler):
             file_content = f.read()
         with open(dest_script, "w", encoding="utf-8") as f:
             f.write(
-                file_content.replace("{HEXAGON_VERSION}", hexagon_version).replace(
-                    "{QAIRT_VERSION}", qairt_version
-                )
+                file_content.replace("{HEXAGON_VERSION}", hexagon_version)
+                .replace("{QAIRT_VERSION}", qairt_version)
+                .replace("{NUM_TRIALS}", str(num_trials))
             )
 
         zip_path = os.path.join(os.path.dirname(dest_dir), "test.zip")
@@ -348,6 +359,7 @@ class GenieQDCJobs(QDCJobs):
         qairt_sdk_path: str | None = None,
         qairt_version: str = "2.45.40.260406",
         eval_prompts: list[str] | None = None,
+        num_trials: int = 25,
     ) -> tuple[list[str], str | None]:
         """Prepare and upload Genie artifacts for the job submission.
 
@@ -364,6 +376,8 @@ class GenieQDCJobs(QDCJobs):
         eval_prompts
             If provided, list of prompts to evaluate. Each prompt is formatted
             using the bundle's tokenizer and run sequentially on device.
+        num_trials
+            Number of profiling trials to run.
 
         Returns
         -------
@@ -391,6 +405,7 @@ class GenieQDCJobs(QDCJobs):
                     tmpdirname,
                     qdc_device.hexagon_version,
                     qairt_version,
+                    num_trials,
                 )
                 upload_response = self.upload_file(zip_path, ArtifactType.TESTSCRIPT)
                 if os.path.exists(zip_path):
@@ -479,14 +494,19 @@ class GenieQDCJobs(QDCJobs):
                             )
 
         if len(tps) > 0:
-            avg_tps = sum(tps) / len(tps)
             # TTFT in profile logs is in microseconds, convert to milliseconds
-            min_ttft_ms = (sum(ttft) / len(ttft)) / 1000.0
+            ttft_ms = [t / 1000.0 for t in ttft]
 
             print("Perf metrics:")
-            print(f"  Average Tokens Per Second: {avg_tps:.2f}")
-            print(f"  Min Time to First Token (ms): {min_ttft_ms:.2f}")
-            return avg_tps, min_ttft_ms
+            print(f"  Tokens Per Second (all trials): {tps}")
+            print(f"  Time to First Token ms (all trials): {ttft_ms}")
+            print(
+                f"  Tokens Per Second — average: {statistics.mean(tps):.2f}, median: {statistics.median(tps):.2f}"
+            )
+            print(
+                f"  Time to First Token (ms) — average: {statistics.mean(ttft_ms):.2f}, median: {statistics.median(ttft_ms):.2f}"
+            )
+            return statistics.median(tps), statistics.median(ttft_ms)
 
         print("No performance metrics found.")
         return None, None
@@ -622,6 +642,7 @@ def submit_genie_bundle_to_qdc_device(
     qairt_sdk_path: str | None = None,
     qairt_version: str = "2.45.40.260406",
     eval_prompts: list[str] | None | object = _USE_DEFAULT_PROMPTS,
+    num_trials: int = 25,
 ) -> tuple[float | None, float | None, list[dict]]:
     """
     Submit a Genie bundle to QDC for execution on the specified device.
@@ -648,6 +669,8 @@ def submit_genie_bundle_to_qdc_device(
         List of prompts to evaluate on device. If not provided, uses the
         default eval_prompts.json (100 questions). Pass None or [] to skip
         evaluation.
+    num_trials
+        Number of profiling trials to run.
 
     Returns
     -------
@@ -676,6 +699,7 @@ def submit_genie_bundle_to_qdc_device(
         qairt_sdk_path,
         qairt_version,
         eval_prompts=prompts_to_use,
+        num_trials=num_trials,
     )
 
     job_id = genie_job.submit_automated_job(
@@ -763,6 +787,13 @@ if __name__ == "__main__":
         default=None,
         help="Path to save eval results as CSV.",
     )
+    parser.add_argument(
+        "--num-trials",
+        type=int,
+        required=False,
+        default=25,
+        help="Number of profiling trials to run (default: 25).",
+    )
 
     args = parser.parse_args()
 
@@ -786,6 +817,7 @@ if __name__ == "__main__":
         args.qairt_sdk_path,
         args.qairt_version,
         eval_prompts=eval_prompts,
+        num_trials=args.num_trials,
     )
 
     if args.output_csv:

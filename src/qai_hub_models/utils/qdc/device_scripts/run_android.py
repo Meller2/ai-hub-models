@@ -24,11 +24,19 @@ class TestGenie:
         )
 
     def test_genie(self, driver: webdriver.Remote) -> None:
-        genie_command = [
-            f"genie-t2t-run -c genie_config.json --prompt_file sample_prompt.txt --profile /data/local/tmp/QDC_logs/profile{i}.txt"
-            for i in range(10)
-        ]
-        full_genie_command = " && ".join(genie_command)
+        # download qairt sdk via curl on device
+        # script to set environment variables
+        # run genie-t2t-run on the device
+        num_trials = int("<<NUM_TRIALS>>")
+        trial_commands = []
+        for i in range(num_trials):
+            trial_commands.append(
+                f'sed -i \'s/"seed": [0-9]*/"seed": {i}/\' genie_config.json'
+            )
+            trial_commands.append(
+                f"genie-t2t-run -c genie_config.json --prompt_file sample_prompt.txt --profile /data/local/tmp/QDC_logs/profile{i}.txt"
+            )
+        full_genie_command = " && ".join(trial_commands)
         qairt_path = "/data/local/tmp/qairt/<<QAIRT_VERSION>>"
         genie_script = f"""set -e
 cd /data/local/tmp/genie_bundle

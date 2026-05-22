@@ -26,8 +26,9 @@ export ADSP_LIBRARY_PATH=$QAIRT_HOME/lib/hexagon-{HEXAGON_VERSION}/unsigned
 # Run genie (capture initial output, including stderr)
 genie-t2t-run -c genie_config.json --prompt_file sample_prompt.txt > /data/local/tmp/QDC_logs/genie.log 2>&1
 
-# Run 10 profiling iterations
-for i in $(seq 1 10); do
+# Run profiling iterations
+for i in $(seq 1 {NUM_TRIALS}); do
+    sed -i "s/\"seed\": [0-9]*/\"seed\": $i/" genie_config.json
     genie-t2t-run -c genie_config.json --prompt_file sample_prompt.txt \
       --profile /data/local/tmp/QDC_logs/profile${i}.txt
 done
