@@ -129,6 +129,7 @@ jobs:
       ignore_job_cache: ${{ inputs.ignore_job_cache }}
       ignore_known_failures: ${{ inputs.ignore_known_failures }}
       split_name: ${{ matrix.split.split_name }}
+      runs_on: ${{ toJson(matrix.split.runs_on) }}
       sync_assets_branch: ${{ inputs.sync_assets_branch }}
       python_version: ${{ inputs.python_version }}
       disable_override_workbench_job_timeout: ${{ inputs.disable_override_workbench_job_timeout }}

@@ -1,3 +1,4 @@
+test_split: pi05
 is_aimet: true
 supported_precisions:
 - mixed

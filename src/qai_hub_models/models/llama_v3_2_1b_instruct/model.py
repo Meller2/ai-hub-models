@@ -592,12 +592,12 @@ class Llama3_2_1B_PartBase(torch.nn.Module, MultiGraphWorkbenchModel):
     def shared_source_model(self) -> bool:
         return True
 
-    def convert_graph_to_hub_source_model(
+    def serialize_graph(
         self,
         graph_name: str,
-        output_path: str | os.PathLike,
+        output_dir: str | os.PathLike,
         input_spec: InputSpec | None = None,
-    ) -> Path | None:
+    ) -> Path:
         """Export ONNX model for this Part."""
         model_name = self.__class__.__name__
 
@@ -605,7 +605,7 @@ class Llama3_2_1B_PartBase(torch.nn.Module, MultiGraphWorkbenchModel):
         # Include precision in directory name to avoid cache collisions
         # between different precisions sharing the same output_path.
         precision_suffix = f"_{self._precision}" if self._is_quantized else ""
-        out_dir = Path(output_path) / f"{model_name}{precision_suffix}{ext}"
+        out_dir = Path(output_dir) / f"{model_name}{precision_suffix}{ext}"
         if (out_dir / f"{model_name}.onnx").exists():
             return out_dir
         out_dir.mkdir(parents=True, exist_ok=True)

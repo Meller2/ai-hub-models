@@ -6,7 +6,9 @@
 from __future__ import annotations
 
 import os
+from enum import Enum
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, model_validator
 
@@ -18,6 +20,28 @@ from qai_hub_models.scorecard.device import (
 )
 from qai_hub_models.utils.base_config import BaseQAIHMConfig
 from qai_hub_models.utils.path_helpers import QAIHM_MODELS_ROOT
+
+
+class TestRunnerSplit(Enum):
+    """Named GitHub actions runner splits for grouping models in CI test runs."""
+
+    DEFAULT = "default"  # May be grouped with any other models; optimized to balance model load among many runners.
+    LLM = "llm"
+    PI0_5 = "pi05"
+
+    @property
+    def name(self) -> str:
+        return self.value
+
+    @property
+    def runs_on(self) -> dict[Literal["group", "labels"], str | list[str]] | None:
+        """
+        Runner configuration for this split, matching GitHub Actions runs-on syntax.
+
+        Returns None (use workflow default) or a dict with "group" and/or "labels"
+        (e.g. {"group": "GPU", "labels": ["self-hosted"]}).
+        """
+        return None
 
 
 class ExternalRepoConfig(BaseQAIHMConfig):
@@ -172,6 +196,9 @@ class QAIHMModelCodeGen(BaseQAIHMConfig):
 
     # Instructions for installing system-level dependencies before pip install.
     readme_install_system_deps: str | None = None
+
+    # Places this model into a named CI test split.
+    test_split: TestRunnerSplit = TestRunnerSplit.DEFAULT
 
     def is_supported(
         self,

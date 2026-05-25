@@ -27,6 +27,10 @@ on:
           type: string
           default: ''
 
+        runs_on:
+          description: JSON array of runner tags (e.g. '["tetra-ubuntu-2204", "self-hosted"]')
+          type: string
+
 env:
   PYTHONUNBUFFERED: 1
   VENV_PATH: build/ci-envs/qaihm-build
@@ -37,7 +41,7 @@ env:
 jobs:
   compute_on_device_accuracy:
     name: Compute On-Device Accuracy Metrics${{ inputs.split_name != '' && format(' ({0})', inputs.split_name) || '' }} (using jobs from ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{inputs.action_id}})
-    runs-on: [tetra-ubuntu-2204, self-hosted]
+    runs-on: ${{ inputs.runs_on && inputs.runs_on != 'null' && fromJson(inputs.runs_on) || fromJson('["tetra-ubuntu-2204", "self-hosted"]') }}
     timeout-minutes: 1440 # 24 hours
     env:
       QAIHM_TEST_ARTIFACTS_DIR: ${{ inputs.action_id == '' && 'src/qai_hub_models/scorecard/intermediates' || format('build/scorecard-yamls/{0}', inputs.action_id) }}

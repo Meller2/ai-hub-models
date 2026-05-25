@@ -109,6 +109,7 @@ jobs:
       upload_to_s3: ${{ inputs.upload_to_s3 }}
       models: ${{ matrix.split.models }}
       split_name: ${{ matrix.split.split_name }}
+      runs_on: ${{ toJson(matrix.split.runs_on) }}
 
   start_accuracy_jobs:
     name: Compute Accuracy (${{ matrix.split.split_name }})
@@ -124,6 +125,7 @@ jobs:
       action_id: ${{ inputs.action_id }}
       models: ${{ matrix.split.models }}
       split_name: ${{ matrix.split.split_name }}
+      runs_on: ${{ toJson(matrix.split.runs_on) }}
 
   combine_artifacts:
     name: Combine Split Artifacts

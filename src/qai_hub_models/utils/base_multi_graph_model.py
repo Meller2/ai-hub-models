@@ -95,7 +95,7 @@ class MultiGraphWorkbenchModel(FromPretrainedProtocol):
     def get_unsupported_reason(
         self, target_runtime: TargetRuntime, device: Device
     ) -> str | None:
-        if target_runtime.is_aot_compiled:
+        if not target_runtime.is_aot_compiled:
             return "Multi-graph models only support AOT-compiled target runtimes."
         return None
 

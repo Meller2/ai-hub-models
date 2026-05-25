@@ -1,3 +1,4 @@
+test_split: llm
 is_aimet: true
 is_collection_model: true
 has_multi_graph: true
