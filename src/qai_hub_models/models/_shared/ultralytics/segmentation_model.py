@@ -17,7 +17,7 @@ from qai_hub_models.models._shared.ultralytics.segment_patches import (
 from qai_hub_models.models._shared.yolo.utils import (
     get_most_likely_score,
 )
-from qai_hub_models.utils.base_model import BaseModel
+from qai_hub_models.utils.base_model import BaseModel, SerializationSettings
 from qai_hub_models.utils.bounding_box_processing import box_xywh_to_xyxy
 from qai_hub_models.utils.input_spec import (
     BboxFormat,
@@ -36,7 +36,10 @@ class UltralyticsSingleClassSegmentor(BaseModel):
     """Ultralytics segmentor that segments 1 class."""
 
     def __init__(self, model: SegmentationModel) -> None:
-        super().__init__()
+        super().__init__(
+            model=model,
+            serialization_settings=SerializationSettings(check_trace=False),
+        )
         patch_ultralytics_segmentation_head(model)
         self.model = model
 
@@ -118,9 +121,14 @@ class UltralyticsMulticlassSegmentor(BaseModel):
     """Ultralytics segmentor that segments multiple classes."""
 
     def __init__(
-        self, model: SegmentationModel, precision: Precision | None = None
+        self,
+        model: SegmentationModel,
+        precision: Precision | None = None,
     ) -> None:
-        super().__init__(model)
+        super().__init__(
+            model=model,
+            serialization_settings=SerializationSettings(check_trace=False),
+        )
         self.precision = precision
         self.num_classes = model.model[-1].nc
         if isinstance(model.model[-1], Segment26):

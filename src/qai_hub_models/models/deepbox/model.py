@@ -22,6 +22,7 @@ from qai_hub_models.utils.base_model import (
     BaseModel,
     CollectionModel,
     PretrainedCollectionModel,
+    SerializationSettings,
 )
 from qai_hub_models.utils.image_processing import normalize_image_torchvision
 from qai_hub_models.utils.input_spec import (
@@ -82,6 +83,12 @@ class VGG3DDetection(BaseModel):
     Hand landmark detector model. Input is an image cropped to the hand. The hand must be upright
     and un-tilted in the frame. Returns [landmark_scores, prob_is_right_hand, landmarks]
     """
+
+    def __init__(self, model: torch.nn.Module) -> None:
+        super().__init__(
+            model=model,
+            serialization_settings=SerializationSettings(check_trace=False),
+        )
 
     @classmethod
     def from_pretrained(cls, ckpt_path: str = "DEFAULT") -> Self:

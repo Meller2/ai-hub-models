@@ -20,6 +20,7 @@ from qai_hub_models import Precision
 from qai_hub_models.models._shared.yolo.model import Yolo
 from qai_hub_models.models._shared.yolo.utils import detect_postprocess_split_input
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset
+from qai_hub_models.utils.base_model import SerializationSettings
 
 MODEL_ID = __name__.split(".")[-2]
 DEFAULT_WEIGHTS = "yolox_s.pth"
@@ -43,7 +44,10 @@ class YoloX(Yolo):
             YOLOX, replace_module(yolox_source_model, nn.SiLU, SiLU)
         )
 
-        super().__init__(yolox_source_model)
+        super().__init__(
+            model=yolox_source_model,
+            serialization_settings=SerializationSettings(check_trace=False),
+        )
         self.model: YOLOX
         self.yolox_meshgrid = meshgrid
         self.include_postprocessing = include_postprocessing

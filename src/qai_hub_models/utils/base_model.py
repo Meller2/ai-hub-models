@@ -11,7 +11,7 @@ import shutil
 from collections.abc import Callable
 from contextlib import nullcontext
 from pathlib import Path
-from typing import Any, ClassVar, Generic, TypeVar, cast
+from typing import Any, ClassVar, Generic, NamedTuple, TypeVar, cast
 
 import torch
 from qai_hub.client import Device
@@ -60,8 +60,14 @@ __all__ = [
     "IndependentComponentFromPretrainedMixin",
     "PrecompiledCollectionModel",
     "PretrainedCollectionModel",
+    "SerializationSettings",
     "WorkbenchModel",
 ]
+
+
+class SerializationSettings(NamedTuple):
+    use_pt2: bool = False
+    check_trace: bool = True
 
 
 def _model_cls_name(cls_instance: Any) -> str:
@@ -289,10 +295,15 @@ class BaseModel(
 ):
     """A pre-trained PyTorch model with helpers for submission to AI Hub Workbench."""
 
-    def __init__(self, model: torch.nn.Module | None = None) -> None:
+    def __init__(
+        self,
+        model: torch.nn.Module | None = None,
+        serialization_settings: SerializationSettings | None = None,
+    ) -> None:
         torch.nn.Module.__init__(self)
         self.eval()
         self.model = cast(torch.nn.Module, model)
+        self.serialization_settings = serialization_settings or SerializationSettings()
 
     def __setattr__(self, name: str, value: Any) -> None:
         """
@@ -382,11 +393,24 @@ class BaseModel(
         input_spec: InputSpec | None = None,
     ) -> Path:
         """Serialize this model to disk. The serialized model will be uploaded to AI Hub Workbench during export."""
-        output_path = Path(output_dir) / f"{self.name}.pt"
-        torch.jit.save(
-            self.convert_to_torchscript(input_spec, check_trace=False),
-            output_path,
-        )
+        if self.serialization_settings.use_pt2:
+            input_spec = input_spec or self.get_input_spec()
+            output_path = Path(output_dir) / f"{self.name}.pt2"
+            self.to("cpu").eval()
+            with torch.no_grad():
+                exported = torch.export.export(
+                    self, tuple(make_torch_inputs(input_spec))
+                )
+            torch.export.save(exported, output_path)
+        else:
+            output_path = Path(output_dir) / f"{self.name}.pt"
+            input_spec = input_spec or self.get_input_spec()
+            torch.jit.save(
+                self.convert_to_torchscript(
+                    input_spec, check_trace=self.serialization_settings.check_trace
+                ),
+                output_path,
+            )
         return output_path
 
 

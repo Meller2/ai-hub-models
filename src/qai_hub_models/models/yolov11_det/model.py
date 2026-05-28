@@ -18,6 +18,7 @@ from qai_hub_models.models._shared.ultralytics.detect_patches import (
 )
 from qai_hub_models.models._shared.yolo.model import Yolo, yolo_detect_postprocess
 from qai_hub_models.utils.base_evaluator import BaseEvaluator
+from qai_hub_models.utils.base_model import SerializationSettings
 
 MODEL_ASSET_VERSION = 1
 MODEL_ID = __name__.split(".")[-2]
@@ -41,11 +42,13 @@ class YoloV11Detector(Yolo):
         include_postprocessing: bool = True,
         split_output: bool = False,
     ) -> None:
-        super().__init__()
-        self.model = model
+        super().__init__(
+            model=model,
+            serialization_settings=SerializationSettings(check_trace=False),
+        )
         self.include_postprocessing = include_postprocessing
         self.split_output = split_output
-        patch_ultralytics_detection_head(self.model)
+        patch_ultralytics_detection_head(model)
 
     @classmethod
     def from_pretrained(

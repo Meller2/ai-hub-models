@@ -5,17 +5,25 @@
 
 from __future__ import annotations
 
+import torch
 import torchvision.models as tv_models
 from typing_extensions import Self
 
 from qai_hub_models import Precision
 from qai_hub_models.models._shared.imagenet_classifier.model import ImagenetClassifier
+from qai_hub_models.utils.base_model import SerializationSettings
 
 MODEL_ID = __name__.split(".")[-2]
 DEFAULT_WEIGHTS = "IMAGENET1K_V1"
 
 
 class VIT(ImagenetClassifier):
+    def __init__(self, net: torch.nn.Module) -> None:
+        super().__init__(
+            net=net,
+            serialization_settings=SerializationSettings(check_trace=False),
+        )
+
     @classmethod
     def from_pretrained(cls, weights: str = DEFAULT_WEIGHTS) -> Self:
         net = tv_models.vit_b_16(weights=weights)

@@ -17,6 +17,7 @@ from qai_hub_models.utils.base_model import (
     BaseModel,
     CollectionModel,
     PretrainedCollectionModel,
+    SerializationSettings,
 )
 from qai_hub_models.utils.image_processing import normalize_image_torchvision
 from qai_hub_models.utils.input_spec import (
@@ -44,7 +45,10 @@ TRACKER_CONFIG_PATH = str(
 
 class TrackAnything(BaseModel):
     def __init__(self, model: XMem) -> None:
-        super().__init__(model)
+        super().__init__(
+            model=model,
+            serialization_settings=SerializationSettings(check_trace=False),
+        )
         self.model: XMem
 
     @classmethod

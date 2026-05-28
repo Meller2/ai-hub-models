@@ -10,6 +10,7 @@ from typing_extensions import Self
 
 from qai_hub_models.models._shared.detr.model import DETR
 from qai_hub_models.models.rf_detr.external_repos.rf_detr.rfdetr import RFDETRBase
+from qai_hub_models.utils.base_model import SerializationSettings
 from qai_hub_models.utils.image_processing import normalize_image_torchvision
 from qai_hub_models.utils.input_spec import InputSpec
 
@@ -21,6 +22,12 @@ DEFAULT_RESOLUTION = 560
 
 class RF_DETR(DETR):
     """Exportable RF-DETR model, end-to-end."""
+
+    def __init__(self, model: torch.nn.Module) -> None:
+        super().__init__(
+            model=model,
+            serialization_settings=SerializationSettings(check_trace=False),
+        )
 
     def forward(
         self, image: torch.Tensor

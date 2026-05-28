@@ -24,6 +24,7 @@ from qai_hub_models.extern.mmengine import (
 )
 from qai_hub_models.models._shared.yolo.model import Yolo
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset
+from qai_hub_models.utils.base_model import SerializationSettings
 
 MODEL_ID = __name__.split(".")[-2]
 MODEL_ASSET_VERSION = 1
@@ -45,7 +46,10 @@ class RTMDet(Yolo):
     def __init__(
         self, model: mmdet_RTMDET, include_postprocessing: bool = True
     ) -> None:
-        super().__init__(model)
+        super().__init__(
+            model=model,
+            serialization_settings=SerializationSettings(check_trace=False),
+        )
         self.model: mmdet_RTMDET
         self.stage = [80, 40, 20]
         self.input_shape = 640

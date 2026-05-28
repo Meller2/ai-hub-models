@@ -14,6 +14,7 @@ from qai_hub_models.models._shared.yolo.utils import detect_postprocess
 from qai_hub_models.models.yolor.external_repos import EXTERNAL_REPO_PATHS
 from qai_hub_models.models.yolor.external_repos.yolor.models.models import Darknet
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_torch
+from qai_hub_models.utils.base_model import SerializationSettings
 
 MODEL_ID = __name__.split(".")[-2]
 MODEL_ASSET_VERSION = 1
@@ -26,8 +27,10 @@ class YoloR(Yolo):
     """Exportable YoloR bounding box detector, end-to-end."""
 
     def __init__(self, model: nn.Module, include_postprocessing: bool = True) -> None:
-        super().__init__()
-        self.model = model
+        super().__init__(
+            model=model,
+            serialization_settings=SerializationSettings(check_trace=False),
+        )
         self.include_postprocessing = include_postprocessing
 
     @classmethod
