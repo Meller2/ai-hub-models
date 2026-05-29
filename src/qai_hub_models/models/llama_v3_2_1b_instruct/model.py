@@ -45,7 +45,11 @@ from qai_hub_models import (
     SampleInputsType,
     TargetRuntime,
 )
-from qai_hub_models.configs.model_metadata import ModelMetadata
+from qai_hub_models.configs.model_metadata import (
+    GenieChatTemplate,
+    GenieMetadata,
+    ModelMetadata,
+)
 from qai_hub_models.models._shared.llama3.model import (
     Llama3DynamicBase,
     Llama3DynamicBase_AIMETOnnx,
@@ -805,6 +809,17 @@ class Llama3_2_1B_Collection(MultiGraphCollectionModel):
         )
         with open(output_path / "sample_prompt.txt", "w") as f:
             f.write(sample_prompt)
+
+        chat_spec = Llama3_2_1B_PreSplit.get_chat_template()
+        metadata.genie = GenieMetadata(
+            chat_template=GenieChatTemplate(**chat_spec)
+            if chat_spec
+            else GenieChatTemplate(),
+            context_lengths=[context_length],
+            supports_streaming=True,
+            supports_vision=False,
+            supports_thinking=False,
+        )
 
         metadata.supplementary_files["genie_config.json"] = (
             "Genie SDK configuration for on-device LLM inference."
