@@ -39,7 +39,7 @@ class TestGenie:
                 f'sed -i \'s/"seed": [0-9]*/"seed": {i}/\' genie_config.json'
             )
             trial_commands.append(
-                f"genie-t2t-run -c genie_config.json --prompt_file sample_prompt.txt --profile /data/local/tmp/QDC_logs/profile{i}.txt"
+                f"genie_retry genie-t2t-run -c genie_config.json --prompt_file sample_prompt.txt --profile /data/local/tmp/QDC_logs/profile{i}.txt"
             )
         full_genie_command = " && ".join(trial_commands)
         qairt_path = "/data/local/tmp/qairt/<<QAIRT_VERSION>>"
@@ -48,6 +48,14 @@ class TestGenie:
         # Needed because adb shell always returns 0, hiding on-device failures.
         genie_script = f"""trap 'rc=$?; echo {_EXIT_MARKER}$rc' EXIT
 set -e
+# genie-t2t-run fails randomly on QDC devices; give each invocation one retry
+# before letting the failure (and set -e) abort the whole job.
+genie_retry() {{
+    "$@" || {{
+        echo "genie_retry: command failed, retrying once: $*" >&2
+        "$@"
+    }}
+}}
 cd /data/local/tmp/genie_bundle
 curl -L -J --fail --max-time 300 --retry 3 --retry-delay 5 --output /data/local/tmp/qairt.zip https://softwarecenter.qualcomm.com/api/download/software/sdks/Qualcomm_AI_Runtime_Community/All/<<QAIRT_VERSION>>/v<<QAIRT_VERSION>>.zip
 unzip /data/local/tmp/qairt.zip -d /data/local/tmp
@@ -57,7 +65,7 @@ export LD_LIBRARY_PATH={qairt_path}/lib/aarch64-android
 export ADSP_LIBRARY_PATH={qairt_path}/lib/hexagon-<<HEXAGON_VERSION>>/unsigned
 
 mkdir -p /data/local/tmp/QDC_logs
-genie-t2t-run -c genie_config.json --prompt_file sample_prompt.txt > /data/local/tmp/QDC_logs/genie.log
+genie_retry genie-t2t-run -c genie_config.json --prompt_file sample_prompt.txt > /data/local/tmp/QDC_logs/genie.log
 {full_genie_command}
 
 PROMPT_DIR=/data/local/tmp/genie_bundle/prompts
@@ -67,7 +75,7 @@ if [ -d "$PROMPT_DIR" ]; then
     for prompt_file in $PROMPT_DIR/prompt_*.txt; do
         idx=$(basename "$prompt_file" | sed 's/prompt_\\([0-9]*\\)\\.txt/\\1/')
         echo "===EVAL_IDX_${{idx}}===" >> "$EVAL_OUTPUT_FILE"
-        genie-t2t-run -c genie_config.json --prompt_file "$prompt_file" >> "$EVAL_OUTPUT_FILE" 2>&1
+        genie_retry genie-t2t-run -c genie_config.json --prompt_file "$prompt_file" >> "$EVAL_OUTPUT_FILE" 2>&1
     done
 fi
 """

@@ -52,7 +52,7 @@ class TestGenie:
                 f'sed -i \'s/"seed": [0-9]*/"seed": {i}/\' genie_config.json'
             )
             trial_commands.append(
-                f"genie-t2t-run -c genie_config.json --prompt_file sample_prompt.txt --profile /data/local/tmp/QDC_logs/profile{i}.txt"
+                f"genie_retry genie-t2t-run -c genie_config.json --prompt_file sample_prompt.txt --profile /data/local/tmp/QDC_logs/profile{i}.txt"
             )
         full_genie_command = " && ".join(trial_commands)
         qairt_path = "/data/local/tmp/genie_bundle/qairt"
@@ -61,6 +61,14 @@ class TestGenie:
         # Needed because adb shell always returns 0, hiding on-device failures.
         genie_script = f"""trap 'rc=$?; echo {_EXIT_MARKER}$rc' EXIT
 set -e
+# genie-t2t-run fails randomly on QDC devices; give each invocation one retry
+# before letting the failure (and set -e) abort the whole job.
+genie_retry() {{
+    "$@" || {{
+        echo "genie_retry: command failed, retrying once: $*" >&2
+        "$@"
+    }}
+}}
 cd /data/local/tmp/genie_bundle
 unzip qairt_sdk.zip -d /data/local/tmp/genie_bundle
 mv /data/local/tmp/genie_bundle/artifact /data/local/tmp/genie_bundle/qairt
@@ -70,7 +78,7 @@ export LD_LIBRARY_PATH={qairt_path}/lib/aarch64-android
 export ADSP_LIBRARY_PATH={qairt_path}/lib/hexagon-<<HEXAGON_VERSION>>/unsigned
 cp /data/local/tmp/qxa.qa_adsplib/libc++.so.1 ${{ADSP_LIBRARY_PATH}}/
 cp /data/local/tmp/qxa.qa_adsplib/libc++abi.so.1 ${{ADSP_LIBRARY_PATH}}/
-genie-t2t-run -c genie_config.json --prompt_file sample_prompt.txt > /data/local/tmp/QDC_logs/genie.log
+genie_retry genie-t2t-run -c genie_config.json --prompt_file sample_prompt.txt > /data/local/tmp/QDC_logs/genie.log
 {full_genie_command}
 """
         # Push the genie_bundle directory to the device
