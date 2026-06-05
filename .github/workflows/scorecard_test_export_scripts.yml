@@ -46,6 +46,14 @@ on:
           description: JSON array of runner tags (e.g. '["tetra-ubuntu-2204", "self-hosted"]')
           type: string
 
+        build_and_test_target:
+          description: |
+            Which build_and_test.py task to invoke. Defaults to "test_export_scripts"
+            (gates on @pytest.mark.export). Set to "test_llm_export_scripts" for the
+            LLM asset-upload workflow (gates on @pytest.mark.llm_export).
+          type: string
+          default: test_export_scripts
+
 env:
   PYTHONUNBUFFERED: 1
   VENV_PATH: build/ci-envs/qaihm-build
@@ -131,7 +139,7 @@ jobs:
             python3 scripts/build_and_test.py \
             --venv="${{ env.VENV_PATH }}" \
             --python="${{ steps.ci_setup.outputs.python-path }}" \
-            test_export_scripts
+            ${{ inputs.build_and_test_target }}
 
       - name: Upload Cached Asset Locations
         id: upload-asset-cache

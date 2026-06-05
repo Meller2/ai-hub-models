@@ -536,6 +536,7 @@ class TaskLibrary:
         enable_inference: bool = False,
         enable_compute_device_accuracy: bool = False,
         enable_export_end2end: bool = False,
+        enable_llm_export: bool = False,
     ) -> PyTestModelsTask:
         models = get_all_models()
         return PyTestModelsTask(
@@ -554,6 +555,7 @@ class TaskLibrary:
             run_export_inference=enable_inference,
             run_compute_device_accuracy=enable_compute_device_accuracy,
             run_full_export=enable_export_end2end,
+            run_llm_export=enable_llm_export,
             # If one model fails, we should still try the others.
             exit_after_single_model_failure=False,
             test_trace=False,
@@ -639,6 +641,17 @@ class TaskLibrary:
     ) -> str:
         return plan.add_step(
             step_id, self._make_hub_scorecard_task(enable_export_end2end=True)
+        )
+
+    @public_task(
+        "Verify LLM export scripts work end-to-end (only @pytest.mark.llm_export)."
+    )
+    @depends(["model_test_setup"])
+    def test_llm_export_scripts(
+        self, plan: Plan, step_id: str = "test_llm_export_scripts"
+    ) -> str:
+        return plan.add_step(
+            step_id, self._make_hub_scorecard_task(enable_llm_export=True)
         )
 
     @public_task("Verify all async workbench jobs completed successfully.")

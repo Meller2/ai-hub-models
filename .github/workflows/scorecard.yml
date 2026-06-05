@@ -199,6 +199,16 @@ jobs:
       deployment: ${{ inputs.deployment }}
       test_mode: false
 
+  llm_asset_upload:
+    name: LLM Asset Upload
+    needs: submit_split_jobs
+    if: ${{ !cancelled() && needs.submit_split_jobs.result != 'skipped' }}
+    secrets: inherit
+    uses: ./.github/workflows/scorecard_llm_asset_upload.yml
+    with:
+      action_id: ${{ github.run_id }}
+      upload_to_s3: ${{ contains(inputs.release_scope, 'upload_export_assets') }}
+
   collect_results_split:
     name: Test Export Scripts, Upload Zip Files & Compute Accuracy
     needs: [submit_split_jobs, fix_flaky_jobs]
@@ -214,7 +224,7 @@ jobs:
 
   collect_results:
     name: Collect Scorecard Results
-    needs: [submit_split_jobs, fix_flaky_jobs, collect_results_split]
+    needs: [submit_split_jobs, fix_flaky_jobs, collect_results_split, llm_asset_upload]
     if: ${{ !cancelled() && needs.submit_split_jobs.result != 'skipped' }}
     secrets: inherit
     uses: ./.github/workflows/scorecard_collect_results.yml

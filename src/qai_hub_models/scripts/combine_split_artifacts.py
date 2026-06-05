@@ -164,7 +164,11 @@ def main() -> None:
     args = parser.parse_args()
 
     if not args.input_dir.exists():
-        parser.error(f"Input directory does not exist: {args.input_dir}")
+        print(
+            f"Input directory does not exist: {args.input_dir}. "
+            "Nothing to combine — exiting cleanly."
+        )
+        return
 
     # Find all subdirectories in the input directory.
     # If no subdirectories exist (e.g. download-artifact v8 with merge-multiple),

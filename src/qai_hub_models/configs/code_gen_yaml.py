@@ -117,14 +117,6 @@ class QAIHMModelCodeGen(BaseQAIHMConfig):
     # Second knob for skipping of scorecard generation. Use case, skip scorecard but run hub tests.
     skip_scorecard: bool = False
 
-    # If set, codegen omits test_profile / test_inference / test_val_data_torch /
-    # test_torch_accuracy / test_sim_accuracy from test_generated.py. test_compile,
-    # test_link, test_val_accuracy (compute_device_accuracy), and test_export still
-    # generate, so release-assets.yaml is still produced.
-    # Use for models where on-device profile/inference numbers aren't meaningful
-    # (e.g. LLMs that only run via orchestrator runtimes like genie).
-    skip_profile_and_inference: bool = False
-
     # If set to true, Scorecard will still run this model, but perf.yaml and associated code-gen.yaml / README.md changes will not be written to disk.
     # This is useful for models whose assets cannot be changed in a release, but we still want to continue testing said models.
     freeze_perf_yaml: bool = False
@@ -289,6 +281,17 @@ class QAIHMModelCodeGen(BaseQAIHMConfig):
             if include_timeouts and reason.causes_timeout:
                 return reason.issue or "Timeout"
         return None
+
+    @property
+    def skips_profile_and_inference(self) -> bool:
+        """
+        True if this model doesn't have meaningful on-device profile or inference
+        numbers (e.g. LLMs that only run via orchestrator runtimes like genie).
+        Codegen omits test_profile / test_inference / test_val_data_torch /
+        test_torch_accuracy / test_sim_accuracy from test_generated.py for these.
+        Scorecard skips perf.yaml writes and runtime-failure updates as well.
+        """
+        return self.test_split is TestRunnerSplit.LLM
 
     @property
     def supports_at_least_1_runtime(self) -> bool:

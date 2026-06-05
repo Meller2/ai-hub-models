@@ -164,6 +164,7 @@ jobs:
         with:
           name: Scorecard Cached Artifact (release-assets.yaml, ${{ inputs.action_id }})
           path: build/combined-release-assets/release-assets.yaml
+          if-no-files-found: ignore
 
       - name: Delete Split Release Asset Artifacts
         if: ${{ inputs.upload_to_s3 && steps.download_release_assets.outcome == 'success' }}
@@ -236,6 +237,7 @@ jobs:
         with:
           name: Scorecard Cached Artifact (accuracy.csv, ${{ inputs.action_id }})
           path: build/combined-accuracy-csvs/accuracy.csv
+          if-no-files-found: ignore
 
       - name: Delete Split Accuracy CSV Artifacts
         if: ${{ steps.download_accuracy_csvs.outcome == 'success' }}

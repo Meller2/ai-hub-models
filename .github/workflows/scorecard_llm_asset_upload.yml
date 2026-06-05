@@ -1,0 +1,80 @@
+name: Scorecard - LLM Export Scripts (Asset Upload)
+
+# LLM models don't have profile jobs (skipped via test_split: llm), so we can
+# upload their release assets immediately after compile/link jobs are submitted,
+# rather than waiting through fix_flaky_jobs and the rest of the matrix.
+
+on:
+    workflow_call:
+      inputs:
+        action_id:
+          type: string
+          required: true
+
+        upload_to_s3:
+          description: Upload export-generated ZIP files to S3
+          type: boolean
+          default: false
+
+env:
+  PYTHONUNBUFFERED: 1
+  VENV_PATH: build/ci-envs/qaihm-build
+  QAIHM_CI: 1
+
+jobs:
+  determine_llm_models:
+    name: Determine LLM Models
+    runs-on: [tetra-ubuntu-2204, self-hosted]
+    outputs:
+      models: ${{ steps.find.outputs.models }}
+      has_models: ${{ steps.find.outputs.has_models }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: CI Setup
+        uses: ./.github/actions/ci-setup
+        with:
+          sudo-password: ${{ secrets.TETRASERVICE_PASSWORD }}
+          venv-path: ${{ env.VENV_PATH }}
+
+      # We run in parallel with fix_flaky_jobs, so the post-flaky-retry artifact
+      # ("Job-IDs") doesn't exist yet — only the original Flaky-Job-IDs artifact
+      # uploaded by submit_split_jobs is available at this point.
+      - name: Download Flaky-Job Artifacts
+        uses: actions/download-artifact@v8
+        with:
+            run-id: ${{ inputs.action_id }}
+            github-token: ${{ github.token }}
+            name: Scorecard Cached Artifact (Flaky-Job-IDs, ${{ inputs.action_id }})
+            path: build/scorecard-yamls/${{ inputs.action_id }}
+
+      - name: Find Models in LLM Split
+        id: find
+        run: |
+          source "${{ env.VENV_PATH }}/bin/activate"
+          # Sanitize: model IDs are [a-z0-9_], comma-separated; strip anything else
+          # to avoid shell-metachar injection from the artifact-sourced env file.
+          MODELS=$(grep '^QAIHM_TEST_MODELS=' build/scorecard-yamls/${{ inputs.action_id }}/environment.env | cut -d= -f2 | tr -cd 'A-Za-z0-9_,\-')
+          MATRIX=$(python -m qai_hub_models.scripts.split_torch_models --models "$MODELS" --output-format github)
+          LLM_MODELS=$(echo "$MATRIX" | python -c "import json, sys; splits=json.load(sys.stdin); m=next((s['models'] for s in splits if s['split_name']=='llm'), ''); print(m)")
+          echo "models=$LLM_MODELS" >> "$GITHUB_OUTPUT"
+          if [ -n "$LLM_MODELS" ]; then
+            echo "has_models=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_models=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "LLM models: $LLM_MODELS"
+
+  test_llm_export:
+    name: Test LLM Export Scripts (Early)
+    needs: determine_llm_models
+    if: ${{ needs.determine_llm_models.outputs.has_models == 'true' }}
+    secrets: inherit
+    uses: ./.github/workflows/scorecard_test_export_scripts.yml
+    with:
+      action_id: ${{ inputs.action_id }}
+      upload_to_s3: ${{ inputs.upload_to_s3 }}
+      models: ${{ needs.determine_llm_models.outputs.models }}
+      split_name: llm
+      runs_on: '["tetra-ubuntu-2204", "self-hosted"]'
+      build_and_test_target: test_llm_export_scripts

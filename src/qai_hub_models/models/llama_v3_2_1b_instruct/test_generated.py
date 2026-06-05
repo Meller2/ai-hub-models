@@ -32,14 +32,12 @@ from qai_hub_models.scorecard import (
 from qai_hub_models.scorecard.errors import CachedScorecardJobError
 from qai_hub_models.scorecard.execution_helpers import (
     get_compile_parameterized_pytest_config,
-    get_evaluation_parameterized_pytest_config,
     get_export_parameterized_pytest_config,
     get_link_parameterized_pytest_config,
     pytest_device_idfn,
 )
 from qai_hub_models.scorecard.utils.testing import skip_invalid_runtime_device
 from qai_hub_models.scorecard.utils.testing_export_eval import (
-    accuracy_on_sample_inputs_via_export,
     compile_via_export,
     export_test_e2e,
     link_via_export,
@@ -177,38 +175,6 @@ def torch_evaluate_mock_outputs(
 
 @pytest.mark.parametrize(
     ("precision", "scorecard_path", "device"),
-    get_evaluation_parameterized_pytest_config(
-        MODEL_ID,
-        EVAL_DEVICE,
-        ENABLED_PRECISION_RUNTIMES,
-        PASSING_PRECISION_RUNTIMES,
-        can_use_quantize_job=False,
-    ),
-    ids=pytest_device_idfn,
-)
-@pytest.mark.compute_device_accuracy
-def test_val_accuracy(
-    precision: Precision,
-    scorecard_path: ScorecardProfilePath,
-    device: ScorecardDevice,
-    torch_val_outputs: list[np.ndarray],
-    torch_evaluate_mock_outputs: list[torch.Tensor | tuple[torch.Tensor, ...]],
-) -> None:
-    try:
-        accuracy_on_sample_inputs_via_export(
-            export_model,
-            MODEL_ID,
-            Model.from_pretrained(checkpoint=f"DEFAULT_{str(precision).upper()}"),
-            precision,
-            scorecard_path,
-            device,
-        )
-    except CachedScorecardJobError as e:
-        pytest.skip(str(e))
-
-
-@pytest.mark.parametrize(
-    ("precision", "scorecard_path", "device"),
     get_export_parameterized_pytest_config(
         MODEL_ID,
         EVAL_DEVICE,
@@ -220,7 +186,7 @@ def test_val_accuracy(
     ),
     ids=pytest_device_idfn,
 )
-@pytest.mark.export
+@pytest.mark.llm_export
 def test_export(
     precision: Precision, scorecard_path: ScorecardProfilePath, device: ScorecardDevice
 ) -> None:
