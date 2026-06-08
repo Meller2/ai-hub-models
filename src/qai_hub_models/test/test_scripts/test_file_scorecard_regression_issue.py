@@ -123,6 +123,33 @@ def test_build_issue_body_truncates_numerics_table() -> None:
     assert "[Numerics Diff](https://num)" in body
 
 
+def test_dev_run_links_previous_prod_jobs_to_workbench() -> None:
+    """A dev scorecard's "Previous Job ID (prod)" link must point to prod.
+
+    Regression test for tetracode#19428. The current-run job and the previous-
+    prod baseline are independent deployments — applying the run's deployment
+    uniformly to both produces broken links from dev runs to prod jobs.
+    """
+    row = {
+        **PERF_REGRESSIONS[0],
+        "Job ID (dev)": "jcurr_dev",
+        "Previous Job ID (prod)": "jprev_prod",
+    }
+    # Drop the original "Job ID (prod)" so we have one column per deployment.
+    row.pop("Job ID (prod)", None)
+
+    body = build_issue_body(
+        [row], [], "https://run", "https://perf", "https://num", deployment="dev"
+    )
+
+    # Current-run job (column suffix "(dev)") -> dev subdomain.
+    assert "[jcurr_dev](https://dev.aihub.qualcomm.com/jobs/jcurr_dev/)" in body
+    # Previous-prod baseline (column suffix "(prod)") -> workbench subdomain,
+    # not dev — even though the run's deployment is dev.
+    assert "[jprev_prod](https://workbench.aihub.qualcomm.com/jobs/jprev_prod/)" in body
+    assert "https://dev.aihub.qualcomm.com/jobs/jprev_prod/" not in body
+
+
 def test_build_issue_body_rejects_malformed_job_ids() -> None:
     """Job IDs that don't match the expected format are not linkified."""
     bad_row = {

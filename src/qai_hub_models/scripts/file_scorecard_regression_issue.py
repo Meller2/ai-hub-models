@@ -63,18 +63,40 @@ def _job_link(job_id: str, deployment: str = "workbench") -> str:
     return f"[{job_id}]({_job_url(job_id, deployment)})"
 
 
+_DEPLOYMENT_SUFFIX_RE = re.compile(r"\((prod|dev|staging)\)")
+# Map suffix tokens to AI Hub URL subdomains.
+_DEPLOYMENT_SUBDOMAIN = {"prod": "workbench", "dev": "dev", "staging": "staging"}
+
+
+def _deployment_for_column(column_name: str, default: str) -> str:
+    """Pick the AI Hub subdomain to use for a Job ID column's links.
+
+    A "Previous Job ID (prod)" column always references prod baselines, even on
+    a dev scorecard run — so the link must use the prod subdomain regardless of
+    which deployment this run is. Columns without a (prod|dev|staging) suffix
+    fall back to the run's deployment.
+    """
+    match = _DEPLOYMENT_SUFFIX_RE.search(column_name)
+    if match:
+        return _DEPLOYMENT_SUBDOMAIN[match.group(1)]
+    return default
+
+
 def _linkify_job_ids(rows: list[dict], deployment: str = "workbench") -> list[dict]:
     """Convert job ID values to markdown links in-place.
 
     Any column whose name contains "Job ID" gets its value converted
-    from a plain ID string to a markdown link.
+    from a plain ID string to a markdown link. The link's deployment subdomain
+    is derived from the column name when it carries a (prod|dev|staging)
+    suffix, so e.g. "Previous Job ID (prod)" always points to prod.
     """
     result = []
     for row in rows:
         new_row = {}
         for key, val in row.items():
             if "Job ID" in key:
-                new_row[key] = _job_link(str(val), deployment)
+                col_deployment = _deployment_for_column(key, deployment)
+                new_row[key] = _job_link(str(val), col_deployment)
             else:
                 new_row[key] = val
         result.append(new_row)
