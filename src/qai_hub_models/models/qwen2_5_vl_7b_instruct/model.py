@@ -59,6 +59,7 @@ from qai_hub_models.models._shared.llm.model import (
     DynamicPreSplitOnnxMixin,
     DynamicQuantizablePreSplitMixin,
     LLMDynamic_AIMETOnnx,
+    LLMPartBase,
     SingleSlotCacheMixin,
     get_onnx_model,
 )
@@ -857,15 +858,20 @@ class Qwen2_5_VL_7B_VisionEncoder(Qwen2VLVisionEncoder):
 # ---------------------------------------------------------------------------
 
 
-class Qwen2_5_VL_7B_PartBase(torch.nn.Module, MultiGraphWorkbenchModel):
+class Qwen2_5_VL_7B_PartBase(LLMPartBase, torch.nn.Module, MultiGraphWorkbenchModel):
     """
     Unified Part base: handles both FP and Quantizable modes based on precision.
 
     Each Part represents one split of the ONNX model for deployment.
-    VLM Parts use input_embeds instead of input_ids.
+    VLM Parts use inputs_embeds instead of input_ids (the FP model's
+    ``llm_io_type`` is ``genie_input_embeds``), so there is no embedding split.
+    ``get_graph_input_spec`` / ``get_graph_output_names`` come from ``LLMPartBase``.
     """
 
     part_id: int = 0
+    hidden_size: int = HIDDEN_SIZE
+    num_attention_heads: int = NUM_ATTN_HEADS
+    num_key_value_heads: int = NUM_KEY_VALUE_HEADS
 
     def __init__(
         self,
@@ -956,66 +962,6 @@ class Qwen2_5_VL_7B_PartBase(torch.nn.Module, MultiGraphWorkbenchModel):
             context_length=context_length,
             llm_io_type=llm_io_type,
         )
-
-    def get_graph_input_spec(self, graph_name: str) -> InputSpec:
-        sequence_length, context_length = self._graph_names[graph_name]
-        """Get input spec for this specific Part instance.
-
-        VLM Parts don't have a separate embedding split. Part 1 takes
-        input_embeds + attention_mask + KV cache for its layers.
-        Names are read from the actual split ONNX model.
-        """
-        if sequence_length is None:
-            sequence_length = self._presplit.sequence_length
-        if context_length is None:
-            context_length = self._presplit.context_length
-        head_dim = HIDDEN_SIZE // NUM_ATTN_HEADS
-        kv_seq_len = context_length - sequence_length
-
-        onnx_input_names = self._get_onnx_input_names()
-        spec: InputSpec = {}
-
-        for name in onnx_input_names:
-            if "past_key" in name:
-                spec[name] = (
-                    (NUM_KEY_VALUE_HEADS, 1, head_dim, kv_seq_len),
-                    "float32",
-                )
-            elif "past_value" in name:
-                spec[name] = (
-                    (NUM_KEY_VALUE_HEADS, 1, kv_seq_len, head_dim),
-                    "float32",
-                )
-            elif name == "attention_mask":
-                spec[name] = (
-                    (1, 1, sequence_length, context_length),
-                    "float32",
-                )
-            elif name == "inputs_embeds":
-                spec[name] = (
-                    (1, sequence_length, HIDDEN_SIZE),
-                    "float32",
-                )
-            elif name in ("position_ids_cos", "position_ids_sin"):
-                embed_dim = head_dim // 2
-                spec[name] = (
-                    (1, 1, sequence_length, embed_dim),
-                    "float32",
-                )
-            else:
-                # Intermediate hidden state from previous part
-                spec[name] = (
-                    (1, sequence_length, HIDDEN_SIZE),
-                    "float32",
-                )
-
-        return spec
-
-    def get_graph_output_names(self, graph_name: str) -> list[str]:
-        return [
-            name.replace("/", "_").replace(".", "_")
-            for name in self._get_onnx_output_names()
-        ]
 
     def _sample_inputs_impl(
         self, input_spec: InputSpec | None = None

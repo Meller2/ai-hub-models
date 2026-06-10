@@ -1051,6 +1051,128 @@ class SplitForwardMixin:
         )
 
 
+class LLMPartBase:
+    """Base for one split of a dynamic-shape ONNX LLM exported for deployment.
+
+    A "Part" is one split of the full model. Both text LLMs (e.g. Llama) and
+    VLMs (e.g. Qwen2.5-VL) split the model into Parts whose ONNX input names
+    follow the same conventions (``past_key_*`` / ``past_value_*`` /
+    ``attention_mask`` / ``position_ids_cos`` / ``position_ids_sin`` / the
+    token-or-embedding input / intermediate hidden states). This base derives
+    the per-graph input spec and output names from those conventions, reading
+    the architecture dimensions from class attributes.
+
+    Subclasses (the model-family Part base) must provide:
+
+    - ``hidden_size``, ``num_attention_heads``, ``num_key_value_heads`` (int)
+    - ``part_id`` (1-indexed int)
+    - ``_presplit``: the full-model PreSplit instance (an ``LLMBase``), whose
+      ``llm_io_type`` determines the first-input convention (see below)
+    - ``_graph_names``: mapping of graph name -> (sequence_length, context_length)
+    - ``_get_onnx_input_names()`` / ``_get_onnx_output_names()``
+
+    ``_presplit.llm_io_type`` gates the first-input convention:
+
+    - ``*_input_ids`` (text LLMs): the embedding is its own split, so Part 1's
+      only input is the int32 ``input_ids``.
+    - ``genie_input_embeds`` (VLMs): there is no embedding split; the token
+      input arrives pre-embedded as float32 ``inputs_embeds``.
+    """
+
+    # Provided by the concrete Part base.
+    hidden_size: int
+    num_attention_heads: int
+    num_key_value_heads: int
+    part_id: int
+    # The full-model PreSplit (FP or quantized). Typed Any because the FP and
+    # quantized PreSplits live in separate hierarchies (LLMBase vs
+    # LLM_AIMETOnnx); the only attribute used here is ``llm_io_type``.
+    _presplit: Any
+    _graph_names: dict[str, tuple[int, int]]
+
+    def _get_onnx_input_names(self) -> list[str]:
+        raise NotImplementedError
+
+    def _get_onnx_output_names(self) -> list[str]:
+        raise NotImplementedError
+
+    @property
+    def _splits_embedding(self) -> bool:
+        """Whether the embedding is its own split (Part 1 takes input_ids).
+
+        Derived from the full model's IO signature: models fed integer token
+        ids split the embedding into Part 1; models fed pre-Gather embeddings
+        (VLMs) do not.
+        """
+        return self._presplit.llm_io_type in (
+            LLMIOType.genie_input_ids,
+            LLMIOType.huggingface_input_ids,
+        )
+
+    def get_graph_input_spec(self, graph_name: str) -> InputSpec:
+        """Build the input spec for one graph from ONNX input names.
+
+        Shapes are derived from the architecture dimensions and the
+        (sequence_length, context_length) recorded for ``graph_name``.
+        """
+        sequence_length, context_length = self._graph_names[graph_name]
+
+        # Embedding split (text LLMs): Part 1's only input is input_ids.
+        if self._splits_embedding and self.part_id == 1:
+            return {"input_ids": ((1, sequence_length), "int32")}
+
+        head_dim = self.hidden_size // self.num_attention_heads
+        embed_dim = head_dim // 2
+        kv_seq_len = context_length - sequence_length
+
+        # Read actual input names from the split ONNX model.
+        onnx_input_names = self._get_onnx_input_names()
+
+        spec: InputSpec = {}
+        for name in onnx_input_names:
+            if "past_key" in name:
+                spec[name] = (
+                    (self.num_key_value_heads, 1, head_dim, kv_seq_len),
+                    "float32",
+                )
+            elif "past_value" in name:
+                spec[name] = (
+                    (self.num_key_value_heads, 1, kv_seq_len, head_dim),
+                    "float32",
+                )
+            elif name == "attention_mask":
+                spec[name] = (
+                    (1, 1, sequence_length, context_length),
+                    "float32",
+                )
+            elif "position_ids_cos" in name or "position_ids_sin" in name:
+                spec[name] = (
+                    (1, 1, sequence_length, embed_dim),
+                    "float32",
+                )
+            else:
+                # Either the pre-embedded token input ("inputs_embeds" for
+                # VLMs) or an intermediate hidden state from the previous part
+                # (found by process of elimination). Both are (1, seq, hidden).
+                spec[name] = (
+                    (1, sequence_length, self.hidden_size),
+                    "float32",
+                )
+
+        return spec
+
+    def get_graph_output_names(self, graph_name: str) -> list[str]:
+        """Output names for this Part, sanitized for the on-device runtime.
+
+        All graphs of a Part share the same outputs, read from the split ONNX
+        model at runtime.
+        """
+        return [
+            name.replace("/", "_").replace(".", "_")
+            for name in self._get_onnx_output_names()
+        ]
+
+
 class LLMBase(BaseModel, LLMConfigEditor, ABC):
     # The Hugging Face LLM class (e.g., LlamaForCausalLM)
     LMClass: Any | None = None

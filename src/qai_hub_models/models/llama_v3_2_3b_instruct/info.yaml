@@ -33,6 +33,7 @@ applicable_scenarios:
 related_models:
 - llama_v3_8b_instruct
 - llama_v3_1_8b_instruct
+- llama_v3_2_1b_instruct
 form_factors:
 - Phone
 - Tablet
