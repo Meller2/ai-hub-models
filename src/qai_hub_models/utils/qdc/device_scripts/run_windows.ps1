@@ -65,11 +65,15 @@ $PromptDir = "C:\Temp\TestContent\prompts"
 $EvalOutputFile = "C:/Temp/QDC_logs/eval_outputs.txt"
 if (Test-Path $PromptDir) {
     New-Item -ItemType Directory -Force -Path "C:/Temp/QDC_logs"
+    # Switch to power_saver perf_profile: sustained burst thermal-throttles and kills the eval loop on QDC.
+    (Get-Content htp_backend_ext_config.json) -replace '"perf_profile": "[^"]*"', '"perf_profile": "power_saver"' | Set-Content htp_backend_ext_config.json
     "" | Out-File -FilePath $EvalOutputFile -Encoding utf8
     $promptFiles = Get-ChildItem -Path $PromptDir -Filter "prompt_*.txt" | Sort-Object Name
     foreach ($promptFile in $promptFiles) {
         $idx = [regex]::Match($promptFile.Name, 'prompt_(\d+)\.txt').Groups[1].Value
         "===EVAL_IDX_${idx}===" | Out-File -FilePath $EvalOutputFile -Append -Encoding utf8
         Invoke-GenieRetry -GenieArgs @("-c", "genie_config.json", "--prompt_file", $promptFile.FullName) -OutFile $EvalOutputFile
+        # Short inter-prompt cooldown to keep the HTP from thermal-throttling.
+        Start-Sleep -Seconds 3
     }
 }

@@ -20,6 +20,11 @@ on:
         default: prod
         type: string
 
+      use_kube:
+        description: Run on Kube cluster (false = use old GPU runner group)
+        type: boolean
+        default: true
+
   schedule:
     - cron: '0 2 * * 0,1,2,4,5,6' # Nightly: Every day except Tuesday 6pm PST (7pm PDT, Wednesday 2am UTC)
 
@@ -31,4 +36,5 @@ jobs:
       models: ${{ inputs.models || 'all' }}
       deployment: ${{ inputs.deployment || 'prod' }}
       test_suite: nightly
+      use_kube: ${{ inputs.use_kube == null && true || inputs.use_kube }}
     secrets: inherit

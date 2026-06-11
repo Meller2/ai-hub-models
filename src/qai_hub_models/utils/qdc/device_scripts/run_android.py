@@ -77,11 +77,15 @@ genie_retry genie-t2t-run -c genie_config.json --prompt_file sample_prompt.txt |
 PROMPT_DIR=/data/local/tmp/genie_bundle/prompts
 EVAL_OUTPUT_FILE=/data/local/tmp/QDC_logs/eval_outputs.txt
 if [ -d "$PROMPT_DIR" ]; then
+    # Switch to power_saver perf_profile: sustained burst thermal-throttles and kills the eval loop on QDC SM8750.
+    sed -i 's/"perf_profile": "[^"]*"/"perf_profile": "power_saver"/' htp_backend_ext_config.json
     > "$EVAL_OUTPUT_FILE"
     for prompt_file in $PROMPT_DIR/prompt_*.txt; do
         idx=$(basename "$prompt_file" | sed 's/prompt_\\([0-9]*\\)\\.txt/\\1/')
         echo "===EVAL_IDX_${{idx}}===" | tee -a "$EVAL_OUTPUT_FILE"
         genie_retry genie-t2t-run -c genie_config.json --prompt_file "$prompt_file" 2>&1 | tee -a "$EVAL_OUTPUT_FILE"
+        # Short inter-prompt cooldown to keep the HTP from thermal-throttling.
+        sleep 3
     done
 fi
 """
