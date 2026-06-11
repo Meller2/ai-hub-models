@@ -22,7 +22,7 @@ set -euo pipefail
 
 JIRA_PROJECT="${JIRA_PROJECT:-TETRAAI}"
 REPO="${REPO:-qcom-ai-hub/ai-hub-models-internal}"
-EXEMPT_TEAMS="${EXEMPT_TEAMS:-ai-hub-models-reviewers tetra-developers}"
+EXEMPT_TEAMS="${EXEMPT_TEAMS:-ai-hub-models-reviewers ai-hub-models-friends tetra-developers}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 UTIL_DIR="$(cd "$SCRIPT_DIR/../util" && pwd)"
