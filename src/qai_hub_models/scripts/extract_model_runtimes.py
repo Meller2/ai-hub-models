@@ -4,25 +4,12 @@
 # ---------------------------------------------------------------------
 """Extract per-model wall-clock runtimes from scorecard JUnit XMLs.
 
-Walks the three combined JUnit XMLs produced by a weekly scorecard run
-(job submission, export-script test, on-device accuracy) and aggregates
-``<testsuite time="...">`` seconds per model. The model id is recovered
-from each testsuite's ``classname``, which pytest sets to the dotted
-module path (e.g. ``qai_hub_models.models.yolov7.test_export``).
+Reads the three combined JUnit XMLs from a scorecard run (job submission,
+export test, accuracy) and writes a YAML of per-model, per-stage seconds.
+``split_torch_models`` reads this to load-balance CI splits.
 
-Output is a YAML file consumed by ``split_torch_models`` to load-balance
-splits across CI runners. By default it's written to the checked-in
-intermediates location, where the scorecard collection workflow's
-existing ``git add src/qai_hub_models/scorecard/intermediates/*.yaml``
-step picks it up automatically — no separate commit logic needed here.
-
-Two ways to source the XMLs:
-
-* ``--action-id <run_id>`` (and optional ``--repo``) downloads the
-  ``test-results-scorecard`` artifact from a previous scorecard run via
-  the ``gh`` CLI and uses the XMLs inside.
-* ``--job-submission-xml`` / ``--export-test-xml`` / ``--accuracy-xml``
-  point at local files (used for local bootstrapping or testing).
+Either pass ``--action-id`` to pull the artifact from a past scorecard
+run via ``gh``, or pass the XML paths directly with the per-stage flags.
 """
 
 from __future__ import annotations
@@ -47,15 +34,11 @@ from qai_hub_models.scorecard.artifacts import (
     ScorecardArtifact,
 )
 
-# Filenames inside the test-results-scorecard artifact, written by
-# scorecard.yml's combine_test_results job.
 SCORECARD_ARTIFACT_NAME = "test-results-scorecard"
 JOB_SUBMISSION_XML_NAME = "qaihm-model-tests-junit.xml"
 EXPORT_TEST_XML_NAME = "qaihm-export-zip-tests-junit.xml"
 ACCURACY_XML_NAME = "qaihm-device-accuracy-tests-junit.xml"
 
-# Matches dotted classnames pytest emits for tests under
-# qai_hub_models/models/<model_id>/. Captures the model id segment.
 _MODEL_CLASSNAME_RE = re.compile(r"^qai_hub_models\.models\.([^.]+)\.")
 
 
@@ -63,7 +46,7 @@ def _extract_model_id(classname: str, name: str) -> str | None:
     match = _MODEL_CLASSNAME_RE.match(classname)
     if match:
         return match.group(1)
-    # Some pytest configurations put the dotted path in 'name' instead.
+    # Some pytest configs put the dotted path in 'name'.
     match = _MODEL_CLASSNAME_RE.match(name)
     if match:
         return match.group(1)
@@ -71,12 +54,11 @@ def _extract_model_id(classname: str, name: str) -> str | None:
 
 
 def parse_junit_per_model_seconds(xml_path: Path) -> dict[str, float]:
-    """Sum ``time`` per model across all testsuites/testcases in one JUnit XML.
+    """Sum testcase ``time`` per model in one JUnit XML.
 
-    A combined scorecard XML contains many ``<testsuite>`` elements (one
-    per per-model pytest invocation). We attribute each testcase's time
-    to the model parsed from its classname so an unknown ``<testsuite>``
-    element doesn't leak time into the wrong bucket.
+    Attribution is per-testcase (via ``classname``) rather than
+    per-testsuite — the combined XMLs have many testsuites and an
+    unknown one would otherwise leak time into the wrong bucket.
     """
     if not xml_path.exists():
         return {}
@@ -164,10 +146,8 @@ def _download_scorecard_artifact(
 ) -> None:
     """Download the ``test-results-scorecard`` artifact via ``gh run download``.
 
-    ``action_id`` and ``repo`` come from CI inputs (workflow dispatch),
-    so they're validated against tight regexes before being shelled out
-    to ``gh``. Without that, a value starting with ``-`` would be parsed
-    as a flag rather than a positional run id.
+    Inputs are regex-validated before shelling out — a value starting
+    with ``-`` would otherwise be parsed by ``gh`` as a flag.
     """
     if shutil.which("gh") is None:
         raise SystemExit("gh CLI not found on PATH; cannot download artifacts.")
@@ -197,9 +177,8 @@ def main() -> None:
         "--action-id",
         default=None,
         help=(
-            "Scorecard kickoff GitHub Actions run id. When set, downloads the "
-            f"'{SCORECARD_ARTIFACT_NAME}' artifact via gh CLI and reads the JUnit "
-            "XMLs inside it. Mutually exclusive with the per-XML path flags."
+            f"Scorecard run id. Downloads '{SCORECARD_ARTIFACT_NAME}' via gh "
+            "and reads the JUnit XMLs inside. Mutually exclusive with --*-xml."
         ),
     )
     parser.add_argument(
@@ -229,19 +208,12 @@ def main() -> None:
         "--output",
         type=Path,
         default=ScorecardArtifact.MODEL_RUNTIME_ESTIMATES.intermediates_path,
-        help=(
-            "Output YAML path. Defaults to the checked-in intermediates location, "
-            "which the scorecard collection workflow auto-commits via its existing "
-            "'git add scorecard/intermediates/*.yaml' step."
-        ),
+        help="Output YAML path. Defaults to the checked-in intermediates copy.",
     )
     parser.add_argument(
         "--source-action-id",
         default=None,
-        help=(
-            "Override for the source_action_id field stamped into the YAML. "
-            "Defaults to --action-id when that's set."
-        ),
+        help="Override the source_action_id stamped into the YAML (default: --action-id).",
     )
 
     args = parser.parse_args()

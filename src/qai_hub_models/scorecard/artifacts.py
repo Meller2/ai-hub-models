@@ -20,9 +20,8 @@ ValT = TypeVar("ValT")
 
 INTERMEDIATES_DIR = QAIHM_PACKAGE_ROOT / "scorecard" / "intermediates"
 
-# Stage names recorded in model-runtime-estimates.yaml. Shared between
-# extract_model_runtimes (writer) and split_torch_models (reader); the
-# YAML schema breaks if these drift apart.
+# Stage keys in model-runtime-estimates.yaml; shared between writer
+# (extract_model_runtimes) and reader (split_torch_models).
 RUNTIME_STAGE_JOB_SUBMISSION = "job_submission"
 RUNTIME_STAGE_EXPORT_TEST = "export_test"
 RUNTIME_STAGE_ACCURACY = "accuracy"
