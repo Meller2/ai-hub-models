@@ -12,8 +12,8 @@ domain: Computer Vision
 use_case: Semantic Segmentation
 tags:
 - real-time
-enabled_device_form_factors:
-- XR
+enabled_devices:
+- cs_8_gen_1
 eval_device: XR2 Gen 2 (Proxy)
 enabled_profile_runtimes:
 - qnn_dlc
