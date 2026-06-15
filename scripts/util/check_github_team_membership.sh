@@ -16,7 +16,8 @@ USERNAME="$1"
 ORG="qcom-ai-hub"
 
 RESULT="false"
-for team in "${@:2}"; do
+# shellcheck disable=SC2068
+for team in ${@:2}; do
   if [ "$(gh api "orgs/${ORG}/teams/${team}/memberships/${USERNAME}" --jq '.state' || true)" = "active" ]; then
     echo "Author '${USERNAME}' is in ${ORG}/${team}." >&2
     RESULT="true"

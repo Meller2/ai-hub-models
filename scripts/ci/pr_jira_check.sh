@@ -80,8 +80,6 @@ if [ "$ISSUE_TYPE" = "Onboarding" ]; then
 fi
 
 # 5. Apply labels
-export GH_TOKEN="$GH_WRITE_TOKEN"
-
 if [ -n "$PR_LABEL" ]; then
   gh pr edit "$PR_NUMBER" --add-label "$PR_LABEL" -R "$REPO"
   echo "Applied label: $PR_LABEL"
