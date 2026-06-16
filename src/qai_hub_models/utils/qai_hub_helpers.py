@@ -405,6 +405,14 @@ def raise_if_fp_is_unsupported(device: hub.Device, precision: Precision) -> None
         return
 
     # Fall back to hub device attributes
+    if not device.attributes:
+        devices = hub.get_devices(device.name, device.os)
+        if len(devices) == 0:
+            raise ValueError(
+                f"Device {device.name} does not exist. Use `qai-hub list-devices` to get the valid device list."
+            )
+        device = devices[0]
+
     if "htp-supports-fp16:true" not in device.attributes:
         raise ValueError(
             f"The selected precision ({precision}) requires FP16 support, "
