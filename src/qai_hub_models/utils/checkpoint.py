@@ -220,8 +220,6 @@ class FromPretrainedMixin:
       @classmethod
       def get_input_spec(cls) -> Mapping[str, torch.Tensor]: ...
       @classmethod
-      def get_output_names(cls) -> List[str]: ...
-      @classmethod
       def get_calibrated_aimet_model(cls) -> Tuple[str, str]: ...
     """
 
@@ -369,7 +367,7 @@ class FromPretrainedMixin:
         )
 
         # Call on the instance (not cls) so this works whether the model defines
-        # get_input_spec/get_output_names as an instance method (e.g. pi05) or as a
+        # get_input_spec/get_output_spec as an instance method (e.g. pi05) or as a
         # static/classmethod. Cast to BaseModel since these methods live there, not
         # on torch.nn.Module (string forward-ref keeps the import type-check-only).
         fp_model_typed = cast("BaseModel", fp_model)
@@ -387,7 +385,7 @@ class FromPretrainedMixin:
             example_input,
             os.path.join(tmpdir, "model.onnx"),
             input_names=list(input_spec.keys()),
-            output_names=fp_model_typed.get_output_names(),
+            output_names=list(fp_model_typed.get_output_spec()),
             **torch_to_onnx_options,
         )
         return ONNXBundle.from_bundle_path(tmpdir, ephemeral=True)

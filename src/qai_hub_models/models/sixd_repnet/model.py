@@ -13,6 +13,8 @@ import torch
 from face_detection.alignment import load_net
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.models.sixd_repnet.external_repos.sixdrepnet.sixdrepnet.model import (
     SixDRepNet as UpstreamSixDRepNet,
 )
@@ -120,8 +122,12 @@ class RetinaFaceDetector(BaseModel):
     ) -> InputSpec:
         return {"image": ((batch_size, 3, height, width), "float32")}
 
-    def get_output_names(self) -> list[str]:
-        return ["bbox_regressions", "classifications", "landmark_regressions"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "bbox_regressions": TensorSpec(),
+            "classifications": TensorSpec(),
+            "landmark_regressions": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]
@@ -185,8 +191,10 @@ class PoseEstimator(BaseModel):
     ) -> InputSpec:
         return {"image": ((batch_size, 3, height, width), "float32")}
 
-    def get_output_names(self) -> list[str]:
-        return ["rotation_matrix"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "rotation_matrix": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

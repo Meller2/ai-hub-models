@@ -11,6 +11,7 @@ from __future__ import annotations
 import torch
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models.pointnet.external_repos.pointnet.source.model import PointNet
 from qai_hub_models.utils.asset_loaders import (
     CachedWebModelAsset,
@@ -75,5 +76,9 @@ class Pointnet(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["x", "crit_idxs", "A_feat"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "x": TensorSpec(),
+            "crit_idxs": TensorSpec(),
+            "A_feat": TensorSpec(),
+        }

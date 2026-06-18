@@ -17,7 +17,7 @@ from qai_hub_models import (
     Precision,
     TargetRuntime,
 )
-from qai_hub_models.configs.model_metadata import ModelMetadata
+from qai_hub_models.configs.model_metadata import ModelMetadata, OutputSpec
 from qai_hub_models.datasets.common_voice import CommonVoiceText
 from qai_hub_models.models._shared.pipertts.pipertts_metadata_json import (
     write_pipertts_supplementary_files,
@@ -98,8 +98,13 @@ class Encoder(BaseModel):
             "x_lengths": TensorSpec(shape=(1,), dtype="int32"),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["x_encoded", "m_p", "logs_p", "x_mask"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "x_encoded": TensorSpec(),
+            "m_p": TensorSpec(),
+            "logs_p": TensorSpec(),
+            "x_mask": TensorSpec(),
+        }
 
     def forward(
         self, x: Tensor, x_lengths: Tensor
@@ -235,8 +240,11 @@ class SDP(BaseModel):
             "noise_scale_w": TensorSpec(shape=(1,), dtype="float32"),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["y_lengths", "w_ceil"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "y_lengths": TensorSpec(),
+            "w_ceil": TensorSpec(),
+        }
 
     @classmethod
     def from_pretrained(cls) -> Self:
@@ -319,8 +327,10 @@ class Flow(BaseModel):
             "noise_scale": TensorSpec(shape=(1,), dtype="float32"),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["z"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "z": TensorSpec(),
+        }
 
     @classmethod
     def from_pretrained(cls) -> Self:
@@ -371,8 +381,10 @@ class Decoder(BaseModel):
             "z": TensorSpec(shape=(1, ENCODER_HIDDEN_DIM, DEC_SEQ_LEN), dtype="float32")
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["audio"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "audio": TensorSpec(),
+        }
 
     @classmethod
     def from_pretrained(cls) -> Self:

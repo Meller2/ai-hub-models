@@ -8,6 +8,7 @@ from __future__ import annotations
 import torch
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models.fomm.external_repos.first_order_model.demo import (
     load_checkpoints,
 )
@@ -105,8 +106,11 @@ class FOMMDetector(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["keypoints", "jacobian"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "keypoints": TensorSpec(),
+            "jacobian": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]
@@ -212,8 +216,10 @@ class FOMMGenerator(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["output_image"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "output_image": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

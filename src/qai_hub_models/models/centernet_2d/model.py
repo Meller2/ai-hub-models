@@ -13,6 +13,8 @@ from torch import nn
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.datasets.coco import CocoDataset
 from qai_hub_models.evaluators.centernet_detection_evaluator import (
     CenternetDetectionEvaluator,
@@ -114,8 +116,12 @@ class CenterNet2D(CenterNet):
         hm = torch.sigmoid(hm)
         return hm, wh, reg
 
-    def get_output_names(self) -> list[str]:
-        return ["hm", "wh", "reg"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "hm": TensorSpec(),
+            "wh": TensorSpec(),
+            "reg": TensorSpec(),
+        }
 
     def _sample_inputs_impl(
         self, input_spec: InputSpec | None = None

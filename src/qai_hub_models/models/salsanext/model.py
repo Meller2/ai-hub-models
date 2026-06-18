@@ -12,6 +12,7 @@ from ruamel.yaml import YAML
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.semantic_kitti import SemanticKittiDataset
 from qai_hub_models.evaluators.semantic_kitti_evaluator import SemanticKittiEvaluator
 from qai_hub_models.models.salsanext.external_repos.salsanext.train.common.laserscan import (
@@ -117,8 +118,10 @@ class SalsaNext(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["predict"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "predict": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["lidar"]

@@ -21,6 +21,7 @@ from segment_anything.modeling.transformer import (
 from segment_anything.utils.onnx import SamOnnxModel
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models._shared.sam.model_patches import (
     Conv2DInplaceLinearSAMMaskDecoderMLP,
     Conv2DInplaceLinearSAMTransformerMLPBlock,
@@ -175,12 +176,15 @@ class SAMEncoderPart(BaseModel):
     def get_channel_last_outputs(self) -> list[str]:
         return ["image_embeddings"] if self.include_neck else []
 
-    def get_output_names(self) -> list[str]:
-        return (
-            ["image_embeddings"]
-            if self.include_neck
-            else ["intermediate_SAM_encoder_output"]
-        )
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            name: TensorSpec()
+            for name in (
+                ["image_embeddings"]
+                if self.include_neck
+                else ["intermediate_SAM_encoder_output"]
+            )
+        }
 
     @classmethod
     def from_pretrained(cls, model_type: str = BASE_MODEL_TYPE) -> Self:
@@ -316,8 +320,11 @@ class SAMDecoder(BaseModel):
     def get_channel_last_outputs(self) -> list[str]:
         return ["masks"]
 
-    def get_output_names(self) -> list[str]:
-        return ["masks", "scores"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "masks": TensorSpec(),
+            "scores": TensorSpec(),
+        }
 
     @classmethod
     def from_pretrained(cls, model_type: str = BASE_MODEL_TYPE) -> Self:

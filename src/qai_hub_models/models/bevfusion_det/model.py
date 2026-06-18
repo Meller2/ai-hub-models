@@ -11,6 +11,7 @@ from torch import nn
 from torchpack.utils.config import configs
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.extern.mmdet import patch_mmdet_no_build_deps
 
 with patch_mmdet_no_build_deps():
@@ -145,8 +146,10 @@ class BEVFusionEncoder1(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["feature_map"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "feature_map": TensorSpec(),
+        }
 
 
 class BEVFusionEncoder2(BaseModel):
@@ -230,8 +233,12 @@ class BEVFusionEncoder2(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["pooled_features", "lengths", "geom_feats"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "pooled_features": TensorSpec(),
+            "lengths": TensorSpec(),
+            "geom_feats": TensorSpec(),
+        }
 
     def get_hub_compile_options(
         self,
@@ -311,8 +318,10 @@ class BEVFusionEncoder3(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["bev_grid"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "bev_grid": TensorSpec(),
+        }
 
     def get_hub_compile_options(
         self,
@@ -384,8 +393,10 @@ class BEVFusionDecoder(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["outputs"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "outputs": TensorSpec(),
+        }
 
     def get_hub_compile_options(
         self,

@@ -11,6 +11,7 @@ from typing_extensions import Self
 
 # isort: off
 # This verifies aimet is installed, and this must be included first.
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.utils.base_dataset import BaseDataset
 from qai_hub_models.utils.quantization_aimet_onnx import (
     AIMETOnnxQuantizableMixin,
@@ -168,8 +169,10 @@ class ControlUnetBase(BaseModel, FromPretrainedMixin):
     def get_channel_last_outputs(self) -> list[str]:
         return ["output_latent"]
 
-    def get_output_names(self) -> list[str]:
-        return ["output_latent"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "output_latent": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return (
@@ -352,7 +355,7 @@ class ControlNetBase(BaseModel, FromPretrainedMixin):
 
     def get_channel_last_outputs(self) -> list[str]:
         # All outputs are channel last
-        return self.get_output_names()
+        return list(self.get_output_spec())
 
     def get_input_spec(self, batch_size: int = 1) -> InputSpec:
         return {
@@ -372,8 +375,11 @@ class ControlNetBase(BaseModel, FromPretrainedMixin):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return [f"down_block_{i}" for i in range(12)] + ["mid_block"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            name: TensorSpec()
+            for name in [f"down_block_{i}" for i in range(12)] + ["mid_block"]
+        }
 
     def get_calibration_dataset_cls(self) -> type[BaseDataset]:
         from qai_hub_models.datasets.stable_diffusion_calib import (

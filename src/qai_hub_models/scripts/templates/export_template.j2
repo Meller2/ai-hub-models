@@ -1290,7 +1290,7 @@ def export_model(
         {% set skipped_outputs = ", outputs_to_skip=[" ~ outputs_to_skip_validation|join(", ") ~ "]" if outputs_to_skip_validation else "" -%}
         {% set inference_metrics = ", metrics=\"" ~ inference_metrics ~ "\"" if inference_metrics and inference_metrics != "psnr" else "" -%}
         print_inference_metrics(
-            {{ "inference_job" if is_collection_model else "inference_result" }}, ij_output, torch_out, {{ model_var }}.get_output_names(){{ skipped_outputs }}{{ inference_metrics }}
+            {{ "inference_job" if is_collection_model else "inference_result" }}, ij_output, torch_out, list({{ model_var }}.get_output_spec()){{ skipped_outputs }}{{ inference_metrics }}
         )
         {%- endfilter %}
     {%- endif %}

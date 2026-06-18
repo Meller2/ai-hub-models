@@ -12,6 +12,7 @@ import torch
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models._shared.mediapipe.external_repos import EXTERNAL_REPO_PATHS
 from qai_hub_models.models._shared.mediapipe.external_repos.mediapipe.blazehand_landmark import (
     BlazeHandLandmark,
@@ -194,8 +195,11 @@ class HandDetector(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["box_coords", "box_scores"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "box_coords": TensorSpec(),
+            "box_scores": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]
@@ -250,8 +254,12 @@ class HandLandmarkDetector(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["scores", "lr", "landmarks"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "scores": TensorSpec(),
+            "lr": TensorSpec(),
+            "landmarks": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

@@ -13,6 +13,7 @@ from ultralytics.models import YOLO as ultralytics_YOLO
 from ultralytics.nn.tasks import DetectionModel
 
 from qai_hub_models import Precision
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models._shared.ultralytics.detect_patches import (
     patch_ultralytics_detection_head,
 )
@@ -118,7 +119,7 @@ class YoloV10Detector(Yolo):
         return boxes, scores, classes
 
     # Overrides Yolo.get_output_spec(): YoloV10 returns "classes" (not "class_idx") — see forward()
-    def get_output_spec(self) -> dict[str, TensorSpec]:
+    def get_output_spec(self) -> OutputSpec:
         return {
             "boxes": TensorSpec(
                 io_type=IoType.BBOX,
@@ -134,13 +135,6 @@ class YoloV10Detector(Yolo):
                 labels_file="coco_labels.txt",
             ),
         }
-
-    def get_output_names(self) -> list[str]:
-        if self.include_postprocessing:
-            return list(self.get_output_spec().keys())
-        if self.split_output:
-            return ["boxes", "scores"]
-        return ["detector_output"]
 
     def get_hub_litemp_percentage(self, precision: Precision) -> float:
         """Returns the Lite-MP percentage value for the specified mixed precision quantization."""

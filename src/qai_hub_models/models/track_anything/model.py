@@ -8,6 +8,7 @@ from __future__ import annotations
 import torch
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models.track_anything.external_repos import EXTERNAL_REPO_PATHS
 from qai_hub_models.models.track_anything.external_repos.track_anything.tracker.model.network import (
     XMem,
@@ -109,8 +110,13 @@ class TrackAnythingEncodeKeyWithShrinkage(TrackAnything):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["key", "shrinkage", "selection", "f16"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "key": TensorSpec(),
+            "shrinkage": TensorSpec(),
+            "selection": TensorSpec(),
+            "f16": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]
@@ -195,8 +201,12 @@ class TrackAnythingEncodeValue(TrackAnything):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["masks", "value", "hidden"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "masks": TensorSpec(),
+            "value": TensorSpec(),
+            "hidden": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]
@@ -254,8 +264,14 @@ class TrackAnythingEncodeKeyWithoutShrinkage(TrackAnything):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["key", "selection", "f16", "f8", "f4"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "key": TensorSpec(),
+            "selection": TensorSpec(),
+            "f16": TensorSpec(),
+            "f8": TensorSpec(),
+            "f4": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]
@@ -342,8 +358,11 @@ class TrackAnythingSegment(TrackAnything):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["masks", "hidden"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "masks": TensorSpec(),
+            "hidden": TensorSpec(),
+        }
 
 
 class TrackAnythingWrapper(WorkbenchModelCollection):

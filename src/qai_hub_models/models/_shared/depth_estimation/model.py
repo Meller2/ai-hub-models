@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.nyuv2 import NYUV2Dataset
 from qai_hub_models.evaluators.depth_evaluator import DepthEvaluator
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
@@ -23,7 +24,7 @@ class DepthEstimationModel(BaseModel):
     def get_channel_last_outputs(self) -> list[str]:
         return ["depth_estimates"]
 
-    def get_output_spec(self) -> dict[str, TensorSpec]:
+    def get_output_spec(self) -> OutputSpec:
         return {
             "depth_estimates": TensorSpec(
                 io_type=IoType.TENSOR,

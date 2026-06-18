@@ -16,6 +16,8 @@ from torch import nn
 from transformers import AutoConfig
 
 from qai_hub_models import TargetRuntime
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.evaluators.base_evaluators import BaseEvaluator
 from qai_hub_models.evaluators.lerobot_evaluator import LeRobotEvaluator
 from qai_hub_models.models.grootn15.constants import (
@@ -148,13 +150,11 @@ class LoadGrootMixin(FromPretrainedMixin):
             model_name="GR00T-N1.5",
         )
 
-    @classmethod
-    def get_input_names(cls) -> list[str]:
+    def get_input_spec(self) -> InputSpec:
         """Return ordered list of input tensor names for this component."""
         raise NotImplementedError
 
-    @classmethod
-    def get_output_names(cls) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         """Return ordered list of output tensor names for this component."""
         raise NotImplementedError
 
@@ -254,15 +254,14 @@ class GrootViT(LoadGrootMixin, BaseModel):
 
     def get_input_spec(self, batch_size: int = 1) -> InputSpec:
         img_size = self.eagle_config.vision_config.image_size
-        return {"pixel_values": ((self.num_cameras, 3, img_size, img_size), "float32")}
+        return {
+            "pixel_values": TensorSpec(
+                shape=(self.num_cameras, 3, img_size, img_size), dtype="float32"
+            )
+        }
 
-    @classmethod
-    def get_input_names(cls) -> list[str]:
-        return ["pixel_values"]
-
-    @classmethod
-    def get_output_names(cls) -> list[str]:
-        return ["vit_embeds"]
+    def get_output_spec(self) -> OutputSpec:
+        return {"vit_embeds": TensorSpec()}
 
 
 class GrootLLMBackbone(LoadGrootMixin, BaseModel):
@@ -309,20 +308,17 @@ class GrootLLMBackbone(LoadGrootMixin, BaseModel):
     def get_input_spec(self, batch_size: int = 1) -> InputSpec:
         llm_hidden_size = self.model.eagle_config.text_config.hidden_size
         return dict(
-            input_embeds=((batch_size, self.vlm_seq_len, llm_hidden_size), "float32"),
-            llm_attention_mask=(
-                (batch_size, 1, self.vlm_seq_len, self.vlm_seq_len),
-                "float32",
+            input_embeds=TensorSpec(
+                shape=(batch_size, self.vlm_seq_len, llm_hidden_size), dtype="float32"
+            ),
+            llm_attention_mask=TensorSpec(
+                shape=(batch_size, 1, self.vlm_seq_len, self.vlm_seq_len),
+                dtype="float32",
             ),
         )
 
-    @classmethod
-    def get_input_names(cls) -> list[str]:
-        return ["input_embeds", "llm_attention_mask"]
-
-    @classmethod
-    def get_output_names(cls) -> list[str]:
-        return ["vlm_embeds"]
+    def get_output_spec(self) -> OutputSpec:
+        return {"vlm_embeds": TensorSpec()}
 
 
 class GrootVLMProjection(LoadGrootMixin, BaseModel):
@@ -419,28 +415,26 @@ class GrootVLMProjection(LoadGrootMixin, BaseModel):
     ) -> InputSpec:
         llm_hidden_size = self.eagle_config.text_config.hidden_size
         return dict(
-            vlm_embeds=((batch_size, self.vlm_seq_len, llm_hidden_size), "float32"),
-            vlm_attention_mask=(
-                (
+            vlm_embeds=TensorSpec(
+                shape=(batch_size, self.vlm_seq_len, llm_hidden_size), dtype="float32"
+            ),
+            vlm_attention_mask=TensorSpec(
+                shape=(
                     batch_size,
                     self.vl_self_attention.transformer_blocks[0].attn1.heads,
                     self.vlm_seq_len,
                     self.vlm_seq_len,
                 ),
-                "float32",
+                dtype="float32",
             ),
         )
 
-    @classmethod
-    def get_input_names(cls) -> list[str]:
-        return ["vlm_embeds", "vlm_attention_mask"]
-
-    @classmethod
-    def get_output_names(cls) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         n_blocks = 8  # known constant (8 cross-attn transformer_blocks)
-        return [f"vlm_proj_keys_{i}" for i in range(n_blocks)] + [
-            f"vlm_proj_values_{i}" for i in range(n_blocks)
-        ]
+        return {
+            **{f"vlm_proj_keys_{i}": TensorSpec() for i in range(n_blocks)},
+            **{f"vlm_proj_values_{i}": TensorSpec() for i in range(n_blocks)},
+        }
 
 
 class GrootDiT(LoadGrootMixin, BaseModel):
@@ -583,49 +577,39 @@ class GrootDiT(LoadGrootMixin, BaseModel):
         num_target_vision_tokens = self.config.num_target_vision_tokens
 
         spec: InputSpec = dict(
-            state=((batch_size, 1, self.config.max_state_dim), "float32"),
-            actions=(
-                (batch_size, self.config.action_horizon, self.config.action_dim),
-                "float32",
+            state=TensorSpec(
+                shape=(batch_size, 1, self.config.max_state_dim), dtype="float32"
             ),
-            cross_attention_mask=(
-                (
+            actions=TensorSpec(
+                shape=(batch_size, self.config.action_horizon, self.config.action_dim),
+                dtype="float32",
+            ),
+            cross_attention_mask=TensorSpec(
+                shape=(
                     batch_size,
                     num_heads,
                     action_horizon + 1 + num_target_vision_tokens,
                     self.vlm_seq_len,
                 ),
-                "float32",
+                dtype="float32",
             ),
         )
         n_blocks = len(self.model.model.transformer_blocks) // 2
         for i in range(n_blocks):
-            spec[f"vlm_proj_keys_{i}"] = (
-                (batch_size, num_heads, self.vlm_seq_len, head_dim),
-                "float32",
+            spec[f"vlm_proj_keys_{i}"] = TensorSpec(
+                shape=(batch_size, num_heads, self.vlm_seq_len, head_dim),
+                dtype="float32",
             )
         for i in range(n_blocks):
-            spec[f"vlm_proj_values_{i}"] = (
-                (batch_size, num_heads, self.vlm_seq_len, head_dim),
-                "float32",
+            spec[f"vlm_proj_values_{i}"] = TensorSpec(
+                shape=(batch_size, num_heads, self.vlm_seq_len, head_dim),
+                dtype="float32",
             )
 
         return spec
 
-    @classmethod
-    def get_input_names(cls) -> list[str]:
-        n_blocks = 8  # known constant (8 cross-attn transformer_blocks)
-        return [
-            "state",
-            "actions",
-            "cross_attention_mask",
-            *[f"vlm_proj_keys_{i}" for i in range(n_blocks)],
-            *[f"vlm_proj_values_{i}" for i in range(n_blocks)],
-        ]
-
-    @classmethod
-    def get_output_names(cls) -> list[str]:
-        return ["actions_out"]
+    def get_output_spec(self) -> OutputSpec:
+        return {"actions_out": TensorSpec()}
 
 
 ### Preprocess methods

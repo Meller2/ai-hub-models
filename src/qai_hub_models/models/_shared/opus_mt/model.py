@@ -15,6 +15,7 @@ import torch
 from transformers import MarianMTModel, MarianTokenizer
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models._shared.opus_mt.model_adaptation import (
     QcMarianDecoder,
     QcMarianEncoder,
@@ -87,13 +88,13 @@ class OpusMTEncoder(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self, num_layers: int = 6) -> OutputSpec:
         """Returns the output names for the encoder."""
         output_names = []
         for layer_idx in range(len(self.encoder.decoder_layers)):
             output_names.append(f"block_{layer_idx}_cross_key_states")
             output_names.append(f"block_{layer_idx}_cross_value_states")
-        return output_names
+        return {name: TensorSpec() for name in output_names}
 
 
 class OpusMTDecoder(BaseModel):
@@ -178,13 +179,13 @@ class OpusMTDecoder(BaseModel):
 
         return specs
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self, num_layers: int = 6) -> OutputSpec:
         """Returns the output names for the decoder."""
         output_names = ["logits"]
         for layer_idx in range(self.num_layers):
             output_names.append(f"block_{layer_idx}_present_self_key_states")
             output_names.append(f"block_{layer_idx}_present_self_value_states")
-        return output_names
+        return {name: TensorSpec() for name in output_names}
 
 
 class OpusMT(WorkbenchModelCollection):

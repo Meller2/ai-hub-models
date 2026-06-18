@@ -10,6 +10,7 @@ from collections.abc import Callable
 import torch
 
 from qai_hub_models import Precision, SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.human_faces import HumanFacesDataset
 from qai_hub_models.models._shared.mediapipe.external_repos import EXTERNAL_REPO_PATHS
 from qai_hub_models.models._shared.mediapipe.external_repos.mediapipe.blazeface import (
@@ -324,8 +325,13 @@ class FaceDetector(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["box_coords_1", "box_coords_2", "box_scores_1", "box_scores_2"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "box_coords_1": TensorSpec(),
+            "box_coords_2": TensorSpec(),
+            "box_scores_1": TensorSpec(),
+            "box_scores_2": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]
@@ -390,8 +396,11 @@ class FaceLandmarkDetector(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["scores", "landmarks"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "scores": TensorSpec(),
+            "landmarks": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

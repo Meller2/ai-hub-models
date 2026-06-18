@@ -57,7 +57,7 @@ Each model lives in `qai_hub_models/models/<model_id>/` and requires:
    **Required methods:**
    - `from_pretrained(cls)` - classmethod to load pretrained weights; all args must have defaults
    - `get_input_spec()` - staticmethod returning `InputSpec` dict of `{input_name: (shape, dtype)}`
-   - `get_output_names()` - staticmethod returning list of output tensor names
+   - `get_output_spec()` - returns list of outputs
 
    **Optional overrides (have default implementations):**
    - `_sample_inputs_impl()` - provide real sample inputs instead of random data

@@ -27,7 +27,7 @@ from qai_hub_models import (
     SampleInputsType,
     TargetRuntime,
 )
-from qai_hub_models.configs.model_metadata import ModelMetadata
+from qai_hub_models.configs.model_metadata import ModelMetadata, OutputSpec
 from qai_hub_models.datasets.common_voice import CommonVoiceText
 from qai_hub_models.models._shared.common import replace_module_recursively
 from qai_hub_models.models._shared.melotts.meloTTS_encoder import (
@@ -161,8 +161,15 @@ class Encoder(BaseModel):
             dic[input_name] = [inputs_list[i].numpy()]
         return dic
 
-    def get_output_names(self) -> list[str]:
-        return ["y_lengths", "x_mask", "m_p", "logs_p", "g", "w_ceil"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "y_lengths": TensorSpec(),
+            "x_mask": TensorSpec(),
+            "m_p": TensorSpec(),
+            "logs_p": TensorSpec(),
+            "g": TensorSpec(),
+            "w_ceil": TensorSpec(),
+        }
 
     def forward(
         self,
@@ -519,8 +526,10 @@ class Flow(BaseModel):
             for name, (shape, dtype) in specs.items()
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["z"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "z": TensorSpec(),
+        }
 
     def get_hub_compile_options(
         self,
@@ -582,8 +591,10 @@ class Decoder(BaseModel):
             "g": TensorSpec(shape=(1, SPEAKER_EMBED_DIM, 1), dtype="float32"),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["audio"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "audio": TensorSpec(),
+        }
 
     def get_hub_compile_options(
         self,
@@ -725,8 +736,10 @@ class BertWrapper(BaseModel):
             "token_type_ids": TensorSpec(shape=(1, MAX_BERT_TOKENS), dtype="int32"),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["hidden_states"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "hidden_states": TensorSpec(),
+        }
 
     def get_hub_compile_options(
         self,

@@ -156,7 +156,7 @@ class MultiGraphWorkbenchModel(FromPretrainedProtocol):
         return build_compile_options(
             target_runtime,
             precision,
-            self.get_graph_output_names(graph_name),
+            list(self.get_graph_output_spec(graph_name)),
             self.get_graph_channel_last_input(graph_name),
             self.get_graph_channel_last_output(graph_name),
             graph_name,
@@ -186,11 +186,6 @@ class MultiGraphWorkbenchModel(FromPretrainedProtocol):
 
     # -- Auto-built from per-graph getters --
 
-    def get_graph_output_names(self, graph_name: str) -> list[str]:
-        outputs = self.get_graph_output_spec(graph_name).keys()
-        assert outputs, f"get_output_spec() is not defined oforn {graph_name}!"
-        return list(outputs)
-
     def get_input_spec(self, *args: Any, **kwargs: Any) -> MultiGraphGroup[InputSpec]:
         return MultiGraphGroup(
             {
@@ -202,11 +197,6 @@ class MultiGraphWorkbenchModel(FromPretrainedProtocol):
     def get_output_spec(self) -> MultiGraphGroup[OutputSpec]:
         return MultiGraphGroup(
             {name: self.get_graph_output_spec(name) for name in self.graph_names}
-        )
-
-    def get_output_names(self) -> MultiGraphGroup[list[str]]:
-        return MultiGraphGroup(
-            {name: self.get_graph_output_names(name) for name in self.graph_names}
         )
 
     def get_channel_last_inputs(self) -> MultiGraphGroup[list[str]]:

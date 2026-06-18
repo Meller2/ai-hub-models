@@ -10,6 +10,7 @@ from torch_audioset.yamnet.model import YAMNet
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.audioset import AudioSetDataset
 from qai_hub_models.evaluators.audioset_evaluator import AudioSetOutputEvaluator
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset
@@ -85,8 +86,10 @@ class YamNet(BaseModel):
         preprocessed_tensor = input_tensor[0:1, :, :, :]
         return {"audio": [preprocessed_tensor.numpy()]}
 
-    def get_output_names(self) -> list[str]:
-        return ["class_scores"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "class_scores": TensorSpec(),
+        }
 
     @classmethod
     def get_eval_dataset_classes(cls) -> list[type[BaseDataset]]:

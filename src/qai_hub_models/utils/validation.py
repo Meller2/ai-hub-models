@@ -49,7 +49,7 @@ def validate_io_names(instance: BaseModel) -> list[str]:
         Error messages for each failing check.
     """
     input_spec = instance.get_input_spec()
-    output_names = instance.get_output_names()
+    output_names = list(instance.get_output_spec())
 
     errors = [
         f"Channel-last input '{name}' not found in input spec: {list(input_spec.keys())}"

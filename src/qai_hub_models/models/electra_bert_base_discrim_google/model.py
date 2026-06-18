@@ -9,6 +9,7 @@ import torch
 from transformers import ElectraForPreTraining, ElectraTokenizer
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.wikitext_masked import ElectraWikiTextMasked
 from qai_hub_models.evaluators.electra_discriminator_evaluator import (
     ElectraDiscriminatorEvaluator,
@@ -95,5 +96,7 @@ class ElectraBertBaseDiscrimGoogle(BaseBertModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["predictions"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "predictions": TensorSpec(),
+        }

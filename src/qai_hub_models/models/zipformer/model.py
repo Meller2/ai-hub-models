@@ -15,6 +15,7 @@ from qai_hub_models import (
     Precision,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.common_voice import CommonVoiceDataset
 from qai_hub_models.models.zipformer.external_repos.icefall.egs.librispeech.ASR.pruned_transducer_stateless7_streaming.decoder import (
     Decoder,
@@ -188,17 +189,20 @@ class ZipformerEncoder(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return (
-            ["encoder_out"]
-            + [f"new_cached_len_{i}" for i in range(5)]
-            + [f"new_cached_avg_{i}" for i in range(5)]
-            + [f"new_cached_key_{i}" for i in range(5)]
-            + [f"new_cached_val_{i}" for i in range(5)]
-            + [f"new_cached_val2_{i}" for i in range(5)]
-            + [f"new_cached_conv1_{i}" for i in range(5)]
-            + [f"new_cached_conv2_{i}" for i in range(5)]
-        )
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            name: TensorSpec()
+            for name in (
+                ["encoder_out"]
+                + [f"new_cached_len_{i}" for i in range(5)]
+                + [f"new_cached_avg_{i}" for i in range(5)]
+                + [f"new_cached_key_{i}" for i in range(5)]
+                + [f"new_cached_val_{i}" for i in range(5)]
+                + [f"new_cached_val2_{i}" for i in range(5)]
+                + [f"new_cached_conv1_{i}" for i in range(5)]
+                + [f"new_cached_conv2_{i}" for i in range(5)]
+            )
+        }
 
     @classmethod
     def from_pretrained(cls) -> "ZipformerEncoder":
@@ -282,8 +286,10 @@ class ZipformerDecoder(BaseModel):
             y=TensorSpec(shape=(1, 2), dtype="int32", io_type=IoType.TENSOR),
         )
 
-    def get_output_names(self) -> list[str]:
-        return ["decoder_out"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "decoder_out": TensorSpec(),
+        }
 
     @classmethod
     def from_pretrained(cls) -> "ZipformerDecoder":
@@ -354,8 +360,10 @@ class ZipformerJoiner(BaseModel):
             ),
         )
 
-    def get_output_names(self) -> list[str]:
-        return ["logit"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "logit": TensorSpec(),
+        }
 
     @classmethod
     def from_pretrained(cls) -> "ZipformerJoiner":

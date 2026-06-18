@@ -18,6 +18,7 @@ from qai_hub_models import (
     Precision,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models.maskrcnn.model_patches import _onnx_merge_levels_optimized
 from qai_hub_models.utils.base_collection_model import WorkbenchModelCollection
 from qai_hub_models.utils.base_model import BaseModel
@@ -161,15 +162,18 @@ class MaskRCNNProposalGenerator(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return [
-            "features_0",
-            "features_1",
-            "features_2",
-            "features_3",
-            "proposals",
-            "objectness_logits",
-        ]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            x: TensorSpec()
+            for x in [
+                "features_0",
+                "features_1",
+                "features_2",
+                "features_3",
+                "proposals",
+                "objectness_logits",
+            ]
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]
@@ -359,7 +363,7 @@ class MaskRCNNROIHead(BaseModel):
             ),
         }
 
-    def get_output_spec(self) -> dict[str, TensorSpec]:
+    def get_output_spec(self) -> OutputSpec:
         return {
             "boxes": TensorSpec(
                 io_type=IoType.BBOX,

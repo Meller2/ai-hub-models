@@ -19,6 +19,7 @@ from tqdm import tqdm
 from typing_extensions import Self
 
 from qai_hub_models import Precision
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets import instantiate_dataset
 from qai_hub_models.datasets.wikitext import WikiText
 from qai_hub_models.datasets.wikitext_ja import WikiText_Japanese
@@ -137,8 +138,8 @@ class Llama3_Elyza_JP_8B(Llama3Base):
             _skip_optimizations=_skip_optimizations,
         )
 
-    def get_output_names(self) -> list[str]:
-        return Llama3Base._get_output_names(NUM_LAYERS)
+    def get_output_spec(self) -> OutputSpec:
+        return Llama3Base._get_output_spec(NUM_LAYERS)
 
     def get_input_spec(
         self,
@@ -275,8 +276,8 @@ class Llama3_Elyza_JP_8B_AIMETOnnx(Llama3Base_AIMETOnnx):
             use_dynamic_shapes=use_dynamic_shapes,
         )
 
-    def get_output_names(self) -> list[str]:
-        return Llama3Base._get_output_names(NUM_LAYERS)
+    def get_output_spec(self) -> OutputSpec:
+        return Llama3Base._get_output_spec(NUM_LAYERS)
 
     def get_input_spec(
         self,
@@ -390,8 +391,8 @@ class Llama3_Elyza_JP_8B_AIMETOnnx(Llama3Base_AIMETOnnx):
 class Llama3_Elyza_JP_8B_QNN(Llama3Base_QNN):
     num_layers_per_split: int = NUM_LAYERS_PER_SPLIT
 
-    def get_output_names(self) -> list[str]:
-        return Llama3Base._get_output_names(NUM_LAYERS)
+    def get_output_spec(self) -> OutputSpec:
+        return Llama3Base._get_output_spec(NUM_LAYERS)
 
     def get_input_spec(
         self,

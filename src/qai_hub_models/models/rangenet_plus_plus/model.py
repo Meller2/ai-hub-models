@@ -14,6 +14,8 @@ from torch import nn
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.models.rangenet_plus_plus.external_repos.lidar_bonnetal.train.tasks.semantic.modules.segmentator import (
     Segmentator,
 )
@@ -111,8 +113,10 @@ class RangeNetPlusPlus(BaseModel):
     ) -> InputSpec:
         return {"range_image": ((batch_size, INPUT_CHANNELS, height, width), "float32")}
 
-    def get_output_names(self) -> list[str]:
-        return ["mask"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "mask": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["range_image"]

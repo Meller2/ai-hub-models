@@ -24,6 +24,7 @@ from sam3.model.sam3_image import Sam3Image as Sam3
 from sam3.model.text_encoder_ve import VETextEncoder
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models.sam3.model_patches import (
     SAM3Normalize,
     SplitHeadMultiheadAttention,
@@ -39,7 +40,7 @@ from qai_hub_models.utils.base_model import (
     SerializationSettings,
 )
 from qai_hub_models.utils.export_result import ComponentGroup
-from qai_hub_models.utils.input_spec import InputSpec
+from qai_hub_models.utils.input_spec import InputSpec, TensorSpec
 from qai_hub_models.utils.window_partitioning import (
     window_partition_5d,
     window_unpartition_5d,
@@ -101,17 +102,20 @@ class SAM3VisionBackbone(BaseModel):
         fpn, _, _, _ = self.vision_model(image)
         return fpn[0], fpn[1], fpn[2]
 
-    @staticmethod
     def get_input_spec(
+        self,
         batch_size: int = 1,
         img_height: int = 1008,
         img_width: int = 1008,
     ) -> InputSpec:
         return {"image": ((batch_size, 3, img_height, img_width), "float32")}
 
-    @staticmethod
-    def get_output_names() -> list[str]:
-        return ["backbone_fpn_0", "backbone_fpn_1", "backbone_fpn_2"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "backbone_fpn_0": TensorSpec(),
+            "backbone_fpn_1": TensorSpec(),
+            "backbone_fpn_2": TensorSpec(),
+        }
 
 
 class SAM3Head(BaseModel):
@@ -289,8 +293,8 @@ class SAM3Head(BaseModel):
 
         return pred_boxes, scores, pred_masks
 
-    @staticmethod
     def get_input_spec(
+        self,
         seq_len: int = 32,
         d_model: int = 256,
         fpn_h: int = 72,
@@ -308,9 +312,12 @@ class SAM3Head(BaseModel):
             "backbone_fpn_2": ((1, d_model, fpn_h, fpn_w), "float32"),
         }
 
-    @staticmethod
-    def get_output_names() -> list[str]:
-        return ["pred_boxes", "scores", "pred_masks"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "pred_boxes": TensorSpec(),
+            "scores": TensorSpec(),
+            "pred_masks": TensorSpec(),
+        }
 
 
 visionBackboneT = TypeVar("visionBackboneT", bound=SAM3VisionBackbone)
@@ -333,7 +340,7 @@ class SAM3Loader:
             normalize=SAM3Normalize(device=model_device),
             vision_model=sam3.backbone.vision_backbone,
         )
-        img_h, img_w = vision_backbone_cls.get_input_spec()["image"][0][-2:]
+        img_h, img_w = vision_backbone.get_input_spec()["image"][0][-2:]
         head = head_cls(
             language_model=sam3.backbone.language_backbone,
             transformer=sam3.transformer,

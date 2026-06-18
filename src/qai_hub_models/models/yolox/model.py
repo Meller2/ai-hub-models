@@ -17,6 +17,8 @@ from yolox.models.yolox import YOLOX
 from yolox.utils import meshgrid, replace_module
 
 from qai_hub_models import Precision
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.models._shared.yolo.model import Yolo
 from qai_hub_models.models._shared.yolo.utils import detect_postprocess_split_input
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset
@@ -215,12 +217,20 @@ class YoloX(Yolo):
 
         return torch.cat([xy, wh, scores], dim=-1)
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         if self.include_postprocessing:
-            return ["boxes", "scores", "class_idx"]
+            return {
+                "boxes": TensorSpec(),
+                "scores": TensorSpec(),
+                "class_idx": TensorSpec(),
+            }
         if self.split_output:
-            return ["boxes_xy", "boxes_wh", "scores"]
-        return ["detector_output"]
+            return {
+                "boxes_xy": TensorSpec(),
+                "boxes_wh": TensorSpec(),
+                "scores": TensorSpec(),
+            }
+        return {"detector_output": TensorSpec()}
 
     def get_hub_litemp_percentage(self, precision: Precision) -> float:
         """Returns the Lite-MP percentage value for the specified mixed precision quantization."""

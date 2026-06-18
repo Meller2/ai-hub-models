@@ -11,7 +11,7 @@ import torch
 from typing_extensions import Self
 
 from qai_hub_models import Precision
-from qai_hub_models.configs.model_metadata import ModelMetadata
+from qai_hub_models.configs.model_metadata import ModelMetadata, OutputSpec
 from qai_hub_models.datasets.imagenet_colorization import ImagenetColorizationDataset
 from qai_hub_models.datasets.imagenette_colorization import (
     ImagenetteColorizationDataset,
@@ -75,8 +75,10 @@ class DDColor(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["output"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "output": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

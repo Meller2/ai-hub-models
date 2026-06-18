@@ -19,6 +19,7 @@ from transformers import AutoModel
 from transformers.utils.hub import HF_MODULES_CACHE
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.amazon_counterfactual import (
     AmazonCounterfactualClassificationDataset,
 )
@@ -171,8 +172,10 @@ class NomicEmbedText(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["embeddings"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "embeddings": TensorSpec(),
+        }
 
     def get_evaluator(self) -> BaseEvaluator:
         model = NomicEmbedText.from_pretrained(self.model_version, self.seq_length)

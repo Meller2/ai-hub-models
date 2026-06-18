@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 
 from qai_hub_models import TargetRuntime
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.models._shared.llm.llm_helpers import get_kv_cache_names
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset
 from qai_hub_models.utils.base_collection_model import (
@@ -42,8 +44,10 @@ class PromptProcessor_Part1(BasePrecompiledModel):
     def get_input_spec(self) -> InputSpec:
         return {"input_ids": ((1, 128), "int32")}
 
-    def get_output_names(self) -> list[str]:
-        return ["_model_embed_tokens_Gather_Gather_output_0"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "_model_embed_tokens_Gather_Gather_output_0": TensorSpec(),
+        }
 
     def get_hub_profile_options(
         self, target_runtime: TargetRuntime, other_profile_options: str = ""
@@ -90,11 +94,14 @@ class PromptProcessor_Part2(BasePrecompiledModel):
             "attention_mask": ((1, 1, 128, 4096), "uint16"),
         }
 
-    def get_output_names(self) -> list[str]:
-        return [
-            *get_kv_cache_names(start=0, end=7),
-            "_model_layers_6_Add_1_Add_output_0",
-        ]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            name: TensorSpec()
+            for name in [
+                *get_kv_cache_names(start=0, end=7),
+                "_model_layers_6_Add_1_Add_output_0",
+            ]
+        }
 
     def get_hub_profile_options(
         self, target_runtime: TargetRuntime, other_profile_options: str = ""
@@ -141,11 +148,14 @@ class PromptProcessor_Part3(BasePrecompiledModel):
             "attention_mask": ((1, 1, 128, 4096), "uint16"),
         }
 
-    def get_output_names(self) -> list[str]:
-        return [
-            *get_kv_cache_names(start=7, end=14),
-            "_model_layers_13_Add_1_Add_output_0",
-        ]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            name: TensorSpec()
+            for name in [
+                *get_kv_cache_names(start=7, end=14),
+                "_model_layers_13_Add_1_Add_output_0",
+            ]
+        }
 
     def get_hub_profile_options(
         self, target_runtime: TargetRuntime, other_profile_options: str = ""
@@ -192,11 +202,14 @@ class PromptProcessor_Part4(BasePrecompiledModel):
             "attention_mask": ((1, 1, 128, 4096), "uint16"),
         }
 
-    def get_output_names(self) -> list[str]:
-        return [
-            *get_kv_cache_names(start=14, end=21),
-            "_model_layers_20_Add_1_Add_output_0",
-        ]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            name: TensorSpec()
+            for name in [
+                *get_kv_cache_names(start=14, end=21),
+                "_model_layers_20_Add_1_Add_output_0",
+            ]
+        }
 
     def get_hub_profile_options(
         self, target_runtime: TargetRuntime, other_profile_options: str = ""
@@ -224,8 +237,10 @@ class TokenGenerator_Part1(BasePrecompiledModel):
     def get_input_spec(self) -> InputSpec:
         return {"input_ids": ((1, 1), "int32")}
 
-    def get_output_names(self) -> list[str]:
-        return ["_model_embed_tokens_Gather_Gather_output_0"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "_model_embed_tokens_Gather_Gather_output_0": TensorSpec(),
+        }
 
     def get_hub_profile_options(
         self, target_runtime: TargetRuntime, other_profile_options: str = ""
@@ -272,11 +287,14 @@ class TokenGenerator_Part2(BasePrecompiledModel):
             "attention_mask": ((1, 1, 1, 4096), "uint16"),
         }
 
-    def get_output_names(self) -> list[str]:
-        return [
-            *get_kv_cache_names(start=0, end=7),
-            "_model_layers_6_Add_1_Add_output_0",
-        ]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            name: TensorSpec()
+            for name in [
+                *get_kv_cache_names(start=0, end=7),
+                "_model_layers_6_Add_1_Add_output_0",
+            ]
+        }
 
     def get_hub_profile_options(
         self, target_runtime: TargetRuntime, other_profile_options: str = ""
@@ -323,11 +341,14 @@ class TokenGenerator_Part3(BasePrecompiledModel):
             "attention_mask": ((1, 1, 1, 4096), "uint16"),
         }
 
-    def get_output_names(self) -> list[str]:
-        return [
-            *get_kv_cache_names(start=7, end=14),
-            "_model_layers_13_Add_1_Add_output_0",
-        ]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            name: TensorSpec()
+            for name in [
+                *get_kv_cache_names(start=7, end=14),
+                "_model_layers_13_Add_1_Add_output_0",
+            ]
+        }
 
     def get_hub_profile_options(
         self, target_runtime: TargetRuntime, other_profile_options: str = ""
@@ -374,11 +395,14 @@ class TokenGenerator_Part4(BasePrecompiledModel):
             "attention_mask": ((1, 1, 1, 4096), "uint16"),
         }
 
-    def get_output_names(self) -> list[str]:
-        return [
-            *get_kv_cache_names(start=14, end=21),
-            "_model_layers_20_Add_1_Add_output_0",
-        ]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            name: TensorSpec()
+            for name in [
+                *get_kv_cache_names(start=14, end=21),
+                "_model_layers_20_Add_1_Add_output_0",
+            ]
+        }
 
     def get_hub_profile_options(
         self, target_runtime: TargetRuntime, other_profile_options: str = ""

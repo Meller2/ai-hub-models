@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 
 from qai_hub_models import SampleInputsType
-from qai_hub_models.configs.model_metadata import ModelMetadata
+from qai_hub_models.configs.model_metadata import ModelMetadata, OutputSpec
 from qai_hub_models.datasets.coco import CocoDataset
 from qai_hub_models.datasets.coco_seg import CocoSegDataset
 from qai_hub_models.models._shared.yolo.utils import (
@@ -208,7 +208,7 @@ class Yolo(BaseModel):
             )
         }
 
-    def get_output_spec(self) -> dict[str, TensorSpec]:
+    def get_output_spec(self) -> OutputSpec:
         return {
             "boxes": TensorSpec(
                 io_type=IoType.BBOX,

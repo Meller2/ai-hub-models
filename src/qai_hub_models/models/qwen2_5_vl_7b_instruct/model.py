@@ -52,7 +52,8 @@ from qai_hub_models import (
     SampleInputsType,
     TargetRuntime,
 )
-from qai_hub_models.configs.model_metadata import ModelMetadata
+from qai_hub_models.configs.model_metadata import ModelMetadata, OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.datasets.imagenette import IMAGENETTE_ASSET
 from qai_hub_models.models._shared.llm.common import LLMIOType
 from qai_hub_models.models._shared.llm.generator_factory import (
@@ -235,9 +236,8 @@ class Qwen2_5_VL_7B_PreSplit(
         cls.cache_store(instance, cache_key)
         return instance
 
-    @staticmethod
-    def get_output_names() -> list[str]:
-        return Qwen2VLTextBase._get_output_names(NUM_LAYERS)
+    def get_output_spec(self) -> OutputSpec:
+        return Qwen2VLTextBase._get_output_spec(NUM_LAYERS)
 
     def get_input_spec(
         self,
@@ -355,9 +355,8 @@ class Qwen2_5_VL_7B_QuantizablePreSplit(  # type: ignore[misc]
         # defined in _shared/qwen2_vl/model.py.
         return (-250.0, 1.0)
 
-    @staticmethod
-    def get_output_names() -> list[str]:
-        return Qwen2VLTextBase._get_output_names(NUM_LAYERS)
+    def get_output_spec(self) -> OutputSpec:
+        return Qwen2VLTextBase._get_output_spec(NUM_LAYERS)
 
     def get_input_spec(
         self,
@@ -622,8 +621,10 @@ class Qwen2_5_VL_7B_VisionEncoder(Qwen2VLVisionEncoder):
             patch_size=VISION_PATCH_SIZE,
         )
 
-    def get_output_names(self) -> list[str]:
-        return ["image_features"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "image_features": TensorSpec(),
+        }
 
     # ------------------------------------------------------------------
     # VEG Quantization Lifecycle (classmethods)
@@ -880,7 +881,7 @@ class Qwen2_5_VL_7B_PartBase(LLMPartBase, torch.nn.Module, MultiGraphWorkbenchMo
     Each Part represents one split of the ONNX model for deployment.
     VLM Parts use inputs_embeds instead of input_ids (the FP model's
     ``llm_io_type`` is ``genie_input_embeds``), so there is no embedding split.
-    ``get_graph_input_spec`` / ``get_graph_output_names`` come from ``LLMPartBase``.
+    ``get_graph_input_spec`` / ``get_graph_output_spec`` come from ``LLMPartBase``.
     """
 
     part_id: int = 0

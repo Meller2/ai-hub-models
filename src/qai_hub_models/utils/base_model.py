@@ -167,15 +167,6 @@ class WorkbenchModel:
 
     # -- Less likely, but subclasses may override these --
 
-    def get_output_names(self) -> list[str]:
-        """
-        List of output names. If there are multiple outputs, the order of the names
-        should match the order of tuple returned by the model.
-        """
-        outputs = self.get_output_spec().keys()
-        assert outputs, "get_output_spec() is not defined!"
-        return list(outputs)
-
     def get_hub_quantize_options(
         self, precision: Precision, other_options: str = ""
     ) -> str:
@@ -199,7 +190,7 @@ class WorkbenchModel:
         return build_compile_options(
             target_runtime,
             precision,
-            self.get_output_names(),
+            list(self.get_output_spec()),
             self.get_channel_last_inputs(),
             self.get_channel_last_outputs(),
             context_graph_name or self.context_graph_name,
@@ -305,7 +296,7 @@ class BaseModel(
     # -- Subclasses must implement these --
 
     # get_input_spec (inherited from WorkbenchModel)
-    # get_output_names (inherited from WorkbenchModel)
+    # get_output_spec (inherited from WorkbenchModel)
 
     # -- Subclasses may override these --
 

@@ -53,6 +53,7 @@ from qai_hub_models.configs.model_metadata import (
     GenieSampleInput,
     ModelFileMetadata,
     ModelMetadata,
+    OutputSpec,
 )
 from qai_hub_models.configs.tensor_spec import (
     QuantizationParameters,
@@ -427,8 +428,8 @@ def get_onnx_model(
                 tuple(example_input),
                 path,
                 input_names=list(input_specs.keys()),
-                output_names=fp_model._get_output_names(
-                    fp_model.llm_config.num_hidden_layers
+                output_names=list(
+                    fp_model._get_output_spec(fp_model.llm_config.num_hidden_layers)
                 ),
                 **extra,
             )
@@ -1187,16 +1188,16 @@ class LLMPartBase:
 
         return spec
 
-    def get_graph_output_names(self, graph_name: str) -> list[str]:
+    def get_graph_output_spec(self, graph_name: str) -> OutputSpec:
         """Output names for this Part, sanitized for the on-device runtime.
 
         All graphs of a Part share the same outputs, read from the split ONNX
         model at runtime.
         """
-        return [
-            name.replace("/", "_").replace(".", "_")
+        return {
+            name.replace("/", "_").replace(".", "_"): TensorSpec()
             for name in self._get_onnx_output_names()
-        ]
+        }
 
 
 class DynamicSplitPartBase(LLMPartBase, torch.nn.Module, MultiGraphWorkbenchModel):
@@ -1881,12 +1882,12 @@ class LLMBase(BaseModel, LLMConfigEditor, ABC):
         pass
 
     @staticmethod
-    def _get_output_names(num_hidden_layers: int) -> list[str]:
-        output_names = ["logits"]
+    def _get_output_spec(num_hidden_layers: int) -> OutputSpec:
+        output_spec: OutputSpec = {"logits": TensorSpec()}
         for layer in range(num_hidden_layers):
-            output_names.append(f"past_key_{layer}_out")
-            output_names.append(f"past_value_{layer}_out")
-        return output_names
+            output_spec[f"past_key_{layer}_out"] = TensorSpec()
+            output_spec[f"past_value_{layer}_out"] = TensorSpec()
+        return output_spec
 
     # Must be defined by transformers generator class
     @property

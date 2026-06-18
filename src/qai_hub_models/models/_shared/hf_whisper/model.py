@@ -20,6 +20,7 @@ from transformers.models.whisper.modeling_whisper import WhisperDecoder, Whisper
 from typing_extensions import Self
 
 from qai_hub_models import Precision, TargetRuntime
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models._shared.hf_whisper.model_adaptation import (
     monkey_patch_model,
 )
@@ -94,12 +95,12 @@ class HfWhisperEncoder(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return [
-            f"{prefix}_cache_cross_{i}"
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            f"{prefix}_cache_cross_{i}": TensorSpec()
             for i in range(self.config.decoder_layers)
             for prefix in ("k", "v")
-        ]
+        }
 
     @classmethod
     def from_pretrained(cls, hf_whisper_version: str = "openai/whisper-base") -> Self:
@@ -270,12 +271,12 @@ class HfWhisperDecoder(BaseModel):
         specs["position_ids"] = TensorSpec(shape=(1,), dtype="int32")
         return specs
 
-    def get_output_names(self) -> list[str]:
-        return ["logits"] + [
-            f"{prefix}_cache_self_{i}_out"
-            for i in range(self.num_blocks)
-            for prefix in ("k", "v")
-        ]
+    def get_output_spec(self) -> OutputSpec:
+        spec: OutputSpec = {"logits": TensorSpec()}
+        for i in range(self.num_blocks):
+            spec[f"k_cache_self_{i}_out"] = TensorSpec()
+            spec[f"v_cache_self_{i}_out"] = TensorSpec()
+        return spec
 
     @classmethod
     def from_pretrained(cls, hf_whisper_version: str = "openai/whisper-base") -> Self:

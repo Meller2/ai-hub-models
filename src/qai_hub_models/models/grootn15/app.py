@@ -409,7 +409,7 @@ def build_app(
     for (name, cls), hub_id in zip(component_classes.items(), hub_ids, strict=False):
         on_device_components[name] = OnDeviceModel(
             model=hub.get_model(hub_id),
-            input_names=list(cls.get_input_names()),
+            input_names=list(cls.get_input_names()),  # type: ignore[attr-defined]
             device=device,
         )
 

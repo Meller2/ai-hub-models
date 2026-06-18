@@ -12,6 +12,7 @@ from typing_extensions import Self
 
 # isort: off
 # This verifies aimet is installed, and this must be included first.
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.utils.base_dataset import BaseDataset
 from qai_hub_models.utils.quantization_aimet_onnx import (
     AIMETOnnxQuantizableMixin,
@@ -88,8 +89,10 @@ class TextEncoderBase(BaseModel, FromPretrainedMixin):
             "tokens": TensorSpec(shape=(batch_size, self.seq_len), dtype="int32"),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["text_embedding"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "text_embedding": TensorSpec(),
+        }
 
 
 class TextEncoderQuantizableBase(AIMETOnnxQuantizableMixin, TextEncoderBase):
@@ -239,8 +242,10 @@ class UnetBase(BaseModel, FromPretrainedMixin):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["output_latent"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "output_latent": TensorSpec(),
+        }
 
 
 class UnetQuantizableBase(AIMETOnnxQuantizableMixin, UnetBase):
@@ -358,8 +363,10 @@ class VaeDecoderBase(BaseModel, FromPretrainedMixin):
             "latent": TensorSpec(shape=(batch_size, 4, 64, 64), dtype="float32"),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["image"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "image": TensorSpec(),
+        }
 
 
 class VaeDecoderQuantizableBase(AIMETOnnxQuantizableMixin, VaeDecoderBase):

@@ -11,6 +11,7 @@ import torch
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.cocowholebody import CocoWholeBodyDataset
 from qai_hub_models.evaluators.wholebody_pose_evaluator import WholeBodyPoseEvaluator
 from qai_hub_models.extern.mmengine import patch_mmengine_pkgresources
@@ -125,8 +126,11 @@ class RTMPosebody2d(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["pred_x", "pred_y"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "pred_x": TensorSpec(),
+            "pred_y": TensorSpec(),
+        }
 
     def get_evaluator(self) -> BaseEvaluator:
         h, w = self.get_input_spec()["image"][0][2:]

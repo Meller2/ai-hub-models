@@ -10,6 +10,7 @@ from qai_hub.client import Device
 from typing_extensions import Self
 
 from qai_hub_models import Precision, SampleInputsType, TargetRuntime
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models._shared.cityscapes_segmentation.model import (
     CityscapesSegmentor,
 )
@@ -116,8 +117,10 @@ class DDRNet(CityscapesSegmentor):
             target_runtime, precision, other_compile_options, device, context_graph_name
         )
 
-    def get_output_names(self) -> list[str]:
-        return ["mask"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "mask": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

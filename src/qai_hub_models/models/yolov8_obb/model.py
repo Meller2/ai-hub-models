@@ -14,7 +14,8 @@ from ultralytics.models import YOLO as ultralytics_YOLO
 from ultralytics.nn.tasks import OBBModel
 
 from qai_hub_models import Precision
-from qai_hub_models.configs.model_metadata import ModelMetadata
+from qai_hub_models.configs.model_metadata import ModelMetadata, OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.datasets.dota128 import Dota128Dataset
 from qai_hub_models.models._shared.ultralytics.obb_patches import (
     patch_ultralytics_obb_head,
@@ -123,20 +124,14 @@ class YoloV8OBB(Yolo):
         boxes, angles, scores, classes = yolo_obb_postprocess(boxes, angles, scores)
         return boxes, angles, scores, classes
 
-    @staticmethod
-    def get_output_names(
-        include_postprocessing: bool = True, split_output: bool = False
-    ) -> list[str]:
-        if include_postprocessing:
-            return ["boxes", "angles", "scores", "class_idx"]
-        if split_output:
-            return ["boxes", "angles", "scores"]
-        return ["detector_output"]
-
-    def _get_output_names_for_instance(self) -> list[str]:
-        return self.__class__.get_output_names(
-            self.include_postprocessing, self.split_output
-        )
+    def get_output_spec(self) -> OutputSpec:
+        if self.include_postprocessing:
+            out = ["boxes", "angles", "scores", "class_idx"]
+        elif self.split_output:
+            out = ["boxes", "angles", "scores"]
+        else:
+            out = ["detector_output"]
+        return {x: TensorSpec() for x in out}
 
     def get_hub_quantize_options(
         self, precision: Precision, other_options: str | None = None

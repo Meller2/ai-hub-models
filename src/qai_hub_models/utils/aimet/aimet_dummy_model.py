@@ -109,7 +109,7 @@ class AimetEncodingLoaderMixin(AIMETQuantizableModelProtocol):
                 input_spec=input_spec,
                 model_name=self.__class__.__name__,
                 external_weights=True,
-                output_names=self.get_output_names(),
+                output_names=list(self.get_output_spec()),
             )
         )
 

@@ -15,7 +15,7 @@ class SimpleBaseModel(BaseModel):
     def get_input_spec(*args: Any, **kwargs: Any) -> None:
         return None
 
-    def get_output_names(*args: Any, **kwargs: Any) -> None:
+    def get_output_spec(*args: Any, **kwargs: Any) -> None:
         return None
 
     @classmethod

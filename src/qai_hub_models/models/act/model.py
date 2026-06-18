@@ -15,6 +15,7 @@ from qai_hub_models import (
     Precision,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models.act.external_repos.act.detr.models.detr_vae import build
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_torch
 from qai_hub_models.utils.base_model import BaseModel
@@ -172,5 +173,7 @@ class ACT(BaseModel):
             target_runtime, precision, other_compile_options, device, context_graph_name
         )
 
-    def get_output_names(self) -> list[str]:
-        return ["actions"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "actions": TensorSpec(),
+        }

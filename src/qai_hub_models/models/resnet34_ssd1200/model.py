@@ -14,6 +14,7 @@ from qai_hub_models import (
     SampleInputsType,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models._shared.yolo.model import (
     Yolo,
 )
@@ -175,12 +176,7 @@ class Resnet34SSD(Yolo):
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]
 
-    def get_output_names(
-        self, include_postprocessing: bool = True, split_output: bool = False
-    ) -> list[str]:
-        return list(self.get_output_spec().keys())
-
-    def get_output_spec(self) -> dict[str, TensorSpec]:
+    def get_output_spec(self) -> OutputSpec:
         return {
             "boxes": TensorSpec(
                 io_type=IoType.BBOX,

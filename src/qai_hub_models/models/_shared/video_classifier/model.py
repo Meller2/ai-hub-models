@@ -8,6 +8,7 @@ from __future__ import annotations
 import torch
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.kinetics400 import Kinetics400Dataset
 from qai_hub_models.evaluators.video_classification_evaluator import (
     VideoClassificationEvaluator,
@@ -148,7 +149,7 @@ class KineticsClassifier(BaseModel):
             ]
         }
 
-    def get_output_spec(self) -> dict[str, TensorSpec]:
+    def get_output_spec(self) -> OutputSpec:
         return {
             "class_probs": TensorSpec(
                 io_type=IoType.TENSOR,

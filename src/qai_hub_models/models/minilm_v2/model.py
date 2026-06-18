@@ -12,6 +12,7 @@ from transformers import AutoModel
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models._shared.bert_hf.model_patches import (
     patch_get_extended_attention_mask,
 )
@@ -98,8 +99,8 @@ class AllMiniLML6V2(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["embeddings"]
+    def get_output_spec(self) -> OutputSpec:
+        return {"embeddings": TensorSpec()}
 
     def get_evaluator(self) -> BaseEvaluator:
         return SentenceEmbeddingEvaluator()

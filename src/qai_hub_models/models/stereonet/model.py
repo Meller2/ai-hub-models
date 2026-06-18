@@ -17,6 +17,7 @@ from qai_hub_models import (
     Precision,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models.stereonet.model_patch import CostVolumeOptimized
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset
 from qai_hub_models.utils.base_model import BaseModel
@@ -177,8 +178,10 @@ class StereoNet(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["disparity"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "disparity": TensorSpec(),
+        }
 
     def get_hub_compile_options(
         self,

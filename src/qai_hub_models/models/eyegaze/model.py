@@ -14,6 +14,7 @@ from qai_hub_models import (
     Precision,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.mpiigaze import MPIIGazeDataset
 from qai_hub_models.evaluators.mpigaze_evaluator import MPIIGazeEvaluator
 from qai_hub_models.models.eyegaze.external_repos.gaze_estimation.models.eyenet import (
@@ -63,8 +64,12 @@ class EyeGaze(BaseModel):
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         return self.model(image)
 
-    def get_output_names(self) -> list[str]:
-        return ["heatmaps", "landmarks", "gaze_pitchyaw"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "heatmaps": TensorSpec(),
+            "landmarks": TensorSpec(),
+            "gaze_pitchyaw": TensorSpec(),
+        }
 
     def get_hub_compile_options(
         self,

@@ -9,6 +9,7 @@ import torch
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.carvana import CarvanaDataset
 from qai_hub_models.evaluators.segmentation_evaluator import SegmentationOutputEvaluator
 from qai_hub_models.utils.asset_loaders import (
@@ -98,8 +99,10 @@ class UNet(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["mask"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "mask": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

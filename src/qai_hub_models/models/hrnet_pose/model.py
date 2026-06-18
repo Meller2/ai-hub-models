@@ -10,6 +10,7 @@ from torch import nn
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.cocobody import CocoBodyDataset
 from qai_hub_models.datasets.mpii import MPIIDataset
 from qai_hub_models.evaluators.hrnet_evaluator import HRNetPoseEvaluator
@@ -117,8 +118,10 @@ class HRNetPose(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["heatmaps"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "heatmaps": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

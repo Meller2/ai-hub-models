@@ -10,6 +10,7 @@ from torch import nn
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.coco_face import CocoFaceDataset
 from qai_hub_models.datasets.facemap_3dmm_dataset import FaceMap3DMMDataset
 from qai_hub_models.evaluators.facemap_3dmm_evaluator import FaceMap3DMMEvaluator
@@ -104,8 +105,10 @@ class FaceMap_3DMM(BaseModel):
             image = image.resize((w, h))
         return {"image": [app_to_net_image_inputs(image)[1].numpy()]}
 
-    def get_output_names(self) -> list[str]:
-        return ["parameters_3dmm"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "parameters_3dmm": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

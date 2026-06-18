@@ -9,6 +9,8 @@ import torch
 from torch import nn
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.models._shared.yolo.model import Yolo
 from qai_hub_models.models._shared.yolo.utils import detect_postprocess
 from qai_hub_models.models.yolor.external_repos import EXTERNAL_REPO_PATHS
@@ -86,7 +88,15 @@ class YoloR(Yolo):
             return detect_postprocess(predictions[0])
         return (predictions[0], torch.zeros(1), torch.zeros(1))
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         if self.include_postprocessing:
-            return ["boxes", "scores", "class_idx"]
-        return ["detector_output", "dummy_score", "dummy_class"]
+            return {
+                "boxes": TensorSpec(),
+                "scores": TensorSpec(),
+                "class_idx": TensorSpec(),
+            }
+        return {
+            "detector_output": TensorSpec(),
+            "dummy_score": TensorSpec(),
+            "dummy_class": TensorSpec(),
+        }

@@ -10,6 +10,8 @@ from pathlib import Path
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.datasets.sidd import SIDDDataset
 from qai_hub_models.models._shared.nafnet.model import (
     NAFNetModel,
@@ -80,8 +82,10 @@ class NafNetDeNoise(NAFNetModel):
             "image": ((batch_size, 3, height, width), "float32"),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["denoised_image"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "denoised_image": TensorSpec(),
+        }
 
     def _sample_inputs_impl(
         self, input_spec: InputSpec | None = None

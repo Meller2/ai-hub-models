@@ -12,6 +12,7 @@ from transformers.models.t5.modeling_t5 import T5Attention
 from typing_extensions import Self
 
 from qai_hub_models import Precision
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models._shared.common import replace_module_recursively
 from qai_hub_models.models._shared.voiceai_tts.t5_attention import T5AttentionMod
 from qai_hub_models.utils.base_model import BaseModel
@@ -101,12 +102,12 @@ class T5Encoder(BaseModel):
             ),
         }
 
-    def get_output_names(self, num_blocks: int = NUM_DECODER_BLOCKS) -> list[str]:
+    def get_output_spec(self, num_blocks: int = NUM_DECODER_BLOCKS) -> OutputSpec:
         names = []
         for i in range(num_blocks):
             names.append(f"block_{i}_cross_key_states")
             names.append(f"block_{i}_cross_value_states")
-        return names
+        return {name: TensorSpec() for name in names}
 
     @classmethod
     def from_pretrained(cls) -> Self:
@@ -262,12 +263,12 @@ class T5Decoder(BaseModel):
             )
         return specs
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         names = ["logits"]
         for i in range(len(self.block)):
             names.append(f"block_{i}_present_self_key_states")
             names.append(f"block_{i}_present_self_value_states")
-        return names
+        return {name: TensorSpec() for name in names}
 
     @classmethod
     def from_pretrained(cls) -> Self:

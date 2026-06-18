@@ -10,6 +10,7 @@ from transformers import DetrForObjectDetection, PreTrainedModel
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.coco91class import Coco91ClassDataset
 from qai_hub_models.evaluators.detection_evaluator import DetectionEvaluator
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
@@ -158,10 +159,7 @@ class DETR(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return list(self.get_output_spec().keys())
-
-    def get_output_spec(self) -> dict[str, TensorSpec]:
+    def get_output_spec(self) -> OutputSpec:
         return {
             "boxes": TensorSpec(
                 io_type=IoType.BBOX,

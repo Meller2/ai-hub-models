@@ -13,6 +13,7 @@ from qai_hub.client import Device
 from typing_extensions import Self
 
 from qai_hub_models import Precision, SampleInputsType, TargetRuntime
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.nuscenes import NuscenesDataset
 from qai_hub_models.evaluators.nuscenes_evaluator import (
     NuscenesObjectDetectionEvaluator,
@@ -279,8 +280,15 @@ class BEVDet(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["reg", "height", "dim", "rot", "vel", "heatmap"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "reg": TensorSpec(),
+            "height": TensorSpec(),
+            "dim": TensorSpec(),
+            "rot": TensorSpec(),
+            "vel": TensorSpec(),
+            "heatmap": TensorSpec(),
+        }
 
     def _sample_inputs_impl(
         self, input_spec: InputSpec | None = None

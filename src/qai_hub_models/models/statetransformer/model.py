@@ -17,6 +17,7 @@ from qai_hub_models import (
     Precision,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models.statetransformer.external_repos.statetransformer.transformer4planning.models.backbone.str_base import (
     build_model_from_path,
 )
@@ -202,13 +203,13 @@ class StateTransformer(BaseModel):
     def get_channel_last_inputs(self) -> list[str]:
         return ["high_res_raster", "low_res_raster"]
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         """
-        Returns the names of the model outputs.
+        Returns the output spec for this model.
 
         Returns
         -------
-        output_names : list[str]
-            A list containing the names of the outputs produced by the model.
+        OutputSpec
+            Mapping of output tensor names to their specs.
         """
-        return ["traj_logits", "traj_scores"]
+        return {"traj_logits": TensorSpec(), "traj_scores": TensorSpec()}

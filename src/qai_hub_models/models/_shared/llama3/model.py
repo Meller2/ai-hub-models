@@ -51,6 +51,10 @@ from transformers.modeling_attn_mask_utils import AttentionMaskConverter
 from transformers.models.llama import LlamaConfig, modeling_llama
 
 from qai_hub_models import Precision
+from qai_hub_models.configs.model_metadata import (
+    OutputSpec,
+)
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.models._shared.llama3.model_adaptations import (
     QcLlama_apply_rotary_pos_emb,
     QCLlamaForCausalLM,
@@ -339,12 +343,12 @@ class Llama3Base_AIMETOnnx(LLM_AIMETOnnx):
         )
 
     @staticmethod
-    def _get_output_names(num_hidden_layers: int) -> list[str]:
-        output_names = ["logits"]
+    def _get_output_spec(num_hidden_layers: int) -> OutputSpec:
+        output_spec: OutputSpec = {"logits": TensorSpec()}
         for layer in range(num_hidden_layers):
-            output_names.append(f"past_key_{layer}_out")
-            output_names.append(f"past_value_{layer}_out")
-        return output_names
+            output_spec[f"past_key_{layer}_out"] = TensorSpec()
+            output_spec[f"past_value_{layer}_out"] = TensorSpec()
+        return output_spec
 
     def _adapt_aimet_encodings(
         self, src_encodings_path: str, dst_encodings_path: str, onnx_model_path: str
@@ -705,9 +709,9 @@ class LlamaPreSplitBase(
         cls.cache_store(instance, cache_key)
         return instance
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         """Get output names for the full model."""
-        return Llama3DynamicBase._get_output_names(self.num_layers)
+        return Llama3DynamicBase._get_output_spec(self.num_layers)
 
     def get_input_spec(
         self,
@@ -791,9 +795,9 @@ class LlamaQuantizablePreSplitBase(  # type: ignore[misc]
     num_splits: int = 0
     num_layers_per_split: int = 0
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         """Get output names for the full model."""
-        return Llama3DynamicBase._get_output_names(self.num_layers)
+        return Llama3DynamicBase._get_output_spec(self.num_layers)
 
     def _postprocess_full_onnx_bundle(self, bundle: ONNXBundle) -> ONNXBundle:
         if bundle.aimet_encodings_path is not None:

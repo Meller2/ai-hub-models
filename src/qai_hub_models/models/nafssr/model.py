@@ -12,6 +12,8 @@ from torchvision import transforms
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.datasets.flickr1024 import Flickr1024Dataset
 from qai_hub_models.evaluators.stereo_evaluator import StereoEvaluator
 from qai_hub_models.models._shared.nafnet.model import (
@@ -135,8 +137,11 @@ class NAFSSR(NAFNetModel):
         img_r = transforms.ToTensor()(r_img).unsqueeze(0)
         return {"l_image": [img_l.numpy()], "r_image": [img_r.numpy()]}
 
-    def get_output_names(self) -> list[str]:
-        return ["upscaled_left", "upscaled_right"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "upscaled_left": TensorSpec(),
+            "upscaled_right": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["l_image", "r_image"]

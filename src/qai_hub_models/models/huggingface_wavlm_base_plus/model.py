@@ -23,6 +23,7 @@ from qai_hub_models import (
     SampleInputsType,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.libri_speech import LibriSpeechDataset
 from qai_hub_models.evaluators.libri_speech_evaluator import LibriSpeechEvaluator
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_numpy
@@ -104,8 +105,10 @@ class HuggingFaceWavLMBasePlus(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["output"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "output": TensorSpec(),
+        }
 
     def _sample_inputs_impl(
         self, input_spec: InputSpec | None = None

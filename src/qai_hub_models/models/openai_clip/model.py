@@ -17,6 +17,7 @@ from torch import Tensor
 from torchvision.transforms import Compose
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.utils.asset_loaders import callback_with_retry
 from qai_hub_models.utils.base_model import BaseModel
 from qai_hub_models.utils.input_spec import (
@@ -114,8 +115,10 @@ class OpenAIClip(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["logits_per_image"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "logits_per_image": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

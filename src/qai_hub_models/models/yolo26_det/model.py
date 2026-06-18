@@ -12,6 +12,8 @@ from typing_extensions import Self
 from ultralytics.models import YOLO as ultralytics_YOLO
 from ultralytics.nn.tasks import DetectionModel
 
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.models._shared.ultralytics.detect_patches import (
     patch_ultralytics_detection_head,
 )
@@ -116,12 +118,16 @@ class Yolo26Detector(Yolo):
         boxes, scores, classes = yolo_detect_postprocess(boxes, scores)
         return boxes, scores, classes
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         if self.include_postprocessing:
-            return ["boxes", "scores", "class_idx"]
+            return {
+                "boxes": TensorSpec(),
+                "scores": TensorSpec(),
+                "class_idx": TensorSpec(),
+            }
         if self.split_output:
-            return ["boxes", "scores"]
-        return ["detector_output"]
+            return {"boxes": TensorSpec(), "scores": TensorSpec()}
+        return {"detector_output": TensorSpec()}
 
     def get_evaluator(self) -> BaseEvaluator:
         # This is imported here so segmentation models don't have to install

@@ -11,6 +11,7 @@ import torch
 from typing_extensions import Self
 
 from qai_hub_models import Precision, SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.human_poses import HumanPosesDataset
 from qai_hub_models.models._shared.mediapipe.external_repos import EXTERNAL_REPO_PATHS
 from qai_hub_models.models._shared.mediapipe.external_repos.mediapipe.blazepose import (
@@ -212,8 +213,13 @@ class PoseDetector(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["box_coords_1", "box_coords_2", "box_scores_1", "box_scores_2"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "box_coords_1": TensorSpec(),
+            "box_coords_2": TensorSpec(),
+            "box_scores_1": TensorSpec(),
+            "box_scores_2": TensorSpec(),
+        }
 
     def get_hub_quantize_options(
         self, precision: Precision, other_options: str | None = None
@@ -304,8 +310,11 @@ class PoseLandmarkDetector(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["scores", "landmarks"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "scores": TensorSpec(),
+            "landmarks": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

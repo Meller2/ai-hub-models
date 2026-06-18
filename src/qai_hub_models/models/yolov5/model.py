@@ -12,6 +12,8 @@ from typing_extensions import Self
 from ultralytics.models import YOLO as ultralytics_YOLO
 from ultralytics.nn.tasks import DetectionModel
 
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.models._shared.ultralytics.detect_patches import (
     patch_ultralytics_detection_head,
 )
@@ -82,7 +84,11 @@ class YoloV5(Yolo):
         boxes, scores, classes = yolo_detect_postprocess(boxes, scores)
         return boxes, scores, classes
 
-    def get_output_names(self, include_postprocessing: bool = True) -> list[str]:
+    def get_output_spec(self, include_postprocessing: bool = True) -> OutputSpec:
         if include_postprocessing:
-            return ["boxes", "scores", "class_idx"]
-        return ["detector_output"]
+            return {
+                "boxes": TensorSpec(),
+                "scores": TensorSpec(),
+                "class_idx": TensorSpec(),
+            }
+        return {"detector_output": TensorSpec()}

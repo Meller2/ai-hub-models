@@ -115,7 +115,7 @@ class WhisperEncoderQuantizableBase(AIMETOnnxQuantizableMixin, HfWhisperEncoder)
                     temp_model_path,
                     export_params=True,
                     input_names=list(specs.keys()),
-                    output_names=fp_encoder.get_output_names(),
+                    output_names=list(fp_encoder.get_output_spec()),
                 )
                 # Simplify the ONNX model
                 onnx_model, _ = simplify(temp_model_path)
@@ -228,7 +228,7 @@ class WhisperDecoderQuantizableBase(AIMETOnnxQuantizableMixin, HfWhisperDecoder)
                     temp_model_path,
                     export_params=True,
                     input_names=list(specs.keys()),
-                    output_names=fp_decoder.get_output_names(),
+                    output_names=list(fp_decoder.get_output_spec()),
                 )
                 # Simplify the ONNX model
                 onnx_model, _ = simplify(temp_model_path)

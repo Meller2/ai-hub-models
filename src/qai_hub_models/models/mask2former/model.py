@@ -21,6 +21,7 @@ from qai_hub_models import (
     Precision,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.coco_panoptic_seg import CocoPanopticSegmentationDataset
 from qai_hub_models.evaluators.panoptic_segmentation_evaluator import (
     PanopticSegmentationEvaluator,
@@ -120,8 +121,12 @@ class Mask2Former(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["scores", "labels", "masks"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "scores": TensorSpec(),
+            "labels": TensorSpec(),
+            "masks": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

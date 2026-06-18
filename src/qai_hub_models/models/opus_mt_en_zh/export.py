@@ -596,7 +596,7 @@ def export_model(
             ij_output = inference_job.download_output_data()
             assert ij_output is not None
             print_inference_metrics(
-                inference_job, ij_output, torch_out, component.get_output_names()
+                inference_job, ij_output, torch_out, list(component.get_output_spec())
             )
 
     if not skip_summary:

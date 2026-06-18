@@ -32,6 +32,7 @@ from qai_hub_models import (
     SampleInputsType,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models._shared.llm._utils import (
     _set_matmul_second_input_to_8b,
     _set_tensors_to_output_8b_sym,
@@ -251,11 +252,11 @@ class Pi05PaliGemmaVision(LoadPolicyMixin, BaseModel):
         return self.get_input_spec_static(batch_size)
 
     @staticmethod
-    def get_output_names_static() -> list[str]:
-        return ["img_embed"]
+    def get_output_spec_static() -> OutputSpec:
+        return {"img_embed": TensorSpec()}
 
-    def get_output_names(self) -> list[str]:
-        return self.get_output_names_static()
+    def get_output_spec(self) -> OutputSpec:
+        return self.get_output_spec_static()
 
 
 class _Pi05CachedExportMixin:
@@ -656,19 +657,19 @@ class Pi05PaliGemmaTokenEmbed(LoadPolicyMixin, BaseModel):
         return result
 
     @staticmethod
-    def get_output_names_static() -> list[str]:
-        return [
-            "prefix_emb",
-            "prefix_att_2d",
-            "prefix_sin",
-            "prefix_cos",
-            "suffix_sin",
-            "suffix_cos",
-            "full_att_4d",
-        ]
+    def get_output_spec_static() -> OutputSpec:
+        return {
+            "prefix_emb": TensorSpec(),
+            "prefix_att_2d": TensorSpec(),
+            "prefix_sin": TensorSpec(),
+            "prefix_cos": TensorSpec(),
+            "suffix_sin": TensorSpec(),
+            "suffix_cos": TensorSpec(),
+            "full_att_4d": TensorSpec(),
+        }
 
-    def get_output_names(self) -> list[str]:
-        return self.get_output_names_static()
+    def get_output_spec(self) -> OutputSpec:
+        return self.get_output_spec_static()
 
     def serialize(
         self,
@@ -1241,11 +1242,11 @@ class Pi05ActionExpert(LoadPolicyMixin, BaseModel):
         return self.get_input_spec_static(batch_size)
 
     @staticmethod
-    def get_output_names_static() -> list[str]:
-        return ["action_emb"]
+    def get_output_spec_static() -> OutputSpec:
+        return {"action_emb": TensorSpec()}
 
-    def get_output_names(self) -> list[str]:
-        return self.get_output_names_static()
+    def get_output_spec(self) -> OutputSpec:
+        return self.get_output_spec_static()
 
 
 class Pi05PaliGemmaBackboneBase(LoadPolicyMixin, BaseModel):
@@ -1469,19 +1470,19 @@ class Pi05PaliGemmaBackboneBase(LoadPolicyMixin, BaseModel):
         return self.get_input_spec_static(batch_size)
 
     @staticmethod
-    def get_output_names_static(layer_range: tuple[int, int]) -> list[str]:
+    def get_output_spec_static(layer_range: tuple[int, int]) -> OutputSpec:
         # Generic placeholders for 6 layers. Concrete subclasses return
         # exactly 6 K and 6 V caches each, matching the range length.
-        names = []
+        names: OutputSpec = {}
         if layer_range[1] != 18:
-            names.append("hidden_state_out")
+            names["hidden_state_out"] = TensorSpec()
         layer_ids = range(layer_range[0], layer_range[1])
-        names.extend([f"k_cache_l{i}" for i in layer_ids])
-        names.extend([f"v_cache_l{i}" for i in layer_ids])
+        names.update({f"k_cache_l{i}": TensorSpec() for i in layer_ids})
+        names.update({f"v_cache_l{i}": TensorSpec() for i in layer_ids})
         return names
 
-    def get_output_names(self) -> list[str]:
-        return self.get_output_names_static((0, 6))
+    def get_output_spec(self) -> OutputSpec:
+        return self.get_output_spec_static((0, 6))
 
 
 class Pi05PaliGemmaBackbone(Pi05PaliGemmaBackboneBase):
@@ -1577,11 +1578,8 @@ class Pi05PaliGemmaBackboneQuantizable(
             ),
         )
 
-    def _get_output_names_for_instance(self) -> list[str]:
-        return Pi05PaliGemmaBackboneBase.get_output_names_static((0, 18))
-
-    def get_output_names(self) -> list[str]:
-        return Pi05PaliGemmaBackboneBase.get_output_names_static((0, 18))
+    def get_output_spec(self) -> OutputSpec:
+        return Pi05PaliGemmaBackboneBase.get_output_spec_static((0, 18))
 
 
 class Pi05ActionExpertQuantizable(

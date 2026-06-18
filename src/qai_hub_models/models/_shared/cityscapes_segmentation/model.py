@@ -10,7 +10,7 @@ import os
 import torch
 
 from qai_hub_models import SampleInputsType
-from qai_hub_models.configs.model_metadata import ModelMetadata
+from qai_hub_models.configs.model_metadata import ModelMetadata, OutputSpec
 from qai_hub_models.datasets.cityscapes import CityscapesDataset
 from qai_hub_models.evaluators.segmentation_evaluator import SegmentationOutputEvaluator
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
@@ -89,7 +89,7 @@ class CityscapesSegmentor(BaseModel):
             )
         }
 
-    def get_output_spec(self) -> dict[str, TensorSpec]:
+    def get_output_spec(self) -> OutputSpec:
         return {
             "mask": TensorSpec(
                 io_type=IoType.TENSOR,

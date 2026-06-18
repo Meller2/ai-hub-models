@@ -10,6 +10,7 @@ from torch import nn
 from typing_extensions import Self
 
 from qai_hub_models import Precision
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.face_det_lite import FaceDetLiteDataset
 from qai_hub_models.evaluators.face_det_lite_evaluator import FaceDetLiteEvaluator
 from qai_hub_models.models.face_det_lite.layers import (
@@ -211,8 +212,12 @@ class FaceDetLite(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["heatmap", "bbox", "landmark"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "heatmap": TensorSpec(),
+            "bbox": TensorSpec(),
+            "landmark": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["input"]

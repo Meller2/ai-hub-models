@@ -22,6 +22,7 @@ from sam2.modeling.sam2_utils import MLP as SAM2MaskDecoderMLP
 from sam2.modeling.sam2_utils import LayerNorm2d
 
 from qai_hub_models import Precision
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models._shared.sam.model_patches import (
     Conv2DInplaceLinearSAMMaskDecoderMLP,
     SplitHeadSAMDecoderAttention,
@@ -167,12 +168,10 @@ class SAM2Encoder(BaseModel, ABC):
             ),
         }
 
-    @staticmethod
-    def get_channel_last_inputs() -> list[str]:
+    def get_channel_last_inputs(self) -> list[str]:
         return ["image"]
 
-    @staticmethod
-    def get_channel_last_outputs() -> list[str]:
+    def get_channel_last_outputs(self) -> list[str]:
         return [
             "image_embeddings",
             "high_res_features1",
@@ -180,14 +179,14 @@ class SAM2Encoder(BaseModel, ABC):
             "pix_feat",
         ]
 
-    def get_output_names(self) -> list[str]:
-        return [
-            "image_embeddings",
-            "high_res_features1",
-            "high_res_features2",
-            "sparse_embedding",
-            "pix_feat",
-        ]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "image_embeddings": TensorSpec(),
+            "high_res_features1": TensorSpec(),
+            "high_res_features2": TensorSpec(),
+            "sparse_embedding": TensorSpec(),
+            "pix_feat": TensorSpec(),
+        }
 
     def get_hub_litemp_percentage(self, _: Precision) -> float:
         """Returns the Lite-MP percentage value for the specified mixed precision quantization."""
@@ -300,8 +299,11 @@ class SAM2Decoder(BaseModel, ABC):
     def get_channel_last_outputs(self) -> list[str]:
         return ["masks"]
 
-    def get_output_names(self) -> list[str]:
-        return ["masks", "scores"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "masks": TensorSpec(),
+            "scores": TensorSpec(),
+        }
 
     def get_hub_litemp_percentage(self, _: Precision) -> float:
         """Returns the Lite-MP percentage value for the specified mixed precision quantization."""
@@ -372,9 +374,13 @@ class SAM2VideoDecoder(SAM2Decoder):
 
         return low_res_masks, iou_predictions, obj_ptr, object_score_logits
 
-    @staticmethod
-    def get_output_names() -> list[str]:
-        return ["masks", "scores", "obj_ptr", "object_score_logits"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "masks": TensorSpec(),
+            "scores": TensorSpec(),
+            "obj_ptr": TensorSpec(),
+            "object_score_logits": TensorSpec(),
+        }
 
 
 class SAM2Loader(ABC):

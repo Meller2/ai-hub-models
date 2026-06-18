@@ -11,7 +11,7 @@ import torch
 from torch import nn
 from typing_extensions import Self
 
-from qai_hub_models.configs.model_metadata import ModelMetadata
+from qai_hub_models.configs.model_metadata import ModelMetadata, OutputSpec
 from qai_hub_models.datasets.foot_track_dataset import FootTrackDataset
 from qai_hub_models.evaluators.foot_track_evaluator import FootTrackNetEvaluator
 from qai_hub_models.models.foot_track_net.layers import (
@@ -256,8 +256,13 @@ class FootTrackNet(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["heatmap", "bbox", "landmark", "landmark_visibility"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "heatmap": TensorSpec(),
+            "bbox": TensorSpec(),
+            "landmark": TensorSpec(),
+            "landmark_visibility": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

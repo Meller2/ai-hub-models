@@ -21,6 +21,9 @@ from typing import TYPE_CHECKING, Any
 
 import piqaro
 
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
+
 if TYPE_CHECKING:
     import onnx
 import torch
@@ -183,21 +186,20 @@ if __name__ == "__main__":
                 output_dir,
                 dummy_input,
                 input_names=list(input_spec.keys()),
-                output_names=self.get_output_names(),
+                output_names=list(self.get_output_spec()),
                 onnx_transforms=onnx_transforms,
                 skip_zip=True,
             )
 
             return output_dir
 
-        @staticmethod
-        def get_output_names() -> list[str]:
+        def get_output_spec(self) -> OutputSpec:
             num_hidden_layers = NUM_LAYERS_TRUNC if truncate_model else NUM_LAYERS
             output_names = ["logits"]
             for layer in range(num_hidden_layers):
                 output_names.append(f"past_key_{layer}_out")
                 output_names.append(f"past_value_{layer}_out")
-            return output_names
+            return {output_name: TensorSpec() for output_name in output_names}
 
         def get_qairt_context_graph_name(
             self, split_index: int, num_splits: int

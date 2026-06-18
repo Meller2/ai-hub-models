@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.evaluators.segmentation_evaluator import SegmentationOutputEvaluator
 from qai_hub_models.utils.base_evaluator import BaseEvaluator
 from qai_hub_models.utils.base_model import BaseModel
@@ -39,7 +40,7 @@ class SelfieSegmentor(BaseModel):
             )
         }
 
-    def get_output_spec(self) -> dict[str, TensorSpec]:
+    def get_output_spec(self) -> OutputSpec:
         return {
             "mask": TensorSpec(
                 io_type=IoType.TENSOR,

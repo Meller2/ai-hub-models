@@ -9,6 +9,7 @@ import torch
 from torch import nn
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models.simple_bev_cam.external_repos.simple_bev.nets.segnet import (
     Segnet,
 )
@@ -165,14 +166,14 @@ class SimpleBev(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return [
-            "raw_e_results",
-            "feat_e_results",
-            "seg_e_results",
-            "center_e_results",
-            "offset_e_results",
-        ]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "raw_e_results": TensorSpec(),
+            "feat_e_results": TensorSpec(),
+            "seg_e_results": TensorSpec(),
+            "center_e_results": TensorSpec(),
+            "offset_e_results": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["cam0_T_camXs"]

@@ -18,6 +18,7 @@ from transformers.models.trocr.modeling_trocr import (
 )
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.utils.base_collection_model import WorkbenchModelCollection
 from qai_hub_models.utils.base_model import BaseModel
 from qai_hub_models.utils.export_result import ComponentGroup
@@ -114,12 +115,12 @@ class TrOCREncoder(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         output_names = []
         for i in range(len(self.decoder.model.decoder.layers)):
             output_names.append(f"kv_cache_key_{i}")
             output_names.append(f"kv_cache_val_{i}")
-        return output_names
+        return {name: TensorSpec() for name in output_names}
 
     @classmethod
     def from_pretrained(cls) -> Self:
@@ -246,12 +247,12 @@ class TrOCRDecoder(BaseModel):
             *out_kv_cache,
         )
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         output_names = ["next_token"]
         for i in range(self.num_decoder_layers):
             output_names.append(f"kv_cache_key_{i}")
             output_names.append(f"kv_cache_val_{i}")
-        return output_names
+        return {name: TensorSpec() for name in output_names}
 
     def get_input_spec(self, batch_size: int = TROCR_BATCH_SIZE) -> InputSpec:
         attn_cache_shape = (

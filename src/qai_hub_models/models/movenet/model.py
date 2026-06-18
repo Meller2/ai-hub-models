@@ -14,6 +14,7 @@ from qai_hub_models import (
     Precision,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.cocobody import CocoBodyDataset
 from qai_hub_models.evaluators.movenet_evaluator import MovenetPoseEvaluator
 from qai_hub_models.models.movenet.external_repos import EXTERNAL_REPO_PATHS
@@ -97,8 +98,10 @@ class Movenet(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["kpt_with_conf"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "kpt_with_conf": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

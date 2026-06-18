@@ -15,6 +15,7 @@ from qai_hub_models import (
     Precision,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.coco import Coco180Dataset, CocoDataset
 from qai_hub_models.evaluators.base_evaluators import BaseEvaluator
 from qai_hub_models.evaluators.detection_evaluator import DetectionEvaluator
@@ -115,8 +116,8 @@ class Detectron2ProposalGenerator(Detectron2):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["feature", "proposals", "score"]
+    def get_output_spec(self) -> OutputSpec:
+        return {x: TensorSpec() for x in ["feature", "proposals", "score"]}
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]
@@ -206,10 +207,7 @@ class Detectron2ROIHead(Detectron2):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return list(self.get_output_spec().keys())
-
-    def get_output_spec(self) -> dict[str, TensorSpec]:
+    def get_output_spec(self) -> OutputSpec:
         return {
             "boxes": TensorSpec(
                 io_type=IoType.BBOX,

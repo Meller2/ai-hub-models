@@ -9,6 +9,7 @@ from torch import Tensor, nn
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.ade20k import ADE10SegmentationDataset
 from qai_hub_models.evaluators.segmentation_evaluator import SegmentationOutputEvaluator
 from qai_hub_models.models._shared.cityscapes_segmentation.model import (
@@ -137,8 +138,10 @@ class PSPNet(CityscapesSegmentor):
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]
 
-    def get_output_names(self) -> list[str]:
-        return ["mask"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "mask": TensorSpec(),
+        }
 
     def get_channel_last_outputs(self) -> list[str]:
         return ["mask"]

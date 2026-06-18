@@ -45,23 +45,22 @@ def test_e2e_numerical() -> None:
     Verify the patched SAM3 produces numerically equivalent outputs to
     the unpatched upstream SAM3 model on a real image + text prompt.
     """
-    img_h, img_w = SAM3VisionBackbone.get_input_spec()["image"][0][-2:]
-    pil_image = load_image(IMAGE_ADDRESS)
-    image = _preprocess_image(pil_image, img_h, img_w)
-    text_prompts = ["cup"]
-
     # Reference: build a fresh upstream SAM3 with only the minimal
     # device-safety patch applied.
     sam3_raw = SAM3Loader._load_sam3("cpu")
     patch_decoder_rpb_device(sam3_raw.transformer.decoder)
     tokenizer = sam3_raw.backbone.language_backbone.tokenizer
     context_length = int(sam3_raw.backbone.language_backbone.context_length)
+    text_prompts = ["cup"]
     tokenized = tokenizer(text_prompts, context_length=context_length).long()
 
     ref_vision_backbone = SAM3VisionBackbone(
         normalize=SAM3Normalize(),
         vision_model=sam3_raw.backbone.vision_backbone,
     )
+    img_h, img_w = ref_vision_backbone.get_input_spec()["image"][0][-2:]
+    pil_image = load_image(IMAGE_ADDRESS)
+    image = _preprocess_image(pil_image, img_h, img_w)
     ref_head = SAM3Head(
         language_model=sam3_raw.backbone.language_backbone,
         transformer=sam3_raw.transformer,

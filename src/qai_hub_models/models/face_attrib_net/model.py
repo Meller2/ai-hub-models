@@ -9,6 +9,7 @@ import torch
 from torch import nn
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.face_attrib_dataset import FaceAttribDataset
 from qai_hub_models.evaluators.face_attrib_evaluator import FaceAttribNetEvaluator
 from qai_hub_models.models.face_attrib_net.layers import (
@@ -560,16 +561,16 @@ class FaceAttribNet(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         """
-        Return list of output names associated with forward function
+        Return the output spec for this model.
 
         Returns
         -------
-        output_names : list[str]
-            each output name corresponds to one in forward function output.
+        OutputSpec
+            Mapping of output tensor names to their specs.
         """
-        return ["probability"]
+        return {"probability": TensorSpec()}
 
     def get_channel_last_inputs(self) -> list[str]:
         """

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 # isort: off
 # This verifies aimet is installed, and this must be included first.
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models._shared.llm.model import (
     LLMBase,
     PositionProcessorBase,
@@ -26,6 +27,8 @@ from typing import TYPE_CHECKING, Any
 
 import onnx
 import torch
+
+from qai_hub_models.utils.input_spec import TensorSpec
 
 if TYPE_CHECKING:
     from aimet_onnx.quantsim import QuantizationSimModel
@@ -230,12 +233,12 @@ class Qwen2Base_AIMETOnnx(LLM_AIMETOnnx):
         )
 
     @staticmethod
-    def _get_output_names(num_hidden_layers: int) -> list[str]:
+    def _get_output_spec(num_hidden_layers: int) -> OutputSpec:
         output_names = ["logits"]
         for layer in range(num_hidden_layers):
             output_names.append(f"past_key_{layer}_out")
             output_names.append(f"past_value_{layer}_out")
-        return output_names
+        return {x: TensorSpec() for x in output_names}
 
     @classmethod
     def prepare_genie_assets(

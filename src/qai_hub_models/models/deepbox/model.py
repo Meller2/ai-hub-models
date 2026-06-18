@@ -11,6 +11,7 @@ from torchvision.models import vgg
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.kitti import KittiDataset
 from qai_hub_models.models.deepbox.external_repos.boundingbox_3d.torch_lib import (
     Model as TorchLibModel,
@@ -151,8 +152,12 @@ class VGG3DDetection(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["orient", "conf", "dim"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "orient": TensorSpec(),
+            "conf": TensorSpec(),
+            "dim": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

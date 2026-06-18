@@ -11,6 +11,8 @@ import pytest
 import torch
 from torch.utils.data import DataLoader
 
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.utils.asset_loaders import qaihm_temp_dir
 from qai_hub_models.utils.base_dataset import BaseDataset, DatasetSplit
 from qai_hub_models.utils.base_evaluator import BaseEvaluator
@@ -83,8 +85,8 @@ class VariableIODummyModel(BaseModel):
     def get_input_spec(self) -> InputSpec:
         return {f"in{i}": (self.shape, "float32") for i in range(self.num_inputs)}
 
-    def get_output_names(self) -> list[str]:
-        return [f"out{i}" for i in range(self.num_outputs)]
+    def get_output_spec(self) -> OutputSpec:
+        return {f"out{i}": TensorSpec() for i in range(self.num_outputs)}
 
     def get_channel_last_inputs(self) -> list[str]:
         if len(self.shape) == 4:
@@ -93,7 +95,7 @@ class VariableIODummyModel(BaseModel):
 
     def get_channel_last_outputs(self) -> list[str]:
         if len(self.shape) == 4:
-            return self.get_output_names()
+            return list(self.get_output_spec())
         return []
 
 

@@ -11,6 +11,7 @@ import torch
 from torch import nn
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.cofw import COFWDataset
 from qai_hub_models.evaluators.hrnet_face_evaluator import HRNetFaceEvaluator
 from qai_hub_models.models.hrnet_face.external_repos import EXTERNAL_REPO_PATHS
@@ -88,8 +89,10 @@ class HRNetFace(BaseModel):
         """
         return self.model(normalize_image_torchvision(image))
 
-    def get_output_names(self) -> list[str]:
-        return ["heatmaps"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "heatmaps": TensorSpec(),
+        }
 
     def get_evaluator(self) -> BaseEvaluator:
         return HRNetFaceEvaluator()

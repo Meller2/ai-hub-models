@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.celebahq import CelebAHQDataset
 from qai_hub_models.evaluators.inpaint_evaluator import InpaintEvaluator
 from qai_hub_models.models._shared.repaint.utils import preprocess_inputs
@@ -56,7 +57,7 @@ class RepaintModel(BaseModel):
             ),
         }
 
-    def get_output_spec(self) -> dict[str, TensorSpec]:
+    def get_output_spec(self) -> OutputSpec:
         return {
             "painted_image": TensorSpec(
                 io_type=IoType.IMAGE,

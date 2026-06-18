@@ -12,7 +12,7 @@ import numpy as np
 import torch
 from typing_extensions import Self
 
-from qai_hub_models.configs.model_metadata import ModelMetadata
+from qai_hub_models.configs.model_metadata import ModelMetadata, OutputSpec
 from qai_hub_models.datasets.imagenet import ImagenetDataset
 from qai_hub_models.datasets.imagenette import ImagenetteDataset
 from qai_hub_models.evaluators.classification_evaluator import ClassificationEvaluator
@@ -131,7 +131,7 @@ class ImagenetClassifier(BaseModel):
             )
         }
 
-    def get_output_spec(self) -> dict[str, TensorSpec]:
+    def get_output_spec(self) -> OutputSpec:
         return {
             "class_logits": TensorSpec(
                 io_type=IoType.TENSOR,

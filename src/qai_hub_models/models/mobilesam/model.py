@@ -16,6 +16,7 @@ from mobile_sam.modeling.transformer import TwoWayAttentionBlock, TwoWayTransfor
 from mobile_sam.utils.onnx import SamOnnxModel
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models._shared.sam.model_patches import (
     Conv2DInplaceLinearSAMMaskDecoderMLP,
     Conv2DInplaceLinearSAMTransformerMLPBlock,
@@ -79,8 +80,10 @@ class MobileSAMEncoder(BaseModel):
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]
 
-    def get_output_names(self) -> list[str]:
-        return ["image_embeddings"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "image_embeddings": TensorSpec(),
+        }
 
     def get_channel_last_outputs(self) -> list[str]:
         return ["image_embeddings"]
@@ -246,8 +249,11 @@ class MobileSAMDecoder(BaseModel):
     def get_channel_last_outputs(self) -> list[str]:
         return ["masks"]
 
-    def get_output_names(self) -> list[str]:
-        return ["masks", "scores"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "masks": TensorSpec(),
+            "scores": TensorSpec(),
+        }
 
     @classmethod
     def from_pretrained(

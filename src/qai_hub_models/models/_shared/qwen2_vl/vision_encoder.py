@@ -26,6 +26,8 @@ from typing import TYPE_CHECKING, Any
 import torch
 import torch.nn.functional as F
 
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.utils.base_model import BaseModel
 from qai_hub_models.utils.input_spec import InputSpec
 
@@ -463,8 +465,10 @@ class Qwen2VLVisionEncoder(BaseModel):
             "full_attention_mask": ((1, seq_len, seq_len), "float32"),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["vision_embeddings"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "vision_embeddings": TensorSpec(),
+        }
 
     def get_sample_inputs(self) -> dict[str, torch.Tensor]:
         """

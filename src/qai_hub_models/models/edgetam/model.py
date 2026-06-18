@@ -14,7 +14,8 @@ from qai_hub.client import Device
 from typing_extensions import Self
 
 from qai_hub_models import Precision, TargetRuntime
-from qai_hub_models.configs.model_metadata import ModelMetadata
+from qai_hub_models.configs.model_metadata import ModelMetadata, OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.datasets.sav import SaVDataset
 from qai_hub_models.models._shared.sam2.model import (
     SAM2Encoder as SAM2EncoderBase,
@@ -154,9 +155,8 @@ class EdgeTAMMemoryEncoder(BaseModel):
             "mask_for_mem": ((1, 1, self._image_size, self._image_size), "float32"),
         }
 
-    @staticmethod
-    def get_output_names() -> list[str]:
-        return ["maskmem_features"]
+    def get_output_spec(self) -> OutputSpec:
+        return {"maskmem_features": TensorSpec()}
 
     def get_hub_compile_options(
         self,

@@ -11,7 +11,7 @@ from copy import deepcopy
 import torch
 from typing_extensions import Self
 
-from qai_hub_models.configs.model_metadata import ModelMetadata
+from qai_hub_models.configs.model_metadata import ModelMetadata, OutputSpec
 from qai_hub_models.datasets.coco_ppe import CocoPPEDataset
 from qai_hub_models.datasets.gear_guard_dataset import GearGuardDataset
 from qai_hub_models.evaluators.detection_evaluator import DetectionEvaluator
@@ -340,8 +340,12 @@ class GearGuardNet(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["boxes", "scores", "class_idx"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "boxes": TensorSpec(),
+            "scores": TensorSpec(),
+            "class_idx": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

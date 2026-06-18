@@ -157,7 +157,7 @@ def compare_inference(
         print("Error: Failed to download inference results.")
         sys.exit(1)
 
-    output_names = model.get_output_names()
+    output_names = list(model.get_output_spec())
 
     # Transpose channel-last outputs if needed
     if channel_last_outputs:

@@ -9,6 +9,7 @@ from ultralytics.nn.modules.head import Segment, Segment26, YOLOESegment
 from ultralytics.nn.tasks import SegmentationModel
 
 from qai_hub_models import Precision
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models._shared.ultralytics.segment_patches import (
     patch_ultralytics_segmentation_head,
     patch_ultralytics_segmentation_head_26,
@@ -95,7 +96,7 @@ class UltralyticsSingleClassSegmentor(BaseModel):
             )
         }
 
-    def get_output_spec(self) -> dict[str, TensorSpec]:
+    def get_output_spec(self) -> OutputSpec:
         return {
             "boxes": TensorSpec(
                 io_type=IoType.BBOX,
@@ -158,7 +159,7 @@ class UltralyticsMulticlassSegmentor(BaseModel):
             )
         }
 
-    def get_output_spec(self) -> dict[str, TensorSpec]:
+    def get_output_spec(self) -> OutputSpec:
         return {
             "boxes": TensorSpec(
                 io_type=IoType.BBOX,

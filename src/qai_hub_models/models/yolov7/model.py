@@ -13,6 +13,8 @@ import torch.nn.functional as F
 from typing_extensions import Self
 
 from qai_hub_models import Precision
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.models._shared.yolo.model import DEFAULT_YOLO_IMAGE_INPUT_HW, Yolo
 from qai_hub_models.models._shared.yolo.utils import detect_postprocess_split_input
 from qai_hub_models.models.yolov7.external_repos.yolov7.models.experimental import (
@@ -129,12 +131,20 @@ class YoloV7(Yolo):
 
         return detect_postprocess_split_input(*detector_output)
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         if self.include_postprocessing:
-            return ["boxes", "scores", "class_idx"]
+            return {
+                "boxes": TensorSpec(),
+                "scores": TensorSpec(),
+                "class_idx": TensorSpec(),
+            }
         if self.split_output:
-            return ["boxes_xy", "boxes_wh", "scores"]
-        return ["detector_output"]
+            return {
+                "boxes_xy": TensorSpec(),
+                "boxes_wh": TensorSpec(),
+                "scores": TensorSpec(),
+            }
+        return {"detector_output": TensorSpec()}
 
     def get_hub_quantize_options(
         self, precision: Precision, other_options: str | None = None

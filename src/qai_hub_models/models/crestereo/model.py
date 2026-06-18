@@ -10,6 +10,7 @@ from qai_hub.client import Device
 from typing_extensions import Self
 
 from qai_hub_models import Precision, TargetRuntime
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models.crestereo.external_repos.crestereo_pytorch.nets import (
     Model,
 )
@@ -150,5 +151,7 @@ class CREStereo(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["disparity"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "disparity": TensorSpec(),
+        }

@@ -500,7 +500,7 @@ def export_model(
             inference_result,
             ij_output,
             torch_out,
-            model.get_output_names(),
+            list(model.get_output_spec()),
             outputs_to_skip=[3],
         )
 

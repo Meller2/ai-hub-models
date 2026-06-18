@@ -14,6 +14,7 @@ from torch import nn
 from typing_extensions import Self
 
 from qai_hub_models import Precision, SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.cocobody import CocoBodyDataset
 from qai_hub_models.evaluators.posenet_mobilenet_evaluator import (
     PosenetMobilenetEvaluator,
@@ -101,14 +102,14 @@ class PosenetMobilenet(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return [
-            "heatmaps_result",
-            "offsets_result",
-            "displacement_fwd_result",
-            "displacement_bwd_result",
-            "max_vals",
-        ]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "heatmaps_result": TensorSpec(),
+            "offsets_result": TensorSpec(),
+            "displacement_fwd_result": TensorSpec(),
+            "displacement_bwd_result": TensorSpec(),
+            "max_vals": TensorSpec(),
+        }
 
     def _sample_inputs_impl(
         self, input_spec: InputSpec | None = None

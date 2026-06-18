@@ -1632,7 +1632,7 @@ def torch_inference_for_accuracy_validation(
         inputs = [inputs]
 
     num_batches = inputs[0].shape[0]
-    output_names = model.get_output_names()
+    output_names = list(model.get_output_spec())
     outputs: list[list[np.ndarray]] = [[] for _ in output_names]
     for b in range(math.ceil(num_batches / compiled_batch_size)):
         # Complete N batches at a time to substantially reduces memory pressure

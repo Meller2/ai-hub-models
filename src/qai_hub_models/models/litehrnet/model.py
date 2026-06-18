@@ -16,6 +16,7 @@ from qai_hub_models import (
     SampleInputsType,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.cocowholebody import CocoWholeBodyDataset
 from qai_hub_models.evaluators.litehrnet_evaluator import LiteHRNetPoseEvaluator
 from qai_hub_models.extern.mmengine import patch_mmengine_pkgresources
@@ -173,8 +174,12 @@ class LiteHRNet(BaseModel):
 
         return compile_options
 
-    def get_output_names(self) -> list[str]:
-        return ["keypoints", "scores", "heatmaps"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "keypoints": TensorSpec(),
+            "scores": TensorSpec(),
+            "heatmaps": TensorSpec(),
+        }
 
     def get_evaluator(self) -> BaseEvaluator:
         return LiteHRNetPoseEvaluator()

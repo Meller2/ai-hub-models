@@ -102,8 +102,8 @@ All models must:
 | Method | Description |
 |--------|-------------|
 | `from_pretrained(cls)` | Classmethod to load pretrained weights. All arguments must have defaults. |
-| `get_input_spec()` | Static method returning `InputSpec` dict of `{input_name: (shape, dtype)}`. For image inputs, follow the standard: RGB format with values in range [0, 1]. |
-| `get_output_names()` | Static method returning list of output tensor names |
+| `get_input_spec()` | Returns `InputSpec` dict of `{input_name: (shape, dtype)}`. For image inputs, follow the standard: RGB format with values in range [0, 1]. |
+| `get_output_spec()` | Returns dict of outputs |
 
 ### Optional Methods
 

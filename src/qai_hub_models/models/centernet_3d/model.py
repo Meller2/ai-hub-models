@@ -13,6 +13,7 @@ from torch import nn
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.kitti import KittiDataset
 from qai_hub_models.evaluators.kitti_evaluator import KittiEvaluator
 from qai_hub_models.models._shared.centernet.external_repos.centernet.src.lib.models.decode import (
@@ -155,9 +156,15 @@ class CenterNet3D(CenterNet):
             ),
         }
 
-    @staticmethod
-    def get_output_names() -> list[str]:
-        return ["hm", "dep", "rot", "dim", "wh", "reg"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "hm": TensorSpec(),
+            "dep": TensorSpec(),
+            "rot": TensorSpec(),
+            "dim": TensorSpec(),
+            "wh": TensorSpec(),
+            "reg": TensorSpec(),
+        }
 
     def _sample_inputs_impl(
         self, input_spec: InputSpec | None = None

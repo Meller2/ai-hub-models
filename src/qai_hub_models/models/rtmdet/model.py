@@ -18,6 +18,7 @@ with patch_mmdet_no_build_deps():
     from mmdet.apis import init_detector
     from mmdet.models.detectors.rtmdet import RTMDet as mmdet_RTMDET
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.extern.mmengine import (
     patch_mmengine_pkgresources,
     patch_mmengine_torch_load_no_weights_only,
@@ -171,21 +172,16 @@ class RTMDet(Yolo):
 
         return boxes, scores, class_idx
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         if self.include_postprocessing:
-            return ["boxes", "scores", "class_idx"]
-        # Raw detection-head maps: 3 classification + 3 box-regression, in the
-        # order returned by mmdet_RTMDET._forward (see forward()).
-        return ["cls_80", "cls_40", "cls_20", "box_80", "box_40", "box_20"]
+            outputs = ["boxes", "scores", "class_idx"]
+        else:
+            # Raw detection-head maps: 3 classification + 3 box-regression, in the
+            # order returned by mmdet_RTMDET._forward (see forward()).
+            outputs = ["cls_80", "cls_40", "cls_20", "box_80", "box_40", "box_20"]
 
-    def get_output_spec(self) -> dict[str, TensorSpec]:
-        if self.include_postprocessing:
-            return super().get_output_spec()
-        # Raw detection-head maps; decode runs on the host (see app.py). Names
-        # must match get_output_names().
-        return {
-            name: TensorSpec(io_type=IoType.TENSOR) for name in self.get_output_names()
-        }
+        # Raw detection-head maps; decode runs on the host (see app.py).
+        return {name: TensorSpec(io_type=IoType.TENSOR) for name in outputs}
 
     def get_hub_litemp_percentage(self, _: Precision) -> float:
         """Returns the Lite-MP percentage value for the specified mixed precision quantization."""

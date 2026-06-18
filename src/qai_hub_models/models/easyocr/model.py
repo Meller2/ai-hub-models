@@ -16,6 +16,7 @@ from easyocr.model.modules import BidirectionalLSTM
 from easyocr.model.vgg_model import Model as VGGRecognizer
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.icdar2015 import ICDAR2015Dataset
 from qai_hub_models.utils.base_collection_model import WorkbenchModelCollection
 from qai_hub_models.utils.base_dataset import BaseDataset
@@ -104,8 +105,10 @@ class EasyOCRDetector(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["results"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "results": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]
@@ -181,8 +184,10 @@ class EasyOCRRecognizer(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["output_preds"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "output_preds": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

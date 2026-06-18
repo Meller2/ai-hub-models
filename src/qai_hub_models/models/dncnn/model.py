@@ -9,6 +9,7 @@ import torch
 from torch import nn
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.bsd300_denoising import BSD300DenoisingDataset
 from qai_hub_models.evaluators.denoising_evaluator import DenoisingEvaluator
 from qai_hub_models.models.dncnn.external_repos.kair.models.network_dncnn import (
@@ -99,8 +100,10 @@ class DnCNN(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["denoised_image"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "denoised_image": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

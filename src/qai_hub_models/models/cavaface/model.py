@@ -8,6 +8,7 @@ from __future__ import annotations
 import torch
 from typing_extensions import Self
 
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset
 from qai_hub_models.utils.base_model import BaseModel
 from qai_hub_models.utils.input_spec import (
@@ -82,8 +83,10 @@ class CavaFace(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["embeddings"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "embeddings": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

@@ -13,6 +13,7 @@ from torch import nn
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.cocobody import CocoBodyDataset
 from qai_hub_models.evaluators.centernet_pose_evaluator import CenternetPoseEvaluator
 from qai_hub_models.models._shared.centernet.external_repos.centernet.src.lib.models.decode import (
@@ -138,9 +139,15 @@ class CenterNetPose(CenterNet):
         hm_hp = torch.sigmoid(hm_hp)
         return hm, wh, hps, reg, hm_hp, hm_offset
 
-    @staticmethod
-    def get_output_names() -> list[str]:
-        return ["hm", "wh", "hps", "reg", "hm_hp", "hm_offset"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "hm": TensorSpec(),
+            "wh": TensorSpec(),
+            "hps": TensorSpec(),
+            "reg": TensorSpec(),
+            "hm_hp": TensorSpec(),
+            "hm_offset": TensorSpec(),
+        }
 
     @staticmethod
     def get_input_spec(

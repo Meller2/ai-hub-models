@@ -12,6 +12,7 @@ from hydra import compose, initialize_config_dir
 from typing_extensions import Self
 
 from qai_hub_models import Precision
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.nuscenes_bev import NuscenesBevGKTDataset
 from qai_hub_models.evaluators.nuscenes_bev_evaluator import (
     NuscenesBevSegmentationEvaluator,
@@ -157,8 +158,10 @@ class GKT(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["bev"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "bev": TensorSpec(),
+        }
 
     def get_evaluator(self) -> BaseEvaluator:
         return NuscenesBevSegmentationEvaluator()

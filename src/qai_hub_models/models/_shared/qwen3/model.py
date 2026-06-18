@@ -6,6 +6,7 @@ from __future__ import annotations
 
 # isort: off
 # This verifies aimet is installed, and this must be included first.
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models._shared.llm.model import (
     LLMBase,
     PositionProcessorBase,
@@ -65,7 +66,7 @@ from qai_hub_models.models._shared.qwen3.model_adaptations import (
 )
 from qai_hub_models.utils.aimet.encodings import propagate_memory_encodings
 from qai_hub_models.utils.asset_loaders import ASSET_CONFIG
-from qai_hub_models.utils.input_spec import InputSpec
+from qai_hub_models.utils.input_spec import InputSpec, TensorSpec
 from qai_hub_models.utils.onnx.helpers import ONNXBundle
 from qai_hub_models.utils.printing import print_with_box
 
@@ -230,12 +231,12 @@ class Qwen3Base_AIMETOnnx(LLM_AIMETOnnx):
         )
 
     @staticmethod
-    def _get_output_names(num_hidden_layers: int) -> list[str]:
+    def _get_output_spec(num_hidden_layers: int) -> OutputSpec:
         output_names = ["logits"]
         for layer in range(num_hidden_layers):
             output_names.append(f"past_key_{layer}_out")
             output_names.append(f"past_value_{layer}_out")
-        return output_names
+        return {x: TensorSpec() for x in output_names}
 
     @classmethod
     def prepare_genie_assets(
@@ -475,12 +476,12 @@ class Qwen3Base_QNN(LLM_QNN):
     num_layers_per_split: int
 
     @staticmethod
-    def _get_output_names(num_hidden_layers: int) -> list[str]:
+    def _get_output_spec(num_hidden_layers: int) -> OutputSpec:
         output_names = ["logits"]
         for layer in range(num_hidden_layers):
             output_names.append(f"past_key_{layer}_out")
             output_names.append(f"past_value_{layer}_out")
-        return output_names
+        return {x: TensorSpec() for x in output_names}
 
 
 # ---------------------------------------------------------------------------
@@ -591,9 +592,9 @@ class Qwen3PreSplitBase(
         cls.cache_store(instance, cache_key)
         return instance
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         """Get output names for the full model."""
-        return Qwen3Base._get_output_names(self.num_layers)
+        return Qwen3Base._get_output_spec(self.num_layers)
 
     def get_input_spec(
         self,
@@ -695,9 +696,9 @@ class Qwen3QuantizablePreSplitBase(  # type: ignore[misc]
         # (-100, 1.0).
         return (-100.0, 1.0)
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         """Get output names for the full model."""
-        return Qwen3Base._get_output_names(self.num_layers)
+        return Qwen3Base._get_output_spec(self.num_layers)
 
     def _postprocess_full_onnx_bundle(self, bundle: ONNXBundle) -> ONNXBundle:
         if bundle.aimet_encodings_path is not None:

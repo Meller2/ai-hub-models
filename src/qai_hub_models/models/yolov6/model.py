@@ -10,6 +10,8 @@ from torch import nn
 from typing_extensions import Self
 
 from qai_hub_models import Precision
+from qai_hub_models.configs.model_metadata import OutputSpec
+from qai_hub_models.configs.tensor_spec import TensorSpec
 from qai_hub_models.models._shared.yolo.model import Yolo
 from qai_hub_models.models._shared.yolo.utils import detect_postprocess
 from qai_hub_models.models.yolov6.external_repos.yolov6.yolov6.layers.common import (
@@ -83,10 +85,14 @@ class YoloV6(Yolo):
             else predictions
         )
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         if self.include_postprocessing:
-            return ["boxes", "scores", "class_idx"]
-        return ["detector_output"]
+            return {
+                "boxes": TensorSpec(),
+                "scores": TensorSpec(),
+                "class_idx": TensorSpec(),
+            }
+        return {"detector_output": TensorSpec()}
 
     def get_hub_litemp_percentage(self, precision: Precision) -> float:
         """Returns the Lite-MP percentage value for the specified mixed precision quantization."""

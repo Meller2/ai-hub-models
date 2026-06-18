@@ -13,6 +13,7 @@ from ultralytics.models import YOLO as ultralytics_YOLO
 from ultralytics.nn.tasks import PoseModel
 
 from qai_hub_models import Precision
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.coco_keypoints import CocoKeypointsDataset
 from qai_hub_models.models._shared.ultralytics.pose_patches import (
     patch_ultralytics_pose_head,
@@ -123,12 +124,7 @@ class YoloV11PoseDetector(Yolo):
 
         return boxes, scores, kpts
 
-    def get_output_names(self) -> list[str]:
-        if self.include_postprocessing:
-            return ["boxes", "scores", "keypoints"]
-        return ["raw_boxes", "raw_scores", "raw_keypoints"]
-
-    def get_output_spec(self) -> dict[str, TensorSpec]:
+    def get_output_spec(self) -> OutputSpec:
         return {
             "boxes": TensorSpec(
                 io_type=IoType.BBOX,

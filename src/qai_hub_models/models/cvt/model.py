@@ -18,6 +18,7 @@ from qai_hub_models import (
     Precision,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.nuscenes_bev import NuscenesBevCVTDataset
 from qai_hub_models.evaluators.nuscenes_bev_evaluator import (
     NuscenesBevSegmentationEvaluator,
@@ -96,8 +97,10 @@ class CVT(BaseModel):
         )
         return out["bev"]
 
-    def get_output_names(self) -> list[str]:
-        return ["bev"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "bev": TensorSpec(),
+        }
 
     def get_hub_compile_options(
         self,

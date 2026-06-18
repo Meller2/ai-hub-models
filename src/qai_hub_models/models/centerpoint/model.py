@@ -15,6 +15,7 @@ from qai_hub_models import (
     Precision,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.models.centerpoint.external_repos import EXTERNAL_REPO_PATHS
 from qai_hub_models.models.centerpoint.external_repos.centerpoint.det3d.models import (
     build_detector,
@@ -202,16 +203,16 @@ class CenterPoint(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
+    def get_output_spec(self) -> OutputSpec:
         """
-        Returns the names of the output tensors produced by the model.
+        Returns the output spec for the model.
 
         Returns
         -------
-        output_names : list[str]
-            List containing output tensor names.
+        OutputSpec
+            Mapping of output tensor names to their specs.
         """
-        return ["batch_box_preds", "batch_hm"]
+        return {"batch_box_preds": TensorSpec(), "batch_hm": TensorSpec()}
 
     def get_hub_compile_options(
         self,

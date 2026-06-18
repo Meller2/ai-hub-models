@@ -10,6 +10,7 @@ from transformers import SegformerForSemanticSegmentation
 from typing_extensions import Self
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.ade20k import ADESegmentationDataset
 from qai_hub_models.evaluators.segmentation_evaluator import SegmentationOutputEvaluator
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
@@ -88,8 +89,10 @@ class SegformerBase(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["class_logits"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "class_logits": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]

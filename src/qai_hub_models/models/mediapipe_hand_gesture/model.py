@@ -13,6 +13,7 @@ from torch import Tensor, nn
 from typing_extensions import Self
 
 from qai_hub_models import Precision, SampleInputsType
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.hagrid import PalmDetectorDataset
 from qai_hub_models.models._shared.common import apply_module_function_recursively
 from qai_hub_models.models.mediapipe_hand.model import (
@@ -760,8 +761,13 @@ class HandLandmarkDetector(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["landmarks", "scores", "lr", "world_landmarks"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "landmarks": TensorSpec(),
+            "scores": TensorSpec(),
+            "lr": TensorSpec(),
+            "world_landmarks": TensorSpec(),
+        }
 
     def get_channel_last_inputs(self) -> list[str]:
         return ["image"]
@@ -1023,8 +1029,10 @@ class CannedGestureClassifier(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["Identity"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "Identity": TensorSpec(),
+        }
 
     def _sample_inputs_impl(
         self, input_spec: InputSpec | None = None

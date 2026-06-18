@@ -14,6 +14,7 @@ from qai_hub_models import (
     Precision,
     TargetRuntime,
 )
+from qai_hub_models.configs.model_metadata import OutputSpec
 from qai_hub_models.datasets.wikitext_masked import WikiTextMasked
 from qai_hub_models.evaluators.maskedlm_evaluator import MaskedLMEvaluator
 from qai_hub_models.utils.base_dataset import BaseDataset
@@ -81,8 +82,10 @@ class BaseBertModel(BaseModel):
             ),
         }
 
-    def get_output_names(self) -> list[str]:
-        return ["token_id"]
+    def get_output_spec(self) -> OutputSpec:
+        return {
+            "token_id": TensorSpec(),
+        }
 
     def get_hub_compile_options(
         self,
