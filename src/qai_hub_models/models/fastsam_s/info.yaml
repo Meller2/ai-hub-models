@@ -20,6 +20,14 @@ form_factors:
 - Tablet
 has_static_banner: true
 has_animated_banner: true
+numerics_benchmark:
+  dataset_name: coco
+  metric_name: Average Recall
+  # The source paper reports AR@1000 only for the FastSAM-x variant; no
+  # benchmark is published for FastSAM-s, so the FastSAM-x value is used here.
+  value: 63.7
+  unit: AR@1000
+  source: https://github.com/CASIA-LMC-Lab/FastSAM
 dataset: []
 technical_details:
   Model checkpoint: fastsam-s.pt

@@ -12,10 +12,13 @@ from ultralytics.models import FastSAM
 from ultralytics.nn.tasks import SegmentationModel
 
 from qai_hub_models import SampleInputsType
+from qai_hub_models.datasets.coco import CocoDataset
 from qai_hub_models.models._shared.ultralytics.segmentation_model import (
     UltralyticsSingleClassSegmentor,
 )
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
+from qai_hub_models.utils.base_dataset import BaseDataset
+from qai_hub_models.utils.base_evaluator import BaseEvaluator
 from qai_hub_models.utils.image_processing import app_to_net_image_inputs
 from qai_hub_models.utils.input_spec import InputSpec
 
@@ -26,6 +29,21 @@ class Fast_SAM(UltralyticsSingleClassSegmentor):
     @classmethod
     def from_pretrained(cls, ckpt_name: str = "") -> Self:
         return cls(cast(SegmentationModel, FastSAM(model=ckpt_name).model))
+
+    def get_evaluator(self) -> BaseEvaluator:
+        from qai_hub_models.evaluators.class_agnostic_ar_evaluator import (
+            ClassAgnosticARkEvaluator,
+        )
+
+        image_height, image_width = self.get_input_spec()["image"][0][2:]
+        return ClassAgnosticARkEvaluator(image_height, image_width)
+
+    @classmethod
+    def get_eval_dataset_classes(cls) -> list[type[BaseDataset]]:
+        return [CocoDataset]
+
+    def get_calibration_dataset_cls(self) -> type[BaseDataset]:
+        return CocoDataset
 
     def _sample_inputs_impl(
         self, input_spec: InputSpec | None = None

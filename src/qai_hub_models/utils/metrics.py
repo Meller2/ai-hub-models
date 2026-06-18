@@ -71,6 +71,16 @@ AVERAGE_PRECISION = _register_metric(
     )
 )
 
+AVERAGE_RECALL_1000 = _register_metric(
+    MetricMetadata(
+        name="Average Recall",
+        unit="AR@1000",
+        description="Class-agnostic average recall over IoU thresholds 0.5 to 0.95 in 0.05 increments, with up to 1000 detections per image.",
+        range=(0.0, 100.0),
+        float_vs_device_threshold=10.0,
+    )
+)
+
 COLORFULNESS = _register_metric(
     MetricMetadata(
         name="Colorfulness",
