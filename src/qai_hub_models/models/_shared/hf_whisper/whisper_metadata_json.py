@@ -25,7 +25,6 @@ class WhisperCapabilities(BaseQAIHMConfig):
 
     streaming: bool
     file_based: bool
-    real_time: bool
     language_detection: bool
     confidence_scores: bool
 

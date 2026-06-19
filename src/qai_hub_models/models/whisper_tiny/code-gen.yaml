@@ -1,6 +1,8 @@
 disabled_paths: {}
 is_collection_model: true
 requires_aot_prepare: true
+orchestrator_runtimes:
+- voice_ai
 readme_install_system_deps: |
   #### Linux
   ```bash

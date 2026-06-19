@@ -51,9 +51,8 @@ DECODER_AIMET = "decoder.aimet"
 # Declared here (not as class-level defaults) so that each model variant
 # owns its own capability declaration.
 WHISPER_SMALL_QUANTIZED_CAPABILITIES = WhisperCapabilities(
-    streaming=True,
+    streaming=False,
     file_based=True,
-    real_time=True,
     language_detection=True,
     confidence_scores=False,
 )
