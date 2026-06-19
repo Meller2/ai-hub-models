@@ -41,7 +41,7 @@ from qai_hub_models_cli.proto.shared.runtime_pb2 import Runtime
 
 # ── Test fixtures ─────────────────────────────────────────────────────
 
-_RELEASE_VERSION = Version("0.45.0")
+_RELEASE_VERSION = Version("0.52.0")
 _DEV_VERSION = Version("0.45.0.dev1")
 
 
@@ -176,6 +176,7 @@ def _platform_info() -> PlatformInfo:
             ChipsetInfo(
                 name="qualcomm-snapdragon-8-gen-3",
                 marketing_name="Snapdragon 8 Gen 3",
+                aliases=["sd8gen3"],
             ),
         ],
     )
@@ -479,18 +480,12 @@ class TestGetModelAssetDetails:
             get_model_asset_details,
         )
 
-        with (
-            patch(
-                "qai_hub_models_cli.proto_helpers.release_assets.get_model_release_assets",
-                return_value=_model_release_assets(),
-            ),
-            patch(
-                "qai_hub_models_cli.proto_helpers.release_assets.get_runtime_info",
-                return_value=RuntimeInfo(is_aot_compiled=False),
-            ),
+        with patch(
+            "qai_hub_models_cli.proto_helpers.release_assets.get_runtime_info",
+            return_value=RuntimeInfo(is_aot_compiled=False),
         ):
             asset = get_model_asset_details(
-                "mobilenet_v2", "tflite", "float", version=_RELEASE_VERSION
+                _model_release_assets(), _platform_info(), "tflite", "float"
             )
         assert asset.runtime == Runtime.RUNTIME_TFLITE
 
@@ -501,20 +496,16 @@ class TestGetModelAssetDetails:
 
         with (
             patch(
-                "qai_hub_models_cli.proto_helpers.release_assets.get_model_release_assets",
-                return_value=_model_release_assets(),
-            ),
-            patch(
                 "qai_hub_models_cli.proto_helpers.release_assets.get_runtime_info",
                 return_value=RuntimeInfo(is_aot_compiled=True),
             ),
             pytest.raises(FileNotFoundError, match="Chipset is required"),
         ):
             get_model_asset_details(
-                "mobilenet_v2",
+                _model_release_assets(),
+                _platform_info(),
                 "qnn_context_binary",
                 "float",
-                version=_RELEASE_VERSION,
             )
 
     def test_chipset_lookup(self) -> None:
@@ -522,24 +513,38 @@ class TestGetModelAssetDetails:
             get_model_asset_details,
         )
 
-        with (
-            patch(
-                "qai_hub_models_cli.proto_helpers.release_assets.get_model_release_assets",
-                return_value=_model_release_assets(),
-            ),
-            patch(
-                "qai_hub_models_cli.proto_helpers.release_assets.get_runtime_info",
-                return_value=RuntimeInfo(is_aot_compiled=True),
-            ),
+        with patch(
+            "qai_hub_models_cli.proto_helpers.release_assets.get_runtime_info",
+            return_value=RuntimeInfo(is_aot_compiled=True),
         ):
             asset = get_model_asset_details(
-                "mobilenet_v2",
+                _model_release_assets(),
+                _platform_info(),
                 "qnn_context_binary",
                 "float",
                 chipset="qualcomm-snapdragon-8-gen-3",
-                version=_RELEASE_VERSION,
             )
         assert asset.chipset == "qualcomm-snapdragon-8-gen-3"
+
+    def test_lookup_by_alias_and_device(self) -> None:
+        from qai_hub_models_cli.proto_helpers.release_assets import (
+            get_model_asset_details,
+        )
+
+        with patch(
+            "qai_hub_models_cli.proto_helpers.release_assets.get_runtime_info",
+            return_value=RuntimeInfo(is_aot_compiled=True),
+        ):
+            # Both an alias ("sd8gen3") and a device name resolve to the chipset.
+            for kwargs in ({"chipset": "sd8gen3"}, {"device": "Samsung Galaxy S24"}):
+                asset = get_model_asset_details(
+                    _model_release_assets(),
+                    _platform_info(),
+                    "qnn_context_binary",
+                    "float",
+                    **kwargs,
+                )
+                assert asset.chipset == "qualcomm-snapdragon-8-gen-3"
 
 
 # ── platform.py ───────────────────────────────────────────────────────
@@ -575,6 +580,42 @@ class TestGetPlatform:
         ):
             result = get_platform(_RELEASE_VERSION)
         assert result.aihm_version == "0.45.0"
+
+
+class TestResolveChipset:
+    def test_resolves_all_reference_forms(self) -> None:
+        from qai_hub_models_cli.proto_helpers.platform import resolve_chipset
+
+        platform = _platform_info()
+        expected = "qualcomm-snapdragon-8-gen-3"
+        # device name (case-insensitive)
+        assert resolve_chipset(platform, device="samsung galaxy s24").name == expected
+        # canonical id, marketing name, and alias all resolve.
+        assert (
+            resolve_chipset(platform, chipset="qualcomm-snapdragon-8-gen-3").name
+            == expected
+        )
+        assert resolve_chipset(platform, chipset="Snapdragon 8 Gen 3").name == expected
+        assert resolve_chipset(platform, chipset="sd8gen3").name == expected
+
+        with pytest.raises(ValueError, match="exactly one"):
+            resolve_chipset(platform)
+        with pytest.raises(KeyError, match="qai-hub-models devices"):
+            resolve_chipset(platform, device="nope")
+        with pytest.raises(KeyError, match="qai-hub-models chipsets"):
+            resolve_chipset(platform, chipset="nope")
+
+
+def test_form_factor_and_world_display_names() -> None:
+    from qai_hub_models_cli.proto.platform_pb2 import FormFactor, WebsiteWorld
+    from qai_hub_models_cli.proto_helpers.platform_enums import (
+        form_factor_proto_to_str,
+        world_proto_to_str,
+    )
+
+    assert form_factor_proto_to_str(FormFactor.FORM_FACTOR_XR) == "XR"
+    assert form_factor_proto_to_str(FormFactor.FORM_FACTOR_IOT) == "IoT"
+    assert world_proto_to_str(WebsiteWorld.WEBSITE_WORLD_AUTOMOTIVE) == "Auto"
 
 
 # ══════════════════════════════════════════════════════════════════════════

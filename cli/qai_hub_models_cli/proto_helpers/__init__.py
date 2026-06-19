@@ -9,6 +9,8 @@ from qai_hub_models_cli.proto_helpers.perf import get_model_perf
 from qai_hub_models_cli.proto_helpers.platform import (
     get_platform,
     get_runtime_info,
+)
+from qai_hub_models_cli.proto_helpers.platform_enums import (
     precision_proto_to_str,
     precision_str_to_proto,
     runtime_proto_to_str,

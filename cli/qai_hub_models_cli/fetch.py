@@ -4,6 +4,7 @@
 # ---------------------------------------------------------------------
 from __future__ import annotations
 
+import contextlib
 import os
 from pathlib import Path
 
@@ -17,14 +18,20 @@ from qai_hub_models_cli.common import (
 )
 from qai_hub_models_cli.proto.shared.precision_pb2 import Precision
 from qai_hub_models_cli.proto.shared.runtime_pb2 import Runtime
-from qai_hub_models_cli.proto_helpers.platform import (
+from qai_hub_models_cli.proto_helpers.platform import get_platform
+from qai_hub_models_cli.proto_helpers.platform_enums import (
     precision_proto_to_str,
     runtime_proto_to_str,
 )
-from qai_hub_models_cli.proto_helpers.release_assets import get_model_asset_details
+from qai_hub_models_cli.proto_helpers.release_assets import (
+    get_model_asset_details,
+    get_model_release_assets,
+)
 from qai_hub_models_cli.utils import download, get_next_free_path
 from qai_hub_models_cli.versions import (
     CURRENT_VERSION,
+    MIN_MANIFEST_VERSION,
+    UnsupportedVersionError,
 )
 
 ASSET_FILENAME = "{model_id}-{runtime}-{precision}.zip"
@@ -79,8 +86,9 @@ def get_asset_url(
     model: str,
     runtime: Runtime.ValueType | str,
     precision: Precision.ValueType | str,
-    version: Version,
+    version: Version = CURRENT_VERSION,
     chipset: str | None = None,
+    device: str | None = None,
 ) -> str:
     """
     Resolve the download URL for a model asset.
@@ -96,7 +104,11 @@ def get_asset_url(
     version
         AI Hub Models version.
     chipset
-        Optional chipset name.
+        Optional chipset reference: canonical ID, name, or alias.
+        Resolved to the canonical chipset ID.
+    device
+        Optional device name to select the asset by; resolved to its chipset.
+        Mutually exclusive with *chipset*.
 
     Returns
     -------
@@ -105,12 +117,25 @@ def get_asset_url(
 
     Raises
     ------
+    ValueError
+        If both *chipset* and *device* are provided.
+    KeyError
+        If *chipset* or *device* is not known.
     FileNotFoundError
         If the asset does not exist on the server.
     """
-    if version >= Version("0.50.1"):
-        asset = get_model_asset_details(model, runtime, precision, chipset, version)
+    with contextlib.suppress(UnsupportedVersionError):
+        release_assets = get_model_release_assets(model, version)
+        platform = get_platform(version)
+        asset = get_model_asset_details(
+            release_assets, platform, runtime, precision, chipset, device
+        )
         return asset.download_url
+
+    if device is not None:
+        raise UnsupportedVersionError(
+            f"Device requires version {MIN_MANIFEST_VERSION} or later; provide a chipset instead."
+        )
 
     # Legacy: No manifest was published for these releases.
     def _head(url: str) -> int:
@@ -148,6 +173,7 @@ def fetch(
     output_dir: str | os.PathLike,
     precision: Precision.ValueType | str = "float",
     chipset: str | None = None,
+    device: str | None = None,
     version: Version = CURRENT_VERSION,
     extract: bool = False,
     quiet: bool = False,
@@ -170,6 +196,9 @@ def fetch(
         Model precision (e.g. ``PRECISION_FLOAT`` or ``"float"``).
     chipset
         Chipset name for device-specific (AOT compiled) runtimes.
+    device
+        Device name (e.g. ``"Samsung Galaxy S24"``) for device-specific (AOT compiled) runtimes.
+        Mutually exclusive with *chipset*.
     version
         AI Hub Models version. Defaults to the installed CLI version.
     extract
@@ -184,10 +213,12 @@ def fetch(
 
     Raises
     ------
+    ValueError
+        If both *chipset* and *device* are provided.
     FileNotFoundError
         If the asset does not exist on the server.
     """
-    url = get_asset_url(model, runtime, precision, version, chipset)
+    url = get_asset_url(model, runtime, precision, version, chipset, device)
 
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)

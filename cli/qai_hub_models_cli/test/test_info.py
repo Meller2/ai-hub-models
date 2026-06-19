@@ -15,6 +15,7 @@ from qai_hub_models_cli.proto.info_pb2 import (
     ModelTag,
     ModelUseCase,
 )
+from qai_hub_models_cli.proto.platform_pb2 import ChipsetInfo, PlatformInfo
 from qai_hub_models_cli.proto.release_assets_pb2 import ModelReleaseAssets
 from qai_hub_models_cli.proto.shared.precision_pb2 import Precision
 from qai_hub_models_cli.proto.shared.runtime_pb2 import Runtime
@@ -59,6 +60,17 @@ def _fake_release_assets() -> ModelReleaseAssets:
     )
 
 
+def _fake_platform() -> PlatformInfo:
+    return PlatformInfo(
+        chipsets=[
+            ChipsetInfo(
+                name="qualcomm-snapdragon-8-gen-3",
+                marketing_name="Snapdragon 8 Gen 3",
+            ),
+        ],
+    )
+
+
 @pytest.fixture(autouse=True)
 def _skip_version_check() -> Generator[None]:
     with patch("qai_hub_models_cli.cli._check_version_match"):
@@ -75,6 +87,10 @@ def info_mocks() -> Generator[None]:
         patch(
             "qai_hub_models_cli.cli.get_model_release_assets",
             return_value=_fake_release_assets(),
+        ),
+        patch(
+            "qai_hub_models_cli.cli.get_platform",
+            return_value=_fake_platform(),
         ),
     ):
         yield
@@ -103,7 +119,9 @@ def test_info_download_options(
     assert "tflite" in output
     assert "Universal" in output
     assert "qnn_context_binary" in output
-    assert "qualcomm-snapdragon-8-gen-3" in output
+    # Chipsets are shown by marketing name, not raw id.
+    assert "Snapdragon 8 Gen 3" in output
+    assert "qualcomm-snapdragon-8-gen-3" not in output
     assert "qai_hub_models fetch mobilenet_v2" in output
     assert "-c <chipset>" in output
     # SDK Versions column lists all set tool versions.

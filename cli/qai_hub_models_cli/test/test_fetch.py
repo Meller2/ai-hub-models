@@ -149,7 +149,7 @@ def test_fetch_downloads_to_output_dir(
     assert result == tmp_path / "model-tflite-float.zip"
     mock_download.assert_called_once()
     mock_get_url.assert_called_once_with(
-        "model", "tflite", "float", Version("0.45.0"), None
+        "model", "tflite", "float", Version("0.45.0"), None, None
     )
 
 
@@ -171,6 +171,34 @@ def test_fetch_extract_increments_dir(
     assert "model-tflite-float-1" in str(call_args)
 
 
+@patch("qai_hub_models_cli.fetch.get_asset_url")
+@patch("qai_hub_models_cli.fetch.download")
+def test_fetch_forwards_device_to_get_asset_url(
+    mock_download: MagicMock,
+    mock_get_url: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_get_url.return_value = "https://example.com/model-qnn-float.zip"
+    mock_download.return_value = tmp_path / "model-qnn-float.zip"
+
+    fetch(
+        "model",
+        "qnn_context_binary",
+        tmp_path,
+        device="Samsung Galaxy S24",
+        version=Version("0.45.0"),
+    )
+    # device is forwarded to get_asset_url, which resolves it to a chipset.
+    mock_get_url.assert_called_once_with(
+        "model",
+        "qnn_context_binary",
+        "float",
+        Version("0.45.0"),
+        None,
+        "Samsung Galaxy S24",
+    )
+
+
 # ── _run_fetch (CLI arg handling) ────────────────────────────────────
 
 
@@ -181,6 +209,7 @@ def _make_args(overrides: dict[str, object] | None = None) -> MagicMock:
         runtime="tflite",
         precision="float",
         chipset=None,
+        device=None,
         qaihm_version=Version("0.45.0"),
         extract=True,
         output_dir=".",
@@ -236,6 +265,23 @@ def test_add_fetch_parser_output_dir() -> None:
 
     args = parser.parse_args(["fetch", "model", "-r", "tflite", "-o", "/tmp/out"])
     assert args.output_dir == "/tmp/out"
+
+
+def test_add_fetch_parser_device() -> None:
+    """-d/--device is parsed, and is mutually exclusive with -c/--chipset."""
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    add_fetch_parser(parser.add_subparsers())
+
+    args = parser.parse_args(
+        ["fetch", "model", "-r", "qnn_context_binary", "-d", "Samsung Galaxy S24"]
+    )
+    assert args.device == "Samsung Galaxy S24"
+    assert args.chipset is None
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["fetch", "model", "-r", "tflite", "-c", "c", "-d", "d"])
 
 
 @patch("qai_hub_models_cli.cli.get_model_asset_details")

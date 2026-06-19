@@ -5,22 +5,61 @@
 from __future__ import annotations
 
 import functools
+from collections.abc import Iterable
 from pathlib import Path
+from typing import TypeVar
 
 from packaging.version import Version
 
-from qai_hub_models_cli.proto.info_pb2 import (
-    ModelDomain,
-    ModelLicense,
-    ModelTag,
-    ModelUseCase,
+from qai_hub_models_cli.proto.platform_pb2 import (
+    ChipsetInfo,
+    DeviceInfo,
+    FormFactor,
+    OperatingSystem,
+    PlatformInfo,
+    RuntimeInfo,
+    WebsiteWorld,
 )
-from qai_hub_models_cli.proto.platform_pb2 import PlatformInfo, RuntimeInfo
-from qai_hub_models_cli.proto.shared.precision_pb2 import Precision
 from qai_hub_models_cli.proto.shared.runtime_pb2 import Runtime
 from qai_hub_models_cli.proto_helpers._common import fetch_release_proto
 from qai_hub_models_cli.proto_helpers.manifest import get_manifest
+from qai_hub_models_cli.proto_helpers.platform_enums import (
+    form_factor_proto_to_str,
+    os_proto_to_str,
+    runtime_proto_to_str,
+    runtime_str_to_proto,
+    world_proto_to_str,
+)
+from qai_hub_models_cli.utils import build_table
 from qai_hub_models_cli.versions import CURRENT_VERSION
+
+# Column headers for the chipset attributes shared by the `chipsets` and
+# `devices` CLI tables, in display order. Kept here so both tables stay aligned.
+CHIPSET_ATTRIBUTE_HEADERS: list[str] = [
+    "FP16",
+    "HTP Version",
+    "SoC Model",
+]
+
+
+_T = TypeVar("_T")
+
+
+def _as_list(value: _T | list[_T]) -> list[_T]:
+    """Wrap a single value in a list, leaving an existing list unchanged."""
+    return value if isinstance(value, list) else [value]
+
+
+def _os_matches(device_os: OperatingSystem, query: OperatingSystem) -> bool:
+    """
+    True if *device_os* satisfies the *query* OS filter.
+
+    The OS type must match. A query with no ``version`` matches any version;
+    a query with a ``version`` must match exactly.
+    """
+    if device_os.ostype != query.ostype:
+        return False
+    return not query.version or device_os.version == query.version
 
 
 @functools.lru_cache(maxsize=1)
@@ -69,19 +108,19 @@ def get_platform(
 
 
 def get_runtime_info(
+    platform: PlatformInfo,
     runtime: Runtime.ValueType | str,
-    version: Version = CURRENT_VERSION,
 ) -> RuntimeInfo:
     """
     Look up the ``RuntimeInfo`` for a given runtime.
 
     Parameters
     ----------
+    platform
+        Platform registry to look the runtime up in.
     runtime
         Runtime enum value (e.g. ``RUNTIME_TFLITE``) or string
         (e.g. ``"tflite"``).
-    version
-        AI Hub Models release version. Defaults to the installed CLI version.
 
     Returns
     -------
@@ -92,198 +131,304 @@ def get_runtime_info(
     Raises
     ------
     KeyError
-        If *runtime* is not found in the platform registry.
+        If *runtime* is not a known runtime.
     """
     runtime_val = runtime_str_to_proto(runtime)
-    platform = get_platform(version)
     for rt in platform.runtimes:
         if rt.runtime == runtime_val:
             return rt
     runtime_name = (
         runtime if isinstance(runtime, str) else runtime_proto_to_str(runtime)
     )
-    raise KeyError(f"Runtime {runtime_name!r} not found in platform registry.")
+    raise KeyError(f"Unknown runtime {runtime_name!r}.")
 
 
-def precision_proto_to_str(precision: Precision.ValueType) -> str:
+def resolve_chipset(
+    platform: PlatformInfo,
+    device: str | None = None,
+    chipset: str | None = None,
+) -> ChipsetInfo:
     """
-    Convert a Precision proto enum value to its lowercase string name.
+    Resolve a device or chipset reference to its ``ChipsetInfo``.
+
+    Exactly one of *device* or *chipset* must be provided.
 
     Parameters
     ----------
-    precision
-        ``Precision`` enum value (e.g. ``PRECISION_FLOAT``).
+    platform
+        Platform registry to resolve against.
+    device
+        A device name (e.g. ``"Samsung Galaxy S24"``). Resolved to the chipset
+        of that device. Matched case-insensitively.
+    chipset
+        A chipset reference: its canonical ID (e.g.
+        ``"qualcomm-snapdragon-8-gen-3"``), name (e.g.
+        ``"Snapdragon 8 Gen 3"``), or one of its aliases. Matched
+        case-insensitively.
 
     Returns
     -------
-    str
-        Lowercase name without the ``PRECISION_`` prefix (e.g. ``"float"``).
+    ChipsetInfo
+        The matching chipset proto.
 
     Raises
     ------
+    ValueError
+        If neither or both of *device* and *chipset* are provided.
     KeyError
-        If *precision* is not a valid enum value.
+        If the reference does not match any known device or chipset.
     """
-    name = Precision.Name(precision)
-    if not name.startswith("PRECISION_"):
-        raise KeyError(f"Unknown precision value: {precision!r}")
-    return name.removeprefix("PRECISION_").lower()
+    if (device is None) == (chipset is None):
+        raise ValueError("Provide exactly one of 'device' or 'chipset'.")
 
+    chipsets_by_name = {c.name: c for c in platform.chipsets}
 
-def precision_str_to_proto(precision: str | Precision.ValueType) -> Precision.ValueType:
-    """
-    Convert a precision string to its proto enum value.
-
-    Parameters
-    ----------
-    precision
-        Precision name (e.g. ``"float"``, ``"w8a8"``, ``"PRECISION_MXFP4"``).
-        Case-insensitive. The ``PRECISION_`` prefix is optional.
-
-    Returns
-    -------
-    Precision.ValueType
-        Corresponding ``Precision`` enum value.
-
-    Raises
-    ------
-    KeyError
-        If *precision* does not match any known precision.
-    """
-    if not isinstance(precision, str):
-        return precision
-
-    key = precision.upper()
-    if not key.startswith("PRECISION_"):
-        key = f"PRECISION_{key}"
-    try:
-        return Precision.Value(key)
-    except ValueError:
-        valid = ", ".join(
-            name.removeprefix("PRECISION_").lower()
-            for name in Precision.DESCRIPTOR.values_by_name
-            if name != "PRECISION_UNSPECIFIED"
-        )
+    if device is not None:
+        device_key = device.lower()
+        for d in platform.devices:
+            if d.name.lower() == device_key and d.chipset in chipsets_by_name:
+                return chipsets_by_name[d.chipset]
         raise KeyError(
-            f"Unknown precision: {precision!r}. Valid precisions: {valid}"
-        ) from None
-
-
-def runtime_proto_to_str(runtime: Runtime.ValueType) -> str:
-    """
-    Convert a Runtime proto enum value to its lowercase string name.
-
-    Parameters
-    ----------
-    runtime
-        ``Runtime`` enum value (e.g. ``RUNTIME_TFLITE``).
-
-    Returns
-    -------
-    str
-        Lowercase name without the ``RUNTIME_`` prefix (e.g. ``"tflite"``).
-
-    Raises
-    ------
-    KeyError
-        If *runtime* is not a valid enum value.
-    """
-    name = Runtime.Name(runtime)
-    if not name.startswith("RUNTIME_"):
-        raise KeyError(f"Unknown runtime value: {runtime!r}")
-    return name.removeprefix("RUNTIME_").lower()
-
-
-def runtime_str_to_proto(runtime: str | Runtime.ValueType) -> Runtime.ValueType:
-    """
-    Convert a runtime string to its proto enum value.
-
-    Parameters
-    ----------
-    runtime
-        Runtime name (e.g. ``"tflite"``, ``"qnn_dlc"``, ``"RUNTIME_ONNX"``).
-        Case-insensitive. The ``RUNTIME_`` prefix is optional.
-
-    Returns
-    -------
-    Runtime.ValueType
-        Corresponding ``Runtime`` enum value.
-
-    Raises
-    ------
-    KeyError
-        If *runtime* does not match any known runtime.
-    """
-    if not isinstance(runtime, str):
-        return runtime
-
-    key = runtime.upper()
-    if not key.startswith("RUNTIME_"):
-        key = f"RUNTIME_{key}"
-    try:
-        return Runtime.Value(key)
-    except ValueError:
-        valid = ", ".join(
-            name.removeprefix("RUNTIME_").lower()
-            for name in Runtime.DESCRIPTOR.values_by_name
-            if name != "RUNTIME_UNSPECIFIED"
+            f"Unknown device {device!r}. "
+            "Run `qai-hub-models devices` to see supported devices."
         )
-        raise KeyError(
-            f"Unknown runtime: {runtime!r}. Valid runtimes: {valid}"
-        ) from None
 
-
-def domain_proto_to_str(domain: int) -> str:
-    """Convert a ModelDomain enum value to a human-readable string."""
-    name = ModelDomain.Name(domain)  # type: ignore[arg-type]
-    return (
-        name.removeprefix("MODEL_DOMAIN_").replace("_", " ").title().replace("Ai", "AI")
+    chipset_key = chipset.lower()  # type: ignore[union-attr]
+    for c in platform.chipsets:
+        candidates = [c.name, c.marketing_name, *c.aliases]
+        if any(candidate.lower() == chipset_key for candidate in candidates):
+            return c
+    raise KeyError(
+        f"Unknown chipset {chipset!r}. "
+        "Run `qai-hub-models chipsets` to see supported chipsets."
     )
 
 
-def use_case_proto_to_str(use_case: int) -> str:
-    """Convert a ModelUseCase enum value to a human-readable string."""
-    name = ModelUseCase.Name(use_case)  # type: ignore[arg-type]
-    return (
-        name.removeprefix("MODEL_USE_CASE_")
-        .replace("_", " ")
-        .title()
-        .replace("Ai", "AI")
+def filter_devices(
+    devices: Iterable[DeviceInfo],
+    chipsets: Iterable[ChipsetInfo],
+    *,
+    form_factor: FormFactor.ValueType | list[FormFactor.ValueType] | None = None,
+    os: OperatingSystem | list[OperatingSystem] | None = None,
+    fp16: bool | None = None,
+    htp_version: int | list[int] | None = None,
+    soc_model: int | list[int] | None = None,
+    similar: bool | None = None,
+) -> list[DeviceInfo]:
+    """
+    Filter *devices* by the given criteria, preserving input order.
+
+    Chipset-derived filters (*fp16*, *htp_version*, *soc_model*) are resolved
+    through each device's chipset, looked up in *chipsets*.
+
+    Parameters
+    ----------
+    devices
+        Devices to filter.
+    chipsets
+        Chipsets used to resolve chipset-derived filters.
+    form_factor
+        Keep only devices of this form factor (or one of several, if a list).
+    os
+        Keep only devices matching this operating system (or one of several, if
+        a list). An ``OperatingSystem`` with no ``version`` matches any version
+        of that OS type; with a ``version`` it must match exactly.
+    fp16
+        If True, keep only devices whose chipset supports fp16.
+    htp_version
+        Keep only devices whose chipset has this HTP version.
+    soc_model
+        Keep only devices whose chipset has this SoC model.
+    similar
+        If True, keep only "similar" devices (those with a reference_chipset);
+        if False, exclude them; if None, include all.
+
+    Returns
+    -------
+    list[DeviceInfo]
+        Matching device protos.
+    """
+    chipsets_by_name = {c.name: c for c in chipsets}
+
+    # Normalize each filter to its comparison form once, up front.
+    form_factors = _as_list(form_factor) if form_factor is not None else None
+    oses = _as_list(os) if os is not None else None
+    htps = _as_list(htp_version) if htp_version is not None else None
+    socs = _as_list(soc_model) if soc_model is not None else None
+    chipset_filtered = fp16 is not None or htps is not None or socs is not None
+
+    def matches(device: DeviceInfo) -> bool:
+        if similar is not None and bool(device.reference_chipset) != similar:
+            return False
+        if form_factors is not None and device.form_factor not in form_factors:
+            return False
+        if oses is not None and not any(_os_matches(device.os, o) for o in oses):
+            return False
+        if chipset_filtered:
+            chipset = chipsets_by_name.get(device.chipset)
+            if chipset is None:
+                return False
+            if fp16 is not None and chipset.supports_fp16 != fp16:
+                return False
+            if htps is not None and chipset.htp_version not in htps:
+                return False
+            if socs is not None and chipset.soc_model not in socs:
+                return False
+        return True
+
+    return [d for d in devices if matches(d)]
+
+
+def filter_chipsets(
+    chipsets: Iterable[ChipsetInfo],
+    *,
+    world: WebsiteWorld.ValueType | list[WebsiteWorld.ValueType] | None = None,
+    fp16: bool | None = None,
+    htp_version: int | list[int] | None = None,
+    soc_model: int | list[int] | None = None,
+) -> list[ChipsetInfo]:
+    """
+    Filter *chipsets* by the given criteria, preserving input order.
+
+    Parameters
+    ----------
+    chipsets
+        Chipsets to filter.
+    world
+        Keep only chipsets of this type (``WebsiteWorld``), or one of several
+        if a list.
+    fp16
+        If True, keep only chipsets that support fp16.
+    htp_version
+        Keep only chipsets with this HTP version.
+    soc_model
+        Keep only chipsets with this SoC model.
+
+    Returns
+    -------
+    list[ChipsetInfo]
+        Matching chipset protos.
+    """
+    worlds = _as_list(world) if world is not None else None
+    htps = _as_list(htp_version) if htp_version is not None else None
+    socs = _as_list(soc_model) if soc_model is not None else None
+
+    def matches(chipset: ChipsetInfo) -> bool:
+        if worlds is not None and chipset.world not in worlds:
+            return False
+        if fp16 is not None and chipset.supports_fp16 != fp16:
+            return False
+        if htps is not None and chipset.htp_version not in htps:
+            return False
+        return not (socs is not None and chipset.soc_model not in socs)
+
+    return [c for c in chipsets if matches(c)]
+
+
+def chipset_attribute_row(chipset: ChipsetInfo | None) -> list[str]:
+    """
+    Render the shared chipset attribute columns for one chipset.
+
+    Returns cells in the same order as ``CHIPSET_ATTRIBUTE_HEADERS``. A ``None``
+    chipset yields empty cells so table rows stay aligned.
+    """
+    if chipset is None:
+        return [""] * len(CHIPSET_ATTRIBUTE_HEADERS)
+    return [
+        "Yes" if chipset.supports_fp16 else "No",
+        str(chipset.htp_version) if chipset.htp_version else "",
+        str(chipset.soc_model) if chipset.soc_model else "",
+    ]
+
+
+def format_devices_table(
+    devices: Iterable[DeviceInfo],
+    chipsets: Iterable[ChipsetInfo],
+    title: str | None = "Devices",
+) -> str:
+    """Format a table of devices with their chipset attributes."""
+    chipsets_by_name = {c.name: c for c in chipsets}
+
+    def chipset_name(chipset_id: str) -> str:
+        chipset = chipsets_by_name.get(chipset_id)
+        return chipset.marketing_name if chipset else chipset_id
+
+    def device_type(device: DeviceInfo) -> str:
+        # A device's type is the "world" of its chipset, falling back to the
+        # device's own form factor when the chipset is not in the registry.
+        chipset = chipsets_by_name.get(device.chipset)
+        if chipset is not None:
+            return world_proto_to_str(chipset.world)
+        return form_factor_proto_to_str(device.form_factor)
+
+    return build_table(
+        ["Type", "Name", "OS", "Chipset", *CHIPSET_ATTRIBUTE_HEADERS],
+        [
+            [
+                device_type(d),
+                d.name,
+                os_proto_to_str(d.os),
+                chipset_name(d.chipset),
+                *chipset_attribute_row(chipsets_by_name.get(d.chipset)),
+            ]
+            for d in devices
+        ],
+        wrap_column="Name",
+        title=title,
     )
 
 
-def tag_proto_to_str(tag: int) -> str:
-    """Convert a ModelTag enum value to a human-readable string."""
-    name = ModelTag.Name(tag)  # type: ignore[arg-type]
-    return name.removeprefix("MODEL_TAG_").replace("_", " ").title().replace("Ai", "AI")
+def format_similar_devices_table(
+    devices: Iterable[DeviceInfo],
+    chipsets: Iterable[ChipsetInfo],
+    title: str | None = "Similar Devices",
+) -> str:
+    """
+    Format a table of "similar" devices, mapping each to the reference
+    device/chipset whose metrics it borrows.
+    """
+    chipsets_by_name = {c.name: c for c in chipsets}
+
+    def chipset_name(chipset_id: str) -> str:
+        chipset = chipsets_by_name.get(chipset_id)
+        return chipset.marketing_name if chipset else chipset_id
+
+    def reference_device(chipset_id: str) -> str:
+        chipset = chipsets_by_name.get(chipset_id)
+        return chipset.reference_device if chipset else ""
+
+    return build_table(
+        ["Type", "Name", "Chipset", "Similar Device", "Similar Chipset"],
+        [
+            [
+                form_factor_proto_to_str(d.form_factor),
+                d.name,
+                chipset_name(d.chipset),
+                reference_device(d.reference_chipset),
+                chipset_name(d.reference_chipset),
+            ]
+            for d in devices
+        ],
+        wrap_column="Name",
+        title=title,
+    )
 
 
-_LICENSE_DISPLAY_NAMES: dict[str, str] = {
-    "UNLICENSED": "Unlicensed",
-    "COMMERCIAL": "Commercial",
-    "AI_HUB_MODELS_LICENSE": "AI Hub Models License",
-    "APACHE_2_0": "Apache-2.0",
-    "MIT": "MIT",
-    "BSD_3_CLAUSE": "BSD-3-Clause",
-    "CC_BY_4_0": "CC-BY-4.0",
-    "AGPL_3_0": "AGPL-3.0",
-    "GPL_3_0": "GPL-3.0",
-    "CREATIVEML_OPENRAIL_M": "CreativeML OpenRAIL-M",
-    "CC_BY_NON_COMMERCIAL_4_0": "CC-BY-NC-4.0",
-    "OTHER_NON_COMMERCIAL": "Other (Non-Commercial)",
-    "LLAMA2": "Llama 2",
-    "LLAMA3": "Llama 3",
-    "TAIDE": "TAIDE",
-    "FALCON3": "Falcon 3",
-    "GEMMA": "Gemma",
-    "LFM1_0": "LFM-1.0",
-    "AIMET_MODEL_ZOO": "AIMET Model Zoo",
-    "SAM3": "SAM3",
-}
-
-
-def license_proto_to_str(license_val: int) -> str:
-    """Convert a ModelLicense enum value to a human-readable string."""
-    name = ModelLicense.Name(license_val)  # type: ignore[arg-type]
-    key = name.removeprefix("MODEL_LICENSE_")
-    return _LICENSE_DISPLAY_NAMES.get(key, key.replace("_", " ").title())
+def format_chipsets_table(
+    chipsets: Iterable[ChipsetInfo], title: str | None = "Chipsets"
+) -> str:
+    """Format a table of chipsets with their attributes."""
+    return build_table(
+        ["Type", "Name", "Aliases", *CHIPSET_ATTRIBUTE_HEADERS],
+        [
+            [
+                world_proto_to_str(c.world),
+                c.marketing_name,
+                ", ".join(c.aliases),
+                *chipset_attribute_row(c),
+            ]
+            for c in chipsets
+        ],
+        wrap_column="Name",
+        title=title,
+    )

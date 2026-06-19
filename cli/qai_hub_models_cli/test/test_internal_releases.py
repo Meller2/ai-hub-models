@@ -74,14 +74,18 @@ def test_fetch_proto_s3_url(tmp_path: Path) -> None:
 def test_get_asset_url_returns_s3_url_from_internal_proto() -> None:
     """When the proto download_url is s3://, get_asset_url returns it as-is."""
     from qai_hub_models_cli.fetch import get_asset_url
-    from qai_hub_models_cli.proto.platform_pb2 import RuntimeInfo
+    from qai_hub_models_cli.proto.platform_pb2 import PlatformInfo, RuntimeInfo
 
     s3_url = "s3://qai-hub-models-private-assets/models/mobilenet_v2/releases/v0.50.1/mobilenet_v2-tflite-float.zip"
 
     with (
         patch(
-            "qai_hub_models_cli.proto_helpers.release_assets.get_model_release_assets",
+            "qai_hub_models_cli.fetch.get_model_release_assets",
             return_value=_s3_release_assets(),
+        ),
+        patch(
+            "qai_hub_models_cli.fetch.get_platform",
+            return_value=PlatformInfo(),
         ),
         patch(
             "qai_hub_models_cli.proto_helpers.release_assets.get_runtime_info",

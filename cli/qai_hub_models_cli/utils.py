@@ -261,8 +261,31 @@ def extract_zip_file(
     return out_path
 
 
-def wrap_table_column(table: PrettyTable, col_index: int) -> None:
-    """Wrap a single column of a PrettyTable to fit within the terminal width."""
+def _wrap_on_commas(text: str, budget: int) -> str:
+    """Wrap a comma-separated string, breaking only at commas (never mid-item)."""
+    items = [s.strip() for s in text.split(",") if s.strip()]
+    lines: list[str] = []
+    current: list[str] = []
+    for item in items:
+        if current and len(", ".join([*current, item])) > budget:
+            lines.append(", ".join(current) + ",")
+            current = [item]
+        else:
+            current.append(item)
+    if current:
+        lines.append(", ".join(current))
+    return "\n".join(lines)
+
+
+def wrap_table_column(
+    table: PrettyTable, col_index: int, wrap_on_commas: bool = False
+) -> None:
+    """Wrap a single column of a PrettyTable to fit within the terminal width.
+
+    When *wrap_on_commas* is True, the column is treated as a comma-separated
+    list and only broken at commas, so individual items (e.g. chipset names
+    with spaces) are never split across lines.
+    """
     num_cols = len(table.field_names)
     term_width = shutil.get_terminal_size(fallback=(120, 24)).columns
     fixed_cols_width = sum(
@@ -271,9 +294,43 @@ def wrap_table_column(table: PrettyTable, col_index: int) -> None:
         if i != col_index
     )
     overhead = num_cols * 4 + 1
-    budget = term_width - overhead - fixed_cols_width
-    if budget > len(table.field_names[col_index]):
-        for row in table._rows:
+    # Shrink the flexible column to whatever space remains, but never below the
+    # width of its own header. The other columns keep their content intact, so a
+    # narrow terminal is honored as closely as possible without truncating
+    # headers.
+    budget = max(
+        term_width - overhead - fixed_cols_width,
+        len(table.field_names[col_index]),
+    )
+    for row in table._rows:
+        if wrap_on_commas:
+            row[col_index] = _wrap_on_commas(row[col_index], budget)
+        else:
             row[col_index] = "\n".join(
                 textwrap.wrap(row[col_index], width=budget, break_on_hyphens=False)
             )
+
+
+def build_table(
+    field_names: list[str],
+    rows: list[list[str]],
+    wrap_column: str,
+    title: str | None = None,
+    wrap_on_commas: bool = False,
+) -> str:
+    """Build a left-aligned table, wrapping the named column to the terminal width.
+
+    When *wrap_on_commas* is True, the wrapped column is treated as a
+    comma-separated list and only broken at commas.
+    """
+    table = PrettyTable()
+    if title:
+        table.title = title
+    table.field_names = field_names
+    table.align = "l"
+    for row in rows:
+        table.add_row(row)
+    wrap_table_column(
+        table, field_names.index(wrap_column), wrap_on_commas=wrap_on_commas
+    )
+    return str(table)

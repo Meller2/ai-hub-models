@@ -24,6 +24,9 @@ from qai_hub_models_cli.envvars import (
 
 CURRENT_VERSION = parse_version(os.environ.get(FORCE_VERSION_ENVVAR, __version__))
 MIN_SUPPORTED_VERSION = Version("0.44.0")
+MIN_MANIFEST_VERSION = Version(
+    "0.52.0"
+)  # the version where manifest files were first published
 MIN_INTERNAL_REGISTRY_VERSION = Version("0.56.0")
 PYPI_VERSIONS_URL = "https://pypi.org/pypi/qai-hub-models/json"
 
@@ -141,7 +144,9 @@ def verify_not_dev_release(version: Version) -> None:
         )
 
 
-def verify_version_supported(version: Version) -> None:
+def verify_version_supported(
+    version: Version, verify_manifest_supported: bool = False
+) -> None:
     """
     Validate that a requested version is readable by this version of the CLI.
 
@@ -156,6 +161,9 @@ def verify_version_supported(version: Version) -> None:
     ----------
     version
         AI Hub Models version.
+    verify_manifest_supported
+        If True, also require *version* to be at or above the first release
+        that published manifest files (``MIN_MANIFEST_VERSION``).
 
     Raises
     ------
@@ -173,6 +181,11 @@ def verify_version_supported(version: Version) -> None:
         raise UnsupportedVersionError(
             f"Version {version} does not have an internal release. Unset {USE_INTERNAL_RELEASES_ENVVAR} to use the public release instead."
             f" An internal release is available for v{MIN_INTERNAL_REGISTRY_VERSION} and above."
+        )
+
+    if verify_manifest_supported and version < MIN_MANIFEST_VERSION:
+        raise UnsupportedVersionError(
+            f"Version {version} does not support this operation. Update to version {MIN_MANIFEST_VERSION} or higher."
         )
 
     if version > CURRENT_VERSION:

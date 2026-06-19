@@ -1,0 +1,353 @@
+# ---------------------------------------------------------------------
+# Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: BSD-3-Clause
+# ---------------------------------------------------------------------
+"""Conversions between platform proto enums and their human-readable strings."""
+
+from __future__ import annotations
+
+from qai_hub_models_cli.proto.info_pb2 import (
+    ModelDomain,
+    ModelLicense,
+    ModelTag,
+    ModelUseCase,
+)
+from qai_hub_models_cli.proto.platform_pb2 import (
+    FormFactor,
+    OperatingSystem,
+    OperatingSystemType,
+    WebsiteWorld,
+)
+from qai_hub_models_cli.proto.shared.precision_pb2 import Precision
+from qai_hub_models_cli.proto.shared.runtime_pb2 import Runtime
+
+
+def _normalize_label(s: str) -> str:
+    """Lowercase and unify separators so filter values match display labels."""
+    return s.lower().replace("_", " ").replace("-", " ")
+
+
+# Display overrides for enum keys that should not be naively title-cased.
+_PLATFORM_DISPLAY_OVERRIDES: dict[str, str] = {
+    "XR": "XR",
+    "IOT": "IoT",
+    "AUTOMOTIVE": "Auto",
+}
+
+
+def precision_proto_to_str(precision: Precision.ValueType) -> str:
+    """
+    Convert a Precision proto enum value to its lowercase string name.
+
+    Parameters
+    ----------
+    precision
+        ``Precision`` enum value (e.g. ``PRECISION_FLOAT``).
+
+    Returns
+    -------
+    str
+        Lowercase name without the ``PRECISION_`` prefix (e.g. ``"float"``).
+
+    Raises
+    ------
+    KeyError
+        If *precision* is not a valid enum value.
+    """
+    name = Precision.Name(precision)
+    if not name.startswith("PRECISION_"):
+        raise KeyError(f"Unknown precision value: {precision!r}")
+    return name.removeprefix("PRECISION_").lower()
+
+
+def precision_str_to_proto(precision: str | Precision.ValueType) -> Precision.ValueType:
+    """
+    Convert a precision string to its proto enum value.
+
+    Parameters
+    ----------
+    precision
+        Precision name (e.g. ``"float"``, ``"w8a8"``, ``"PRECISION_MXFP4"``).
+        Case-insensitive. The ``PRECISION_`` prefix is optional.
+
+    Returns
+    -------
+    Precision.ValueType
+        Corresponding ``Precision`` enum value.
+
+    Raises
+    ------
+    KeyError
+        If *precision* does not match any known precision.
+    """
+    if not isinstance(precision, str):
+        return precision
+
+    key = precision.upper()
+    if not key.startswith("PRECISION_"):
+        key = f"PRECISION_{key}"
+    try:
+        return Precision.Value(key)
+    except ValueError:
+        valid = ", ".join(
+            name.removeprefix("PRECISION_").lower()
+            for name in Precision.DESCRIPTOR.values_by_name
+            if name != "PRECISION_UNSPECIFIED"
+        )
+        raise KeyError(
+            f"Unknown precision: {precision!r}. Valid precisions: {valid}"
+        ) from None
+
+
+def runtime_proto_to_str(runtime: Runtime.ValueType) -> str:
+    """
+    Convert a Runtime proto enum value to its lowercase string name.
+
+    Parameters
+    ----------
+    runtime
+        ``Runtime`` enum value (e.g. ``RUNTIME_TFLITE``).
+
+    Returns
+    -------
+    str
+        Lowercase name without the ``RUNTIME_`` prefix (e.g. ``"tflite"``).
+
+    Raises
+    ------
+    KeyError
+        If *runtime* is not a valid enum value.
+    """
+    name = Runtime.Name(runtime)
+    if not name.startswith("RUNTIME_"):
+        raise KeyError(f"Unknown runtime value: {runtime!r}")
+    return name.removeprefix("RUNTIME_").lower()
+
+
+def runtime_str_to_proto(runtime: str | Runtime.ValueType) -> Runtime.ValueType:
+    """
+    Convert a runtime string to its proto enum value.
+
+    Parameters
+    ----------
+    runtime
+        Runtime name (e.g. ``"tflite"``, ``"qnn_dlc"``, ``"RUNTIME_ONNX"``).
+        Case-insensitive. The ``RUNTIME_`` prefix is optional.
+
+    Returns
+    -------
+    Runtime.ValueType
+        Corresponding ``Runtime`` enum value.
+
+    Raises
+    ------
+    KeyError
+        If *runtime* does not match any known runtime.
+    """
+    if not isinstance(runtime, str):
+        return runtime
+
+    key = runtime.upper()
+    if not key.startswith("RUNTIME_"):
+        key = f"RUNTIME_{key}"
+    try:
+        return Runtime.Value(key)
+    except ValueError:
+        valid = ", ".join(
+            name.removeprefix("RUNTIME_").lower()
+            for name in Runtime.DESCRIPTOR.values_by_name
+            if name != "RUNTIME_UNSPECIFIED"
+        )
+        raise KeyError(
+            f"Unknown runtime: {runtime!r}. Valid runtimes: {valid}"
+        ) from None
+
+
+def form_factor_proto_to_str(form_factor: int) -> str:
+    """Convert a FormFactor enum value to a human-readable string."""
+    name = FormFactor.Name(form_factor)  # type: ignore[arg-type]
+    key = name.removeprefix("FORM_FACTOR_")
+    return _PLATFORM_DISPLAY_OVERRIDES.get(key, key.replace("_", " ").title())
+
+
+def form_factor_str_to_proto(form_factor: str) -> FormFactor.ValueType:
+    """
+    Convert a form-factor display string (e.g. ``"phone"``, ``"IoT"``) to its
+    proto enum value. Case- and separator-insensitive.
+
+    Parameters
+    ----------
+    form_factor
+        Form-factor display name.
+
+    Returns
+    -------
+    FormFactor.ValueType
+        Corresponding ``FormFactor`` enum value.
+
+    Raises
+    ------
+    KeyError
+        If *form_factor* does not match any known form factor.
+    """
+    target = _normalize_label(form_factor)
+    for ff in FormFactor.values():
+        if ff != FormFactor.FORM_FACTOR_UNSPECIFIED and (
+            _normalize_label(form_factor_proto_to_str(ff)) == target
+        ):
+            return ff
+    valid = ", ".join(
+        form_factor_proto_to_str(ff)
+        for ff in FormFactor.values()
+        if ff != FormFactor.FORM_FACTOR_UNSPECIFIED
+    )
+    raise KeyError(f"Unknown device type: {form_factor!r}. Valid types: {valid}")
+
+
+def world_proto_to_str(world: int) -> str:
+    """Convert a WebsiteWorld enum value to a human-readable string."""
+    name = WebsiteWorld.Name(world)  # type: ignore[arg-type]
+    key = name.removeprefix("WEBSITE_WORLD_")
+    return _PLATFORM_DISPLAY_OVERRIDES.get(key, key.replace("_", " ").title())
+
+
+def world_str_to_proto(world: str) -> WebsiteWorld.ValueType:
+    """
+    Convert a world display string (e.g. ``"mobile"``, ``"auto"``) to its proto
+    enum value. Case- and separator-insensitive.
+
+    Parameters
+    ----------
+    world
+        World (chipset type) display name.
+
+    Returns
+    -------
+    WebsiteWorld.ValueType
+        Corresponding ``WebsiteWorld`` enum value.
+
+    Raises
+    ------
+    KeyError
+        If *world* does not match any known chipset type.
+    """
+    target = _normalize_label(world)
+    for w in WebsiteWorld.values():
+        if w != WebsiteWorld.WEBSITE_WORLD_UNSPECIFIED and (
+            _normalize_label(world_proto_to_str(w)) == target
+        ):
+            return w
+    valid = ", ".join(
+        world_proto_to_str(w)
+        for w in WebsiteWorld.values()
+        if w != WebsiteWorld.WEBSITE_WORLD_UNSPECIFIED
+    )
+    raise KeyError(f"Unknown chipset type: {world!r}. Valid types: {valid}")
+
+
+def os_type_proto_to_str(os_type: int) -> str:
+    """Convert an OperatingSystemType enum value to a human-readable string."""
+    name = OperatingSystemType.Name(os_type)  # type: ignore[arg-type]
+    key = name.removeprefix("OPERATING_SYSTEM_TYPE_")
+    return {"QC_LINUX": "QC Linux"}.get(key, key.title())
+
+
+def os_str_to_proto(os: str) -> OperatingSystem:
+    """
+    Parse an OS filter string into an ``OperatingSystem``.
+
+    Accepts a bare OS name (e.g. ``"android"``) or a name with a version
+    (e.g. ``"android 14"``). Case- and separator-insensitive on the name.
+
+    Parameters
+    ----------
+    os
+        OS filter string (name, optionally followed by a version).
+
+    Returns
+    -------
+    OperatingSystem
+        Parsed OS with its type and (optional) version.
+
+    Raises
+    ------
+    KeyError
+        If the OS name does not match any known operating system.
+    """
+    name, _, version = os.strip().partition(" ")
+    target = _normalize_label(name)
+    for ot in OperatingSystemType.values():
+        if ot != OperatingSystemType.OPERATING_SYSTEM_TYPE_UNSPECIFIED and (
+            _normalize_label(os_type_proto_to_str(ot)) == target
+        ):
+            return OperatingSystem(ostype=ot, version=version.strip())
+    valid = ", ".join(
+        os_type_proto_to_str(ot)
+        for ot in OperatingSystemType.values()
+        if ot != OperatingSystemType.OPERATING_SYSTEM_TYPE_UNSPECIFIED
+    )
+    raise KeyError(f"Unknown OS: {os!r}. Valid operating systems: {valid}")
+
+
+def os_proto_to_str(os: OperatingSystem) -> str:
+    """Format an OperatingSystem message as ``Type Version`` (e.g. ``Android 14``)."""
+    if os.ostype == OperatingSystemType.OPERATING_SYSTEM_TYPE_UNSPECIFIED:
+        return ""
+    name = os_type_proto_to_str(os.ostype)
+    return f"{name} {os.version}".strip() if os.version else name
+
+
+def domain_proto_to_str(domain: int) -> str:
+    """Convert a ModelDomain enum value to a human-readable string."""
+    name = ModelDomain.Name(domain)  # type: ignore[arg-type]
+    return (
+        name.removeprefix("MODEL_DOMAIN_").replace("_", " ").title().replace("Ai", "AI")
+    )
+
+
+def use_case_proto_to_str(use_case: int) -> str:
+    """Convert a ModelUseCase enum value to a human-readable string."""
+    name = ModelUseCase.Name(use_case)  # type: ignore[arg-type]
+    return (
+        name.removeprefix("MODEL_USE_CASE_")
+        .replace("_", " ")
+        .title()
+        .replace("Ai", "AI")
+    )
+
+
+def tag_proto_to_str(tag: int) -> str:
+    """Convert a ModelTag enum value to a human-readable string."""
+    name = ModelTag.Name(tag)  # type: ignore[arg-type]
+    return name.removeprefix("MODEL_TAG_").replace("_", " ").title().replace("Ai", "AI")
+
+
+_LICENSE_DISPLAY_NAMES: dict[str, str] = {
+    "UNLICENSED": "Unlicensed",
+    "COMMERCIAL": "Commercial",
+    "AI_HUB_MODELS_LICENSE": "AI Hub Models License",
+    "APACHE_2_0": "Apache-2.0",
+    "MIT": "MIT",
+    "BSD_3_CLAUSE": "BSD-3-Clause",
+    "CC_BY_4_0": "CC-BY-4.0",
+    "AGPL_3_0": "AGPL-3.0",
+    "GPL_3_0": "GPL-3.0",
+    "CREATIVEML_OPENRAIL_M": "CreativeML OpenRAIL-M",
+    "CC_BY_NON_COMMERCIAL_4_0": "CC-BY-NC-4.0",
+    "OTHER_NON_COMMERCIAL": "Other (Non-Commercial)",
+    "LLAMA2": "Llama 2",
+    "LLAMA3": "Llama 3",
+    "TAIDE": "TAIDE",
+    "FALCON3": "Falcon 3",
+    "GEMMA": "Gemma",
+    "LFM1_0": "LFM-1.0",
+    "AIMET_MODEL_ZOO": "AIMET Model Zoo",
+    "SAM3": "SAM3",
+}
+
+
+def license_proto_to_str(license_val: int) -> str:
+    """Convert a ModelLicense enum value to a human-readable string."""
+    name = ModelLicense.Name(license_val)  # type: ignore[arg-type]
+    key = name.removeprefix("MODEL_LICENSE_")
+    return _LICENSE_DISPLAY_NAMES.get(key, key.replace("_", " ").title())

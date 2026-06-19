@@ -5,13 +5,14 @@
 from __future__ import annotations
 
 import functools
+from collections.abc import Iterable
 from pathlib import Path
 
 from packaging.version import Version
-from prettytable import PrettyTable
 
 from qai_hub_models_cli.common import model_repo_url
 from qai_hub_models_cli.proto import info_pb2
+from qai_hub_models_cli.proto.platform_pb2 import ChipsetInfo, PlatformInfo
 from qai_hub_models_cli.proto.release_assets_pb2 import ModelReleaseAssets
 from qai_hub_models_cli.proto.shared.precision_pb2 import Precision
 from qai_hub_models_cli.proto.shared.runtime_pb2 import Runtime
@@ -21,12 +22,15 @@ from qai_hub_models_cli.proto_helpers.info import get_model_info
 from qai_hub_models_cli.proto_helpers.manifest import get_manifest_entry
 from qai_hub_models_cli.proto_helpers.platform import (
     get_runtime_info,
+    resolve_chipset,
+)
+from qai_hub_models_cli.proto_helpers.platform_enums import (
     precision_proto_to_str,
     precision_str_to_proto,
     runtime_proto_to_str,
     runtime_str_to_proto,
 )
-from qai_hub_models_cli.utils import wrap_table_column
+from qai_hub_models_cli.utils import build_table
 from qai_hub_models_cli.versions import CURRENT_VERSION
 
 
@@ -152,10 +156,18 @@ def get_model_release_assets(
 
 def format_release_assets_table(
     release_assets: ModelReleaseAssets,
-    model: str,
+    chipsets: Iterable[ChipsetInfo],
+    model: str | None = None,
     title: str | None = None,
 ) -> str:
-    """Format a table of download options for a model."""
+    """Format a table of download options for a model.
+
+    *chipsets* is used to display each asset's chipset by its marketing name.
+    When *model* is provided, the table is followed by ``fetch`` instructions
+    for that model; otherwise only the table is returned.
+    """
+    chipset_names = {c.name: c.marketing_name for c in chipsets}
+
     grouped: dict[tuple[str, str, str], list[str | None]] = {}
     for asset in release_assets.assets:
         prec = precision_proto_to_str(asset.precision)
@@ -166,53 +178,70 @@ def format_release_assets_table(
             else "—"
         )
         key = (prec, rt, sdk)
-        chipset = asset.chipset if asset.HasField("chipset") else None
+        chipset = (
+            chipset_names.get(asset.chipset, asset.chipset)
+            if asset.HasField("chipset")
+            else None
+        )
         grouped.setdefault(key, []).append(chipset)
 
-    table = PrettyTable()
-    if title:
-        table.title = title
-    table.field_names = ["Precision", "Runtime", "Chipsets", "SDK Versions"]
-    table.align = "l"
-    for (prec, rt, sdk), chipsets in grouped.items():
-        if all(c is None for c in chipsets):
+    rows = []
+    for (prec, rt, sdk), grouped_chipsets in grouped.items():
+        if all(c is None for c in grouped_chipsets):
             chipset_str = "Universal"
         else:
-            chipset_str = ", ".join(sorted(c for c in chipsets if c))
-        table.add_row([prec, rt, chipset_str, sdk])
-    wrap_table_column(table, 2)
+            chipset_str = ", ".join(sorted(c for c in grouped_chipsets if c))
+        rows.append([prec, rt, chipset_str, sdk])
+    table = build_table(
+        ["Precision", "Runtime", "Chipsets", "SDK Versions"],
+        rows,
+        wrap_column="Chipsets",
+        title=title,
+        wrap_on_commas=True,
+    )
 
-    chipset_flag = (
-        " -c <chipset>"
+    if model is None:
+        return table
+
+    chipset_or_device_flag = (
+        " [ -c <chipset> || -d <device> ]"
         if any(asset.HasField("chipset") for asset in release_assets.assets)
         else ""
     )
     lines = [
-        str(table),
-        f"\nRun `qai_hub_models fetch {model} -r <runtime> -p <precision>"
-        f"{chipset_flag}` to download the model.\n",
+        table,
+        (
+            "Use `qai_hub_models devices` to list the devices compatible with each chipset.\n"
+            if chipset_or_device_flag
+            else ""
+        )
+        + f"Run `qai_hub_models fetch {model} -r <runtime> -p <precision>"
+        f"{chipset_or_device_flag}` to download the model.\n",
     ]
     return "\n".join(lines)
 
 
 def get_model_asset_details(
-    model: str,
+    release_assets: ModelReleaseAssets,
+    platform: PlatformInfo,
     runtime: Runtime.ValueType | str,
     precision: Precision.ValueType | str,
     chipset: str | None = None,
-    version: Version = CURRENT_VERSION,
+    device: str | None = None,
 ) -> ModelReleaseAssets.AssetDetails:
     """
     Look up a specific asset from a model's release assets.
 
-    If the runtime is AOT-compiled (per the platform registry), *chipset*
+    If the runtime is AOT-compiled, *chipset* (or *device*)
     is required and a chipset-specific asset is returned. Otherwise
     *chipset* is ignored and a universal asset is returned.
 
     Parameters
     ----------
-    model
-        Model ID (e.g. ``"mobilenet_v2"``) or display name.
+    release_assets
+        The model's release assets to search.
+    platform
+        Platform registry used to resolve *chipset*/*device* and the runtime.
     runtime
         Runtime enum value (e.g. ``RUNTIME_TFLITE``) or string
         (e.g. ``"tflite"``).
@@ -220,9 +249,12 @@ def get_model_asset_details(
         Precision enum value (e.g. ``PRECISION_FLOAT``) or string
         (e.g. ``"float"``).
     chipset
-        Chipset name. Required for AOT-compiled runtimes, ignored otherwise.
-    version
-        AI Hub Models release version. Defaults to the installed CLI version.
+        Chipset reference: canonical ID, name, or alias. Resolved to
+        the canonical chipset ID. Required for AOT-compiled runtimes, ignored
+        otherwise.
+    device
+        Device name to select the asset by; resolved to its chipset. Mutually
+        exclusive with *chipset*.
 
     Returns
     -------
@@ -231,14 +263,21 @@ def get_model_asset_details(
 
     Raises
     ------
+    ValueError
+        If both *chipset* and *device* are provided.
     KeyError
-        If no matching asset is found, or if *chipset* is missing for
-        an AOT-compiled runtime.
+        If no matching asset is found, if *chipset* is missing for an
+        AOT-compiled runtime, or if *chipset*/*device* is not known.
     """
+    if chipset is not None and device is not None:
+        raise ValueError("Provide at most one of 'chipset' or 'device'.")
+    if device is not None or chipset is not None:
+        chipset = resolve_chipset(platform, device=device, chipset=chipset).name
+
     runtime_val = runtime_str_to_proto(runtime)
     precision_val = precision_str_to_proto(precision)
-    rt_info = get_runtime_info(runtime_val, version)
-    release_assets = get_model_release_assets(model, version)
+    rt_info = get_runtime_info(platform, runtime_val)
+    model = release_assets.model_id
 
     errmsg: str | None = None
     if rt_info.is_aot_compiled:
@@ -259,9 +298,9 @@ def get_model_asset_details(
 
     errmsg = errmsg or (
         f"No asset found for model={model!r} with runtime={runtime!r}, "
-        f"precision={precision!r}, chipset={chipset!r} (version={version}).\n"
+        f"precision={precision!r}, chipset={chipset!r}.\n"
         f"The model was found, but not with the requested runtime, precision, or chipset.\n\n"
     )
     errmsg += f"The following are valid fetch options for {model}:\n"
-    errmsg += format_release_assets_table(release_assets, model)
+    errmsg += format_release_assets_table(release_assets, platform.chipsets)
     raise AssetNotFoundError(errmsg)

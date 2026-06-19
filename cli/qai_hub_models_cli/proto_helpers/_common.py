@@ -108,7 +108,7 @@ def fetch_release_proto(
 
     if not use_aihm_source(version):
         verify_not_dev_release(version)
-        verify_version_supported(version)
+        verify_version_supported(version, verify_manifest_supported=True)
     else:
         from qai_hub_models._version import __version__ as models_version
 
@@ -170,7 +170,7 @@ def fetch_model_proto(
 
     if not use_aihm_source(version):
         verify_not_dev_release(version)
-        verify_version_supported(version)
+        verify_version_supported(version, verify_manifest_supported=True)
 
     # Avoids circular import.
     from qai_hub_models_cli.proto_helpers.manifest import get_manifest_entry
