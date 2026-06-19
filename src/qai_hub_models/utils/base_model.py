@@ -332,8 +332,8 @@ class BaseModel(
         if self.serialization_settings.use_pt2:
             if torch.torch_version.TorchVersion(torch.__version__) < "2.9":
                 raise RuntimeError(
-                    f"PT2 serialization (use_pt2=True) requires torch>=2.9, but found {torch.__version__}. "
-                    "Upgrade torch or set SerializationSettings(use_pt2=False)."
+                    "This model does serialization using the pt2 format, which "
+                    "requires torch>=2.9; Please upgrade your torch version to proceed."
                 )
             input_spec = input_spec or self.get_input_spec()
             output_path = Path(output_dir) / f"{self.name}.pt2"
