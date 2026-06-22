@@ -31,6 +31,7 @@ from qai_hub_models.models._shared.llm.model import (
     DEFAULT_EXPORT_SEQUENCE_LENGTHS as GLOBAL_DEFAULT_EXPORT_SEQUENCE_LENGTHS,
 )
 from qai_hub_models.models._shared.llm.model import SplitForwardMixin
+from qai_hub_models.models._shared.lm_driver.generator import HubCompatibleGenerator
 from qai_hub_models.models._shared.qwen3.model import (
     Qwen3PartBase,
     Qwen3PreSplitBase,
@@ -79,6 +80,7 @@ SPLIT_MODEL_NAME = "Qwen3_4B"
 class Qwen3_4B_PreSplit(Qwen3PreSplitBase):
     """FP PreSplit for Qwen3-4B."""
 
+    GeneratorClass = HubCompatibleGenerator
     num_layers = NUM_LAYERS
     hidden_size = HIDDEN_SIZE
     num_attention_heads = NUM_ATTN_HEADS
@@ -101,6 +103,7 @@ class Qwen3_4B_QuantizablePreSplit(Qwen3QuantizablePreSplitBase[Qwen3_4B_PreSpli
     """Quantizable PreSplit for Qwen3-4B."""
 
     FPModel = Qwen3_4B_PreSplit
+    GeneratorClass = HubCompatibleGenerator
 
     num_layers = NUM_LAYERS
     model_id = MODEL_ID
