@@ -31,6 +31,7 @@ from qai_hub_models.models._shared.llm.perf_collection import (
 )
 from qai_hub_models.models._shared.llm.quantize import quantize
 from qai_hub_models.scorecard import ScorecardDevice, ScorecardProfilePath
+from qai_hub_models.scorecard.device import DEFAULT_QDC_DEVICE
 from qai_hub_models.scorecard.utils.testing import patch_qai_hub
 from qai_hub_models.utils.asset_loaders import ASSET_CONFIG
 from qai_hub_models.utils.fetch_prerelease_assets import download_prerelease_asset
@@ -799,7 +800,8 @@ def run_llm_perf_test(
 
     # Eval is expensive (100 prompts); run only on the default scorecard device.
     run_eval = (
-        os.environ.get("QAIHM_RUN_EVAL", "true").lower() == "true" and device.is_default
+        os.environ.get("QAIHM_RUN_EVAL", "true").lower() == "true"
+        and device == DEFAULT_QDC_DEVICE
     )
     tps, prefill_tps, ttft, eval_results = submit_genie_bundle_to_qdc_device(
         api_token,

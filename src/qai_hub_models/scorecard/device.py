@@ -740,14 +740,18 @@ CANARY_DEVICES = {
 
 
 # Devices LLM models compile against by default (any precision).
+# The first entry is the canonical default device for LLMs (DEFAULT_QDC_DEVICE).
 LLM_COMPILE_DEVICES = [
+    cs_8_elite_qrd,
     cs_9075,
     cs_auto_lemans_8775,
-    cs_8_elite_qrd,
     cs_8_elite_gen_5_qrd,
     cs_x_elite,
     cs_x2_elite,
 ]
+
+# Default device for LLM (QDC / Genie) tests and asset uploads.
+DEFAULT_QDC_DEVICE = LLM_COMPILE_DEVICES[0]
 
 # Extra devices LLM models compile against for w4 precision only,
 # in addition to LLM_COMPILE_DEVICES.

@@ -253,6 +253,11 @@ Special options:
         return {SpecialDeviceSetting.ALL}
 
     @classmethod
+    def default_set(cls) -> bool:
+        """True if the envvar contains the literal "default" device token."""
+        return "default" in super().get(None)
+
+    @classmethod
     def get(
         cls, default: set[str | SpecialDeviceSetting] | None = None
     ) -> set[str | SpecialDeviceSetting]:

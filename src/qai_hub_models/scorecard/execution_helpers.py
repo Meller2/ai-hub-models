@@ -16,12 +16,14 @@ import qai_hub as hub
 from qai_hub_models import Precision, TargetRuntime
 from qai_hub_models.scorecard import ScorecardCompilePath, ScorecardProfilePath
 from qai_hub_models.scorecard.device import (
+    DEFAULT_QDC_DEVICE,
     LLM_COMPILE_DEVICES,
     LLM_W4FP16_COMPILE_DEVICES,
     ScorecardDevice,
 )
 from qai_hub_models.scorecard.envvars import (
     DisableWorkbenchJobTimeoutEnvvar,
+    EnabledDevicesEnvvar,
     EnabledPrecisionsEnvvar,
     IgnoreKnownFailuresEnvvar,
     SpecialPrecisionSetting,
@@ -344,6 +346,10 @@ def get_model_test_parameterizations(
         include_unsupported_paths,
     )
 
+    # When the user passes QAIHM_TEST_DEVICES=default for an LLM run,
+    # use DEFAULT_QDC_DEVICE instead of DEFAULT_SCORECARD_DEVICE
+    llm_default_override = is_llm and EnabledDevicesEnvvar.default_set()
+
     # Calculate the tests to run based on enabled paths, devices, and precisions
     ret: list[tuple[Precision, ScorecardPathTypeVar, ScorecardDevice]] = []
     for precision, sc_paths in enabled_test_paths.items():
@@ -357,7 +363,12 @@ def get_model_test_parameterizations(
             precision_devices = ScorecardDevice.all_devices()
         for sc_path in sc_paths:
             for device in precision_devices:
-                if not device.enabled or not device.npu_supports_precision(precision):
+                if not device.npu_supports_precision(precision):
+                    continue
+                if not (
+                    device.enabled
+                    or (llm_default_override and device == DEFAULT_QDC_DEVICE)
+                ):
                     continue
                 if (
                     isinstance(sc_path, ScorecardCompilePath)

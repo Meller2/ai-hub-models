@@ -49,7 +49,11 @@ from qai_hub_models.scorecard import (
     ScorecardCompilePath,
     ScorecardDevice,
 )
-from qai_hub_models.scorecard.device import cs_8_elite_qrd, cs_x_elite
+from qai_hub_models.scorecard.device import (
+    DEFAULT_QDC_DEVICE,
+    cs_8_elite_qrd,
+    cs_x_elite,
+)
 from qai_hub_models.scorecard.utils.testing_export_eval import run_llm_compile
 from qai_hub_models.utils.asset_loaders import ASSET_CONFIG
 from qai_hub_models.utils.checkpoint import CheckpointSpec
@@ -384,7 +388,7 @@ def test_qdc(
         device.reference_device.name,
         str(genie_bundle_path),
         job_name=qdc_job_name,
-        eval_prompts=(_USE_DEFAULT_PROMPTS if device.is_default else None),
+        eval_prompts=(_USE_DEFAULT_PROMPTS if device == DEFAULT_QDC_DEVICE else None),
     )
     assert tps is not None and min_ttft_ms is not None, "QDC execution failed."
     log_perf_on_device_result(
