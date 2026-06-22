@@ -204,22 +204,6 @@ devices:
     form_factor: Phone
     vendor: xiaomi
     icon: Phone_S22
-  QCS8450 (Proxy):
-    chipset: qualcomm-qcs8450-proxy
-    os:
-      ostype: Android
-      version: '13'
-    form_factor: XR
-    vendor: qualcomm
-    icon: XR_Headset
-  XR2 Gen 2 (Proxy):
-    chipset: qualcomm-qcs8450-proxy
-    os:
-      ostype: Android
-      version: '13'
-    form_factor: XR
-    vendor: qualcomm
-    icon: XR_Headset
   Samsung Galaxy S23:
     chipset: qualcomm-snapdragon-8gen2
     os:
@@ -606,6 +590,7 @@ chipsets:
   qualcomm-qcs8550-proxy:
     aliases:
     - qualcomm-qcs8550-proxy
+    - qualcomm-dragonwing-qcs8550-proxy
     marketing_name: Qualcomm® QCS8550 (Proxy)
     world: IoT
     supports_fp16: true
@@ -623,15 +608,6 @@ chipsets:
     htp_version: 69
     soc_model: 36
     reference_device: Samsung Galaxy S22 5G
-  qualcomm-qcs8450-proxy:
-    aliases:
-    - qualcomm-qcs8450-proxy
-    marketing_name: Qualcomm® QCS8450 (Proxy)
-    world: XR
-    supports_fp16: true
-    htp_version: 69
-    soc_model: 36
-    reference_device: QCS8450 (Proxy)
   qualcomm-snapdragon-8gen2:
     aliases:
     - qualcomm-snapdragon-8gen2
@@ -775,6 +751,7 @@ chipsets:
     aliases:
     - qualcomm-qcm6690
     - qcm6690
+    - qualcomm-dragonwing-q-6690
     marketing_name: Qualcomm® QCM6690
     world: IoT
     htp_version: 73
@@ -784,6 +761,8 @@ chipsets:
   qualcomm-qcs8275-proxy:
     aliases:
     - qualcomm-qcs8275-proxy
+    - qcs8275
+    - qualcomm-dragonwing-iq-8275-proxy
     marketing_name: Qualcomm® QCS8275 (Proxy)
     world: IoT
     supports_fp16: true
@@ -795,6 +774,7 @@ chipsets:
     aliases:
     - qualcomm-qcs6490
     - qcs6490
+    - qualcomm-dragonwing-qcs6490
     marketing_name: Qualcomm® QCS6490
     world: IoT
     htp_version: 68
@@ -804,6 +784,7 @@ chipsets:
     aliases:
     - qualcomm-qcs9075
     - qcs9075
+    - qualcomm-dragonwing-iq-9075
     marketing_name: Qualcomm® QCS9075
     world: IoT
     supports_fp16: true
