@@ -19,14 +19,20 @@ from mypy_boto3_s3.service_resource import Bucket
 from qai_hub_models_cli.proto import manifest_pb2
 from qai_hub_models_cli.proto.release_assets_pb2 import ModelReleaseAssets
 
+from qai_hub_models import Precision, TargetRuntime
 from qai_hub_models._version import __version__
 from qai_hub_models.configs._info_yaml_enums import MODEL_STATUS
 from qai_hub_models.configs.devices_and_chipsets_yaml import DevicesAndChipsetsYaml
 from qai_hub_models.configs.info_yaml import QAIHMModelInfo
 from qai_hub_models.configs.numerics_yaml import QAIHMModelNumerics
 from qai_hub_models.configs.perf_yaml import QAIHMModelPerf
-from qai_hub_models.configs.proto_helpers import domain_to_proto
+from qai_hub_models.configs.proto_helpers import (
+    domain_to_proto,
+    runtime_to_proto,
+    tag_to_proto,
+)
 from qai_hub_models.configs.release_assets_yaml import QAIHMModelReleaseAssets
+from qai_hub_models.scorecard import ScorecardDevice, ScorecardProfilePath
 from qai_hub_models.scorecard.envvars import EnabledModelsEnvvar, SpecialModelSetting
 from qai_hub_models.scorecard.static.list_models import (
     validate_and_split_enabled_models,
@@ -298,6 +304,59 @@ def cmd_website(args: argparse.Namespace) -> None:
     print(f"Built website yamls for {len(model_ids)} models in {output_root}")
 
 
+def _manifest_filter_fields(
+    release_assets: QAIHMModelReleaseAssets,
+    perf: QAIHMModelPerf,
+    info: QAIHMModelInfo,
+) -> dict[str, Any]:
+    """
+    Derive the manifest filter fields for a single model.
+
+    Runtimes and precisions are unioned across both the model's released assets
+    and its perf data (a model is quantized if either source reports a non-float
+    precision). Chipsets come from perf data, and tags from info.yaml.
+
+    Parameters
+    ----------
+    release_assets
+        The model's release assets.
+    perf
+        The model's perf data.
+    info
+        The model's info.yaml config.
+
+    Returns
+    -------
+    dict[str, Any]
+        Keyword arguments for ``ManifestModelEntry``.
+    """
+    precisions: set[Precision] = set(release_assets.precisions)
+    runtimes: set[TargetRuntime] = set()
+    for prec_details in release_assets.precisions.values():
+        runtimes.update(path.runtime for path in prec_details.universal_assets)
+        for path_dict in prec_details.chipset_assets.values():
+            runtimes.update(path.runtime for path in path_dict)
+
+    def _collect_perf(
+        precision: Precision,
+        component: str,
+        device: ScorecardDevice,
+        path: ScorecardProfilePath,
+        details: QAIHMModelPerf.PerformanceDetails,
+    ) -> None:
+        precisions.add(precision)
+        runtimes.add(path.runtime)
+
+    perf.for_each_entry(_collect_perf)
+
+    return dict(
+        is_quantized=any(p != Precision.float for p in precisions),
+        supported_runtimes=sorted(runtime_to_proto(r) for r in runtimes),
+        supported_chipsets=list(perf.supported_chipsets),
+        tags=[tag_to_proto(t) for t in info.tags],
+    )
+
+
 def _build_manifest(
     version: str,
     model_written_paths: dict[str, list[Path]],
@@ -314,9 +373,13 @@ def _build_manifest(
 
     global_s3_folder = ASSET_CONFIG.get_global_release_s3_folder(version)
 
-    model_infos: list[tuple[str, set[str], QAIHMModelInfo, str]] = []
+    model_infos: list[tuple[str, set[str], QAIHMModelInfo, str, dict[str, Any]]] = []
     for model_id, written in model_written_paths.items():
         info = QAIHMModelInfo.from_model(model_id)
+        release_assets = QAIHMModelReleaseAssets.from_model(
+            model_id, not_exists_ok=True
+        )
+        perf = QAIHMModelPerf.from_model(model_id, not_exists_ok=True)
         written_stems = {p.stem for p in written}
         s3_folder = ASSET_CONFIG.get_release_s3_folder(model_id, version)
         model_infos.append(
@@ -327,6 +390,7 @@ def _build_manifest(
                 f"s3://{QAIHM_PRIVATE_S3_BUCKET}/{s3_folder}"
                 if internal
                 else ASSET_CONFIG.get_asset_url(s3_folder),
+                _manifest_filter_fields(release_assets, perf, info),
             )
         )
 
@@ -340,7 +404,7 @@ def _build_manifest(
             if internal
             else ASSET_CONFIG.get_asset_url(platform_ref),
         )
-        for model_id, written_stems, info, s3_folder in model_infos:
+        for model_id, written_stems, info, s3_folder, filter_fields in model_infos:
             url_kwargs: dict[str, str] = {}
             for stem, field in _STEM_TO_FIELD:
                 if stem in written_stems:
@@ -351,6 +415,7 @@ def _build_manifest(
                     display_name=info.name,
                     domain=domain_to_proto(info.domain),
                     manifest_urls=manifest_pb2.ModelManifestUrls(**url_kwargs),
+                    **filter_fields,
                 )
             )
         result.append(_write_proto(manifest, output_dir / "manifest", fmt))

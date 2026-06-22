@@ -15,6 +15,7 @@ from qai_hub_models_cli.proto.info_pb2 import (
     ModelTag,
     ModelUseCase,
 )
+from qai_hub_models_cli.proto.manifest_pb2 import ManifestModelEntry
 from qai_hub_models_cli.proto.platform_pb2 import ChipsetInfo, PlatformInfo
 from qai_hub_models_cli.proto.release_assets_pb2 import ModelReleaseAssets
 from qai_hub_models_cli.proto.shared.precision_pb2 import Precision
@@ -77,6 +78,15 @@ def _skip_version_check() -> Generator[None]:
         yield
 
 
+def _fake_manifest_entry() -> ManifestModelEntry:
+    return ManifestModelEntry(
+        id="mobilenet_v2",
+        is_quantized=True,
+        supported_runtimes=[Runtime.RUNTIME_TFLITE, Runtime.RUNTIME_ONNX],
+        supported_chipsets=["qualcomm-snapdragon-8-gen-3"],
+    )
+
+
 @pytest.fixture
 def info_mocks() -> Generator[None]:
     with (
@@ -92,6 +102,10 @@ def info_mocks() -> Generator[None]:
             "qai_hub_models_cli.cli.get_platform",
             return_value=_fake_platform(),
         ),
+        patch(
+            "qai_hub_models_cli.cli.get_manifest_entry",
+            return_value=_fake_manifest_entry(),
+        ),
     ):
         yield
 
@@ -103,11 +117,17 @@ def test_info_full_output(info_mocks: None, capsys: pytest.CaptureFixture[str]) 
     assert "Imagenet classifier" in output
     assert "Computer Vision" in output
     assert "Image Classification" in output
-    assert "Real Time" in output
+    assert "Real-Time" in output
     assert "Apache-2.0" in output
     assert "3500000" in output
     assert "14.2" in output
     assert "CNN" in output
+    # Quantized + Supported Runtimes/Chipsets (from the manifest entry);
+    # chipset shows its marketing name.
+    assert "Quantized" in output
+    assert "Supported Runtimes" in output
+    assert "Supported Chipsets" in output
+    assert "Snapdragon 8 Gen 3" in output
 
 
 def test_info_download_options(

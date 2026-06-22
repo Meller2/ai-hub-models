@@ -4,7 +4,9 @@
 # ---------------------------------------------------------------------
 import argparse
 import sys
+from collections.abc import Callable
 from importlib.metadata import PackageNotFoundError, version
+from typing import TypeVar
 
 from packaging.version import Version
 from packaging.version import parse as parse_version
@@ -21,13 +23,13 @@ from qai_hub_models_cli.envvars import (
     bool_envvar_value,
 )
 from qai_hub_models_cli.fetch import fetch, get_asset_url
-from qai_hub_models_cli.proto.info_pb2 import ModelDomain
+from qai_hub_models_cli.proto.info_pb2 import MODEL_TAG_LLM, ModelDomain, ModelTag
 from qai_hub_models_cli.proto.manifest_pb2 import ManifestModelEntry
 from qai_hub_models_cli.proto.platform_pb2 import FormFactor, WebsiteWorld
 from qai_hub_models_cli.proto.shared.precision_pb2 import Precision
 from qai_hub_models_cli.proto.shared.runtime_pb2 import Runtime
 from qai_hub_models_cli.proto_helpers.info import get_model_info
-from qai_hub_models_cli.proto_helpers.manifest import get_manifest
+from qai_hub_models_cli.proto_helpers.manifest import get_manifest, get_manifest_entry
 from qai_hub_models_cli.proto_helpers.platform import (
     filter_chipsets,
     filter_devices,
@@ -35,6 +37,7 @@ from qai_hub_models_cli.proto_helpers.platform import (
     format_devices_table,
     format_similar_devices_table,
     get_platform,
+    resolve_chipset,
 )
 from qai_hub_models_cli.proto_helpers.platform_enums import (
     domain_proto_to_str,
@@ -44,7 +47,9 @@ from qai_hub_models_cli.proto_helpers.platform_enums import (
     os_str_to_proto,
     precision_proto_to_str,
     runtime_proto_to_str,
+    runtime_str_to_proto,
     tag_proto_to_str,
+    tag_str_to_proto,
     use_case_proto_to_str,
     world_proto_to_str,
     world_str_to_proto,
@@ -61,11 +66,14 @@ from qai_hub_models_cli.proto_helpers.release_assets import (
 from qai_hub_models_cli.utils import build_table, wrap_table_column
 from qai_hub_models_cli.versions import (
     CURRENT_VERSION,
+    MIN_MODEL_FILTER_VERSION,
     UnsupportedVersionError,
     get_supported_versions,
     normalize_version,
     print_upgrade_notice,
 )
+
+T = TypeVar("T")
 
 
 def _check_version_match() -> None:
@@ -106,6 +114,18 @@ def _add_quiet_arg(parser: argparse.ArgumentParser, help_text: str) -> None:
     parser.add_argument("-q", "--quiet", action="store_true", help=help_text)
 
 
+def _flatten_multi_arg(value: list[list[T]] | None) -> list[T] | None:
+    """Flatten an ``action="append", nargs="+"`` value into a single list.
+
+    Such args parse to a list-of-lists (one inner list per flag occurrence), so
+    both ``--flag a b`` and repeated ``--flag a --flag b`` accumulate rather than
+    overwrite. Returns None when the flag was not given.
+    """
+    if not value:
+        return None
+    return [item for group in value for item in group]
+
+
 def _add_chipset_attribute_filter_args(parser: argparse.ArgumentParser) -> None:
     """Add the chipset-attribute filters shared by the devices/chipsets commands."""
     parser.add_argument(
@@ -116,6 +136,7 @@ def _add_chipset_attribute_filter_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--htp-version",
         nargs="+",
+        action="append",
         type=int,
         default=None,
         help="Filter by chipset HTP version(s).",
@@ -123,6 +144,7 @@ def _add_chipset_attribute_filter_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--soc-model",
         nargs="+",
+        action="append",
         type=int,
         default=None,
         help="Filter by chipset SoC model(s).",
@@ -335,7 +357,30 @@ def add_fetch_parser(subparsers: argparse._SubParsersAction) -> argparse.Argumen
 
 def _run_list_models(args: argparse.Namespace) -> None:
     manifest = get_manifest(args.qaihm_version)
-    entries = sorted(manifest.models, key=lambda e: e.id)
+
+    # All filters except --domain rely on manifest fields added in
+    # MIN_MODEL_FILTER_VERSION; older releases only support --domain.
+    gated_filters = (
+        args.quantized,
+        args.runtime,
+        args.aot,
+        args.jit,
+        args.tag,
+        args.chipset,
+        args.device,
+        args.llm,
+    )
+    if any(gated_filters) and args.qaihm_version < MIN_MODEL_FILTER_VERSION:
+        print(
+            f"Filtering by quantization, runtime, chipset, device, or tag requires "
+            f"version {MIN_MODEL_FILTER_VERSION} or later. Only --domain is supported "
+            f"for version {args.qaihm_version}."
+        )
+        return
+
+    # Resolve/validate each filter's criteria once up front, then build a list of
+    # per-model predicates so the models are walked a single time below.
+    predicates: list[Callable[[ManifestModelEntry], bool]] = []
 
     if args.domain:
 
@@ -343,11 +388,56 @@ def _run_list_models(args: argparse.Namespace) -> None:
             return s.lower().replace("_", " ").replace("-", " ")
 
         domain_filter = _normalize_domain(args.domain)
-        entries = [
-            e
-            for e in entries
-            if _normalize_domain(domain_proto_to_str(e.domain)) == domain_filter
-        ]
+        predicates.append(
+            lambda e: _normalize_domain(domain_proto_to_str(e.domain)) == domain_filter
+        )
+
+    if args.quantized:
+        predicates.append(lambda e: e.is_quantized)
+
+    if args.aot or args.jit or args.runtime:
+        platform_runtimes = get_platform(args.qaihm_version).runtimes
+        if runtimes := _flatten_multi_arg(args.runtime):
+            try:
+                runtime_vals = {runtime_str_to_proto(r) for r in runtimes}
+            except KeyError as e:
+                print(str(e))
+                return
+            predicates.append(lambda e: runtime_vals.issubset(e.supported_runtimes))
+        if args.aot:
+            aot = {rt.runtime for rt in platform_runtimes if rt.is_aot_compiled}
+            predicates.append(lambda e: bool(aot.intersection(e.supported_runtimes)))
+        if args.jit:
+            jit = {rt.runtime for rt in platform_runtimes if not rt.is_aot_compiled}
+            predicates.append(lambda e: bool(jit.intersection(e.supported_runtimes)))
+
+    if tags := _flatten_multi_arg(args.tag):
+        try:
+            tag_vals = {tag_str_to_proto(t) for t in tags}
+        except KeyError as e:
+            print(str(e))
+            return
+        predicates.append(lambda e: tag_vals.issubset(e.tags))
+
+    if args.llm:
+        predicates.append(lambda e: MODEL_TAG_LLM in e.tags)
+
+    if args.chipset or args.device:
+        try:
+            chipset_name = resolve_chipset(
+                get_platform(args.qaihm_version),
+                chipset=args.chipset,
+                device=args.device,
+            ).name
+        except KeyError as e:
+            print(str(e))
+            return
+        predicates.append(lambda e: chipset_name in e.supported_chipsets)
+
+    entries = sorted(
+        (e for e in manifest.models if all(p(e) for p in predicates)),
+        key=lambda e: e.id,
+    )
 
     if not entries:
         print("No models found.")
@@ -363,19 +453,47 @@ def _run_list_models(args: argparse.Namespace) -> None:
         domain = domain_proto_to_str(entry.domain)
         groups.setdefault(domain, []).append(entry)
 
-    table = build_table(
-        ["Name", "Domain"],
-        [
-            [f"{entry.display_name} ({entry.id})", domain]
-            for domain, group in groups.items()
-            for entry in group
-        ],
-        wrap_column="Name",
-        title="Models",
-    )
-    print(table)
+    # The Quantized/Runtimes columns are populated from manifest fields added in
+    # MIN_MODEL_FILTER_VERSION; on older releases they'd be blank, so omit them.
+    show_filter_columns = args.qaihm_version >= MIN_MODEL_FILTER_VERSION
+    if show_filter_columns:
+        columns = ["Name", "Domain", "Quantized", "Runtimes"]
+        wrap_column, wrap_on_commas = "Runtimes", True
+    else:
+        columns = ["Name", "Domain"]
+        wrap_column, wrap_on_commas = "Name", False
 
-    print(f"Total: {len(entries)} models")
+    rows = []
+    for domain, group in groups.items():
+        for entry in group:
+            row = [entry.display_name, domain]
+            if show_filter_columns:
+                row += [
+                    "Yes" if entry.is_quantized else "No",
+                    ", ".join(
+                        runtime_proto_to_str(r) for r in entry.supported_runtimes
+                    ),
+                ]
+            rows.append(row)
+
+    print(
+        build_table(
+            columns,
+            rows,
+            wrap_column=wrap_column,
+            wrap_on_commas=wrap_on_commas,
+            title="Models",
+        )
+    )
+
+    print(f"Total: {len(entries)} models\n")
+    print("Looking for something else?")
+    print(
+        " - Use AI Hub Workbench to bring your own model: https://aihub.qualcomm.com/get-started#workbench"
+    )
+    print(
+        " - Request we add a new model: https://github.com/qualcomm/ai-hub-models/issues\n"
+    )
     print("Run `qai_hub_models info <model_id>` for details and download options.")
     print_upgrade_notice()
 
@@ -395,11 +513,80 @@ def add_list_models_parser(
         if d != ModelDomain.MODEL_DOMAIN_UNSPECIFIED
     )
     parser.add_argument(
-        "-d",
         "--domain",
         default=None,
         type=str.lower,
         help=f"Filter by domain. Known values: {domain_values}.",
+    )
+    parser.add_argument(
+        "--quantized",
+        action="store_true",
+        help="Filter to quantized models.",
+    )
+    runtime_values = ", ".join(
+        runtime_proto_to_str(r)
+        for r in Runtime.values()
+        if r != Runtime.RUNTIME_UNSPECIFIED
+    )
+    parser.add_argument(
+        "-r",
+        "--runtime",
+        nargs="+",
+        action="append",
+        default=None,
+        type=str.lower,
+        help="Filter to models with assets for all of the given runtimes. "
+        "May be repeated or given multiple values. "
+        f"Known values: {runtime_values}.",
+    )
+    parser.add_argument(
+        "--llm",
+        action="store_true",
+        help="Filter to Large Language Models and Vision Language Models.",
+    )
+    compile_group = parser.add_mutually_exclusive_group()
+    compile_group.add_argument(
+        "--aot",
+        action="store_true",
+        help="Filter to models with ahead-of-time (device-specific) compiled assets.",
+    )
+    compile_group.add_argument(
+        "--jit",
+        action="store_true",
+        help="Filter to models with just-in-time (universal) compiled assets.",
+    )
+    target_group = parser.add_mutually_exclusive_group()
+    target_group.add_argument(
+        "-c",
+        "--chipset",
+        default=None,
+        type=str.lower,
+        help="Filter by a chipset the model has been profiled on. "
+        "Run `qai-hub-models chipsets` to see supported chipsets.",
+    )
+    target_group.add_argument(
+        "-d",
+        "--device",
+        default=None,
+        help="Filter by a device the model has been profiled on. "
+        "Run `qai-hub-models devices` to see supported devices. "
+        "Cannot be combined with --chipset.",
+    )
+    tag_values = ", ".join(
+        tag_proto_to_str(t)
+        for t in ModelTag.values()
+        if t != ModelTag.MODEL_TAG_UNSPECIFIED
+    )
+    parser.add_argument(
+        "-t",
+        "--tag",
+        nargs="+",
+        action="append",
+        default=None,
+        type=str.lower,
+        help="Filter to models with all of the given tags. "
+        "May be repeated or given multiple values. "
+        f"Known values: {tag_values}.",
     )
     _add_quiet_arg(parser, "Print model IDs only, one per line.")
     parser.set_defaults(func=_run_list_models)
@@ -412,16 +599,16 @@ def _run_list_devices(args: argparse.Namespace) -> None:
         platform.devices,
         key=lambda d: (form_factor_proto_to_str(d.form_factor), d.name),
     )
+    types = _flatten_multi_arg(args.type)
+    oses = _flatten_multi_arg(args.os)
     devices = filter_devices(
         devices,
         platform.chipsets,
-        form_factor=[form_factor_str_to_proto(t) for t in args.type]
-        if args.type
-        else None,
-        os=[os_str_to_proto(o) for o in args.os] if args.os else None,
+        form_factor=[form_factor_str_to_proto(t) for t in types] if types else None,
+        os=[os_str_to_proto(o) for o in oses] if oses else None,
         fp16=True if args.fp16 else None,
-        htp_version=args.htp_version,
-        soc_model=args.soc_model,
+        htp_version=_flatten_multi_arg(args.htp_version),
+        soc_model=_flatten_multi_arg(args.soc_model),
     )
 
     if not devices:
@@ -478,12 +665,14 @@ def add_list_devices_parser(
         "-t",
         "--type",
         nargs="+",
+        action="append",
         default=None,
         help=f"Filter by device type(s). Known values: {type_values}.",
     )
     parser.add_argument(
         "--os",
         nargs="+",
+        action="append",
         default=None,
         help="Filter by operating system(s) (e.g. Android, Windows).",
     )
@@ -498,12 +687,13 @@ def _run_list_chipsets(args: argparse.Namespace) -> None:
         get_platform(args.qaihm_version).chipsets,
         key=lambda c: (world_proto_to_str(c.world), c.marketing_name),
     )
+    types = _flatten_multi_arg(args.type)
     chipsets = filter_chipsets(
         chipsets,
-        world=[world_str_to_proto(t) for t in args.type] if args.type else None,
+        world=[world_str_to_proto(t) for t in types] if types else None,
         fp16=True if args.fp16 else None,
-        htp_version=args.htp_version,
-        soc_model=args.soc_model,
+        htp_version=_flatten_multi_arg(args.htp_version),
+        soc_model=_flatten_multi_arg(args.soc_model),
     )
 
     if not chipsets:
@@ -543,6 +733,7 @@ def add_list_chipsets_parser(
         "-t",
         "--type",
         nargs="+",
+        action="append",
         default=None,
         help=f"Filter by chipset type(s). Known values: {type_values}.",
     )
@@ -584,6 +775,37 @@ def _run_info(args: argparse.Namespace) -> None:
         metadata_table.add_row(
             ["Tags", ", ".join(tag_proto_to_str(t) for t in info.tags)]
         )
+    # is_quantized / supported_runtimes are manifest fields added in 0.56.0.
+    # Best-effort: skip if the model isn't in the manifest for this version.
+    if args.qaihm_version >= MIN_MODEL_FILTER_VERSION:
+        try:
+            entry = get_manifest_entry(args.model, args.qaihm_version)
+        except KeyError:
+            entry = None
+        if entry is not None:
+            metadata_table.add_row(["Quantized", "Yes" if entry.is_quantized else "No"])
+            if entry.supported_runtimes:
+                metadata_table.add_row(
+                    [
+                        "Supported Runtimes",
+                        ", ".join(
+                            runtime_proto_to_str(r) for r in entry.supported_runtimes
+                        ),
+                    ]
+                )
+            if entry.supported_chipsets:
+                chipset_names = {
+                    c.name: c.marketing_name
+                    for c in get_platform(args.qaihm_version).chipsets
+                }
+                metadata_table.add_row(
+                    [
+                        "Supported Chipsets",
+                        ", ".join(
+                            chipset_names.get(c, c) for c in entry.supported_chipsets
+                        ),
+                    ]
+                )
     if info.license_type:
         license_str = license_proto_to_str(info.license_type)
         if info.HasField("license_url"):

@@ -17,19 +17,20 @@ _sym_db = _symbol_database.Default()
 
 
 from qai_hub_models_cli.proto import info_pb2 as info__pb2
+from qai_hub_models_cli.proto.shared import runtime_pb2 as shared_dot_runtime__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0emanifest.proto\x12\x05qaihm\x1a\ninfo.proto\"Y\n\x11ModelManifestUrls\x12\x0c\n\x04info\x18\x01 \x01(\t\x12\x0c\n\x04perf\x18\x02 \x01(\t\x12\x10\n\x08numerics\x18\x03 \x01(\t\x12\x16\n\x0erelease_assets\x18\x04 \x01(\t\"\x8b\x01\n\x12ManifestModelEntry\x12\n\n\x02id\x18\x01 \x01(\t\x12\x14\n\x0c\x64isplay_name\x18\x02 \x01(\t\x12\"\n\x06\x64omain\x18\x03 \x01(\x0e\x32\x12.qaihm.ModelDomain\x12/\n\rmanifest_urls\x18\x04 \x01(\x0b\x32\x18.qaihm.ModelManifestUrls\"c\n\x0fReleaseManifest\x12\x0f\n\x07version\x18\x01 \x01(\t\x12\x14\n\x0cplatform_url\x18\x02 \x01(\t\x12)\n\x06models\x18\x03 \x03(\x0b\x32\x19.qaihm.ManifestModelEntryb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0emanifest.proto\x12\x05qaihm\x1a\ninfo.proto\x1a\x14shared/runtime.proto\"Y\n\x11ModelManifestUrls\x12\x0c\n\x04info\x18\x01 \x01(\t\x12\x0c\n\x04perf\x18\x02 \x01(\t\x12\x10\n\x08numerics\x18\x03 \x01(\t\x12\x16\n\x0erelease_assets\x18\x04 \x01(\t\"\x88\x02\n\x12ManifestModelEntry\x12\n\n\x02id\x18\x01 \x01(\t\x12\x14\n\x0c\x64isplay_name\x18\x02 \x01(\t\x12\"\n\x06\x64omain\x18\x03 \x01(\x0e\x32\x12.qaihm.ModelDomain\x12/\n\rmanifest_urls\x18\x04 \x01(\x0b\x32\x18.qaihm.ModelManifestUrls\x12\x14\n\x0cis_quantized\x18\x05 \x01(\x08\x12*\n\x12supported_runtimes\x18\x06 \x03(\x0e\x32\x0e.qaihm.Runtime\x12\x1a\n\x12supported_chipsets\x18\x07 \x03(\t\x12\x1d\n\x04tags\x18\x08 \x03(\x0e\x32\x0f.qaihm.ModelTag\"c\n\x0fReleaseManifest\x12\x0f\n\x07version\x18\x01 \x01(\t\x12\x14\n\x0cplatform_url\x18\x02 \x01(\t\x12)\n\x06models\x18\x03 \x03(\x0b\x32\x19.qaihm.ManifestModelEntryb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'manifest_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
   DESCRIPTOR._options = None
-  _globals['_MODELMANIFESTURLS']._serialized_start=37
-  _globals['_MODELMANIFESTURLS']._serialized_end=126
-  _globals['_MANIFESTMODELENTRY']._serialized_start=129
-  _globals['_MANIFESTMODELENTRY']._serialized_end=268
-  _globals['_RELEASEMANIFEST']._serialized_start=270
-  _globals['_RELEASEMANIFEST']._serialized_end=369
+  _globals['_MODELMANIFESTURLS']._serialized_start=59
+  _globals['_MODELMANIFESTURLS']._serialized_end=148
+  _globals['_MANIFESTMODELENTRY']._serialized_start=151
+  _globals['_MANIFESTMODELENTRY']._serialized_end=415
+  _globals['_RELEASEMANIFEST']._serialized_start=417
+  _globals['_RELEASEMANIFEST']._serialized_end=516
 # @@protoc_insertion_point(module_scope)

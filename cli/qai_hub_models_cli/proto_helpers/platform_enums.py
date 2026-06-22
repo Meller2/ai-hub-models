@@ -316,10 +316,58 @@ def use_case_proto_to_str(use_case: int) -> str:
     )
 
 
+_TAG_DISPLAY_NAMES: dict[str, str] = {
+    "BACKBONE": "Backbone",
+    "REAL_TIME": "Real-Time",
+    "FOUNDATION": "Foundation",
+    "LLM": "LLM",
+    "GENERATIVE_AI": "Generative AI",
+    "BU_IOT": "BU IoT",
+    "BU_AUTO": "BU Auto",
+    "BU_COMPUTE": "BU Compute",
+    "MOE": "MoE",
+}
+
+
 def tag_proto_to_str(tag: int) -> str:
     """Convert a ModelTag enum value to a human-readable string."""
     name = ModelTag.Name(tag)  # type: ignore[arg-type]
-    return name.removeprefix("MODEL_TAG_").replace("_", " ").title().replace("Ai", "AI")
+    key = name.removeprefix("MODEL_TAG_")
+    return _TAG_DISPLAY_NAMES.get(key, key.replace("_", " ").title())
+
+
+def tag_str_to_proto(tag: str) -> ModelTag.ValueType:
+    """
+    Convert a tag display string (e.g. ``"llm"``, ``"real time"``) to its proto
+    enum value. Case- and separator-insensitive.
+
+    Parameters
+    ----------
+    tag
+        Tag display name.
+
+    Returns
+    -------
+    ModelTag.ValueType
+        Corresponding ``ModelTag`` enum value.
+
+    Raises
+    ------
+    KeyError
+        If *tag* does not match any known tag.
+    """
+    target = _normalize_label(tag)
+    for t in ModelTag.values():
+        if t != ModelTag.MODEL_TAG_UNSPECIFIED and (
+            _normalize_label(tag_proto_to_str(t)) == target
+        ):
+            return t
+    valid = ", ".join(
+        tag_proto_to_str(t)
+        for t in ModelTag.values()
+        if t != ModelTag.MODEL_TAG_UNSPECIFIED
+    )
+    raise KeyError(f"Unknown tag: {tag!r}. Valid tags: {valid}")
 
 
 _LICENSE_DISPLAY_NAMES: dict[str, str] = {

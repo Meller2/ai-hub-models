@@ -7,6 +7,7 @@ syntax = "proto3";
 package qaihm;
 
 import "info.proto";
+import "shared/runtime.proto";
 
 message ModelManifestUrls {
   string info = 1;
@@ -20,6 +21,22 @@ message ManifestModelEntry {
   string display_name = 2;
   ModelDomain domain = 3;
   ModelManifestUrls manifest_urls = 4;
+
+  // Fields 5-8 (the model-filter fields) were added in AI Hub Models 0.56.0.
+  // They are unset/empty in manifests from earlier releases, so consumers must
+  // only rely on them when the manifest version is >= 0.56.0.
+
+  // Whether the model has any quantized (non-float) released assets.
+  bool is_quantized = 5;
+
+  // Runtimes for which the model has released assets.
+  repeated Runtime supported_runtimes = 6;
+
+  // Chipsets on which the model has been profiled.
+  repeated string supported_chipsets = 7;
+
+  // Tags applied to the model (mirrors ModelInfo.tags).
+  repeated ModelTag tags = 8;
 }
 
 message ReleaseManifest {

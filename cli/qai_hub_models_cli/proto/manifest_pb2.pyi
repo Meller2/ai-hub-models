@@ -17,6 +17,7 @@ import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
 from qai_hub_models_cli.proto import info_pb2
+import shared.runtime_pb2
 import typing
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
@@ -53,11 +54,34 @@ class ManifestModelEntry(google.protobuf.message.Message):
     DISPLAY_NAME_FIELD_NUMBER: builtins.int
     DOMAIN_FIELD_NUMBER: builtins.int
     MANIFEST_URLS_FIELD_NUMBER: builtins.int
+    IS_QUANTIZED_FIELD_NUMBER: builtins.int
+    SUPPORTED_RUNTIMES_FIELD_NUMBER: builtins.int
+    SUPPORTED_CHIPSETS_FIELD_NUMBER: builtins.int
+    TAGS_FIELD_NUMBER: builtins.int
     id: builtins.str
     display_name: builtins.str
     domain: info_pb2.ModelDomain.ValueType
+    is_quantized: builtins.bool
+    """Fields 5-8 (the model-filter fields) were added in AI Hub Models 0.56.0.
+    They are unset/empty in manifests from earlier releases, so consumers must
+    only rely on them when the manifest version is >= 0.56.0.
+
+    Whether the model has any quantized (non-float) released assets.
+    """
     @property
     def manifest_urls(self) -> global___ModelManifestUrls: ...
+    @property
+    def supported_runtimes(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[shared.runtime_pb2.Runtime.ValueType]:
+        """Runtimes for which the model has released assets."""
+
+    @property
+    def supported_chipsets(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Chipsets on which the model has been profiled."""
+
+    @property
+    def tags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[info_pb2.ModelTag.ValueType]:
+        """Tags applied to the model (mirrors ModelInfo.tags)."""
+
     def __init__(
         self,
         *,
@@ -65,9 +89,13 @@ class ManifestModelEntry(google.protobuf.message.Message):
         display_name: builtins.str = ...,
         domain: info_pb2.ModelDomain.ValueType = ...,
         manifest_urls: global___ModelManifestUrls | None = ...,
+        is_quantized: builtins.bool = ...,
+        supported_runtimes: collections.abc.Iterable[shared.runtime_pb2.Runtime.ValueType] | None = ...,
+        supported_chipsets: collections.abc.Iterable[builtins.str] | None = ...,
+        tags: collections.abc.Iterable[info_pb2.ModelTag.ValueType] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["manifest_urls", b"manifest_urls"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["display_name", b"display_name", "domain", b"domain", "id", b"id", "manifest_urls", b"manifest_urls"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["display_name", b"display_name", "domain", b"domain", "id", b"id", "is_quantized", b"is_quantized", "manifest_urls", b"manifest_urls", "supported_chipsets", b"supported_chipsets", "supported_runtimes", b"supported_runtimes", "tags", b"tags"]) -> None: ...
 
 global___ManifestModelEntry = ManifestModelEntry
 

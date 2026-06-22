@@ -4,6 +4,7 @@
 # ---------------------------------------------------------------------
 from __future__ import annotations
 
+import sys
 from concurrent.futures import ThreadPoolExecutor
 
 from qai_hub_models_cli.proto.info_pb2 import ModelInfo
@@ -20,22 +21,35 @@ from qai_hub_models.configs.devices_and_chipsets_yaml import DevicesAndChipsetsY
 from qai_hub_models.configs.info_yaml import QAIHMModelInfo
 from qai_hub_models.configs.numerics_yaml import QAIHMModelNumerics
 from qai_hub_models.configs.perf_yaml import QAIHMModelPerf
-from qai_hub_models.scripts.build_release_proto import _build_release_assets_proto
+from qai_hub_models.configs.release_assets_yaml import QAIHMModelReleaseAssets
+from qai_hub_models.scripts.build_release_proto import (
+    _build_release_assets_proto,
+    _manifest_filter_fields,
+)
 from qai_hub_models.utils.path_helpers import MODEL_IDS, is_internal_repo
 
 
 def get_manifest_proto() -> ReleaseManifest:
     """Build a ReleaseManifest from local model configs (dev installs)."""
+    print(
+        "Building the dev model manifest from local configs; this can take a minute...",
+        file=sys.stderr,
+    )
 
     def _build_entry(model_id: str) -> ManifestModelEntry | None:
         info = QAIHMModelInfo.from_model(model_id)
         info_proto = info.to_proto(__version__)
         if not is_internal_repo() and info.status != MODEL_STATUS.PUBLISHED:
             return None
+        release_assets = QAIHMModelReleaseAssets.from_model(
+            model_id, not_exists_ok=True
+        )
+        perf = QAIHMModelPerf.from_model(model_id, not_exists_ok=True)
         return ManifestModelEntry(
             id=model_id,
             display_name=info.name,
             domain=info_proto.domain,
+            **_manifest_filter_fields(release_assets, perf, info),
         )
 
     with ThreadPoolExecutor(max_workers=8) as pool:
