@@ -9,6 +9,7 @@ import torch
 
 from qai_hub_models import SampleInputsType
 from qai_hub_models.datasets.bsd import BSD300Dataset
+from qai_hub_models.datasets.set14 import Set14Dataset
 from qai_hub_models.evaluators.superres_evaluator import SuperResolutionOutputEvaluator
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 from qai_hub_models.utils.base_dataset import BaseDataset
@@ -121,7 +122,7 @@ class SuperResolutionModel(BaseModel):
 
     @classmethod
     def get_eval_dataset_classes(cls) -> list[type[BaseDataset]]:
-        return [BSD300Dataset]
+        return [Set14Dataset, BSD300Dataset]
 
     def get_calibration_dataset_cls(self) -> type[BaseDataset]:
         return BSD300Dataset

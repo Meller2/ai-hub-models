@@ -19,7 +19,9 @@ form_factors:
 - Tablet
 has_static_banner: true
 has_animated_banner: true
-dataset: []
+dataset:
+- set14
+- bsd300
 technical_details:
   Model checkpoint: quicksrnet_small_3x_checkpoint
   Input resolution: 128x128
@@ -33,8 +35,8 @@ source_repo: https://github.com/quic/aimet-model-zoo/tree/develop/aimet_zoo_torc
 license: https://github.com/quic/aimet-model-zoo/blob/develop/LICENSE.md
 imsdk_supported: true
 numerics_benchmark:
-  dataset_name: bsd300
+  dataset_name: set14
   metric_name: Peak Signal-to-Noise Ratio (PSNR)
-  value: 29.3
+  value: 32.52
   unit: dB
-  source: AI Hub Models Reference Eval
+  source: AIMET Model Zoo

@@ -10,10 +10,11 @@ from typing_extensions import Self
 
 from qai_hub_models.extern.basicsr.archs.rrdbnet_arch import RRDBNet
 from qai_hub_models.models._shared.super_resolution.model import (
-    DEFAULT_SCALE_FACTOR,
     SuperResolutionModel,
 )
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_torch
+
+SCALING_FACTOR = 4
 
 MODEL_ID = __name__.split(".")[-2]
 MODEL_ASSET_VERSION = 4
@@ -38,7 +39,7 @@ class Real_ESRGAN_x4plus(SuperResolutionModel):
     """Exportable RealESRGAN upscaler, end-to-end."""
 
     @classmethod
-    def from_pretrained(cls, scale_factor: int = DEFAULT_SCALE_FACTOR) -> Self:
+    def from_pretrained(cls, scale_factor: int = SCALING_FACTOR) -> Self:
         """Load RealESRGAN from a weightfile created by the source RealESRGAN repository."""
         # Load PyTorch model from disk
         if scale_factor == 4:
@@ -53,6 +54,14 @@ class Real_ESRGAN_x4plus(SuperResolutionModel):
 
     def forward(self, image: torch.Tensor) -> torch.Tensor:
         return super().forward(image).clamp_(0, 1)
+
+    @staticmethod
+    def eval_datasets() -> list[str]:
+        return ["bsd100", "bsd300"]
+
+    @staticmethod
+    def calibration_dataset_name() -> str:
+        return "bsd300"
 
 
 def _get_weightsfile_from_name(

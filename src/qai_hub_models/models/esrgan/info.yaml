@@ -31,8 +31,8 @@ source_repo: https://github.com/xinntao/ESRGAN/
 license: https://github.com/xinntao/ESRGAN/blob/master/LICENSE
 imsdk_supported: true
 numerics_benchmark:
-  dataset_name: bsd300
+  dataset_name: bsd100
   metric_name: Peak Signal-to-Noise Ratio (PSNR)
-  value: 27.1
+  value: 27.85
   unit: dB
-  source: AI Hub Models Reference Eval
+  source: ESRGAN source repo
