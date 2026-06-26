@@ -130,14 +130,7 @@ def _extract_runtime_and_precision_options(
         p: rs for p, rs in supported_precision_runtimes.items() if rs
     }  # drop empty precision entries
 
-    # Default runtime for the export script.
-    default_runtime = (
-        next(iter(test_passing_precision_runtimes.values()))[0]
-        if test_passing_precision_runtimes
-        else TargetRuntime.QNN_CONTEXT_BINARY.name
-    )
-
-    export_options_dict["default_runtime"] = default_runtime
+    export_options_dict["default_runtime"] = export_options.default_runtime.name
     export_options_dict["supported_precision_runtimes"] = supported_precision_runtimes
     export_options_dict["test_enabled_precision_runtimes"] = (
         test_enabled_precision_runtimes

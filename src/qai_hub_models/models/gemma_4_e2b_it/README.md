@@ -10,6 +10,26 @@ This repository contains scripts for optimized on-device export suitable to run 
 
 Qualcomm AI Hub Models uses [Qualcomm AI Hub Workbench](https://workbench.aihub.qualcomm.com) to compile, profile, and evaluate this model. [Sign up](https://myaccount.qualcomm.com/signup) to run these models on a hosted Qualcomm® device.
 
+## Quick Start
+
+Use our lightweight command-line interface to inspect and download Gemma-4-E2B-it:
+
+```bash
+pip install qai_hub_models_cli # (the CLI is also available with the qai-hub-models package)
+
+# Inspect the model and list the available download options
+qai-hub-models info Gemma-4-E2B-it
+
+# Print performance and accuracy metrics
+qai-hub-models perf Gemma-4-E2B-it
+qai-hub-models numerics Gemma-4-E2B-it
+
+# Download a ready-to-deploy asset
+qai-hub-models fetch Gemma-4-E2B-it --runtime qnn_context_binary --precision q4_0
+```
+See the [CLI README](../../../../cli/README.md)
+for the full list of commands and filters.
+
 ## License
 * The license for the original implementation of Gemma-4-E2B-it can be found
   [here](https://ai.google.dev/gemma/apache_2).

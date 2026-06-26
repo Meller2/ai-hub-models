@@ -7,6 +7,26 @@ This repository contains scripts for optimized on-device export suitable to run 
 
 Qualcomm AI Hub Models uses [Qualcomm AI Hub Workbench](https://workbench.aihub.qualcomm.com) to compile, profile, and evaluate this model. [Sign up](https://myaccount.qualcomm.com/signup) to run these models on a hosted Qualcomm® device.
 
+## Quick Start
+
+Use our lightweight command-line interface to inspect and download Stable-Diffusion-v2.1:
+
+```bash
+pip install qai_hub_models_cli # (the CLI is also available with the qai-hub-models package)
+
+# Inspect the model and list the available download options
+qai-hub-models info Stable-Diffusion-v2.1
+
+# Print performance and accuracy metrics
+qai-hub-models perf Stable-Diffusion-v2.1
+qai-hub-models numerics Stable-Diffusion-v2.1
+
+# Download a ready-to-deploy asset
+qai-hub-models fetch Stable-Diffusion-v2.1 --runtime qnn_context_binary --precision w8a16
+```
+See the [CLI README](../../../../cli/README.md)
+for the full list of commands and filters.
+
 ## Deploy to Snapdragon X Elite NPU
 Please follow the [Stable Diffusion Windows App](https://github.com/quic/ai-hub-apps/tree/main/apps/windows/python/StableDiffusion) tutorial to quantize model with custom weights.
 

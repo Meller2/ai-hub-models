@@ -7,6 +7,26 @@ This repository contains scripts for optimized on-device export suitable to run 
 
 Qualcomm AI Hub Models uses [Qualcomm AI Hub Workbench](https://workbench.aihub.qualcomm.com) to compile, profile, and evaluate this model. [Sign up](https://myaccount.qualcomm.com/signup) to run these models on a hosted Qualcomm® device.
 
+## Quick Start
+
+Use our lightweight command-line interface to inspect and download First-Order-Motion-Model:
+
+```bash
+pip install qai_hub_models_cli # (the CLI is also available with the qai-hub-models package)
+
+# Inspect the model and list the available download options
+qai-hub-models info First-Order-Motion-Model
+
+# Print performance and accuracy metrics
+qai-hub-models perf First-Order-Motion-Model
+qai-hub-models numerics First-Order-Motion-Model
+
+# Download a ready-to-deploy asset
+qai-hub-models fetch First-Order-Motion-Model --runtime onnx --precision float
+```
+See the [CLI README](../../../../cli/README.md)
+for the full list of commands and filters.
+
 ## Setup
 ### 1. Install System-Level Dependencies
 #### Linux

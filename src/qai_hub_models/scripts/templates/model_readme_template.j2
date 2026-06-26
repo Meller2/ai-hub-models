@@ -4,7 +4,7 @@
     Generates the README.md for each model in the qai_hub_models repository.
     Includes installation instructions, usage examples, and model documentation.
 #}
-{% from 'shared/readme_macros.j2' import model_intro, license, references, community, usage_and_limitations, example_and_usage %}
+{% from 'shared/readme_macros.j2' import model_intro, license, references, community, usage_and_limitations, example_and_usage, download_assets %}
 {#
     Render the model README.
 
@@ -61,6 +61,10 @@
     readme_export_device : str, optional
         When set, appends ``--device "<value>"`` to the README export command.
         Derived from ``requires_aot_prepare`` in code-gen.yaml.
+    model_assets_shareable : bool, optional
+        Whether pre-exported assets may be shared. When True, a "Download
+        pre-exported assets" section is added near the top. Derived from the
+        negation of ``restrict_model_sharing`` in info.yaml.
 #}
 {% macro render(
     model_name,
@@ -90,7 +94,10 @@
     readme_export_device=None,
     local_device_deployment=False,
     model_status="published",
-    unpublished_model_warning=""
+    unpublished_model_warning="",
+    model_assets_shareable=False,
+    default_runtime=None,
+    default_precision=None
 ) %}
 {% if model_status != "published" %}
 > [!WARNING]
@@ -102,6 +109,8 @@
 {{ model_description }}
 
 {{ model_intro(model_name, source_repo, model_url) }}
+
+{{ download_assets(model_name, model_assets_shareable, default_runtime, default_precision) }}
 {% if additional_readme_section %}
 
 {{ additional_readme_section }}

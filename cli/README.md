@@ -99,8 +99,8 @@ released versions — newest first — for one matching the same filters `fetch`
 accepts, and reports the release(s) that have it:
 
 ```bash
-# Newest release with a tflite/float MobileNet-v2 asset
-qai-hub-models find mobilenet_v2 -r tflite -p float
+# Newest release with tflite MobileNet-v2 assets that were tested with QAIRT 2.45
+qai-hub-models find mobilenet_v2 -r tflite -s qairt=2.45
 
 # Every matching release, not just the newest
 qai-hub-models find mobilenet_v2 -r qnn -c qualcomm-snapdragon-8gen3 --all

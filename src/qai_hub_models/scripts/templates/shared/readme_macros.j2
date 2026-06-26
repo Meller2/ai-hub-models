@@ -131,6 +131,53 @@ Install the GPU package via pip:
 {%- endmacro -%}
 
 
+{#
+    Generate the "Quick Start" section.
+
+    Parameters
+    ----------
+    model_name : str
+        Display name of the model.
+    assets_shareable : bool
+        Whether pre-exported assets are downloadable via the CLI.
+    default_runtime : str
+        CLI runtime name for the sample fetch command (e.g., "tflite").
+    default_precision : str
+        CLI precision name for the sample fetch command (e.g., "float").
+#}
+{%- macro download_assets(model_name, assets_shareable, default_runtime, default_precision) -%}
+## Quick Start
+
+Use our lightweight command-line interface to inspect{{ " and download" if assets_shareable else "" }} {{ model_name }}:
+
+```bash
+pip install qai_hub_models_cli # (the CLI is also available with the qai-hub-models package)
+
+{% if assets_shareable %}
+# Inspect the model and list the available download options
+{% else %}
+# Inspect the model's metadata
+{% endif %}
+qai-hub-models info {{ model_name }}
+
+# Print performance and accuracy metrics
+qai-hub-models perf {{ model_name }}
+qai-hub-models numerics {{ model_name }}
+{% if assets_shareable %}
+
+# Download a ready-to-deploy asset
+qai-hub-models fetch {{ model_name }} --runtime {{ default_runtime }} --precision {{ default_precision }}
+{% else %}
+
+# Pre-exported assets are not available to download for this model due to
+# licensing restrictions. Continue to the next section to export it yourself.
+{% endif %}
+```
+See the [CLI README](../../../../cli/README.md)
+for the full list of commands and filters.
+{%- endmacro -%}
+
+
 {#  Generate AI Hub Workbench configuration instructions.  #}
 {%- macro configure_aihub() -%}
 Sign-in to [Qualcomm® AI Hub Workbench](https://workbench.aihub.qualcomm.com/) with your

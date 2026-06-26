@@ -7,6 +7,26 @@ This repository contains scripts for optimized on-device export suitable to run 
 
 Qualcomm AI Hub Models uses [Qualcomm AI Hub Workbench](https://workbench.aihub.qualcomm.com) to compile, profile, and evaluate this model. [Sign up](https://myaccount.qualcomm.com/signup) to run these models on a hosted Qualcomm® device.
 
+## Quick Start
+
+Use our lightweight command-line interface to inspect and download OpusMT-Es-En:
+
+```bash
+pip install qai_hub_models_cli # (the CLI is also available with the qai-hub-models package)
+
+# Inspect the model and list the available download options
+qai-hub-models info OpusMT-Es-En
+
+# Print performance and accuracy metrics
+qai-hub-models perf OpusMT-Es-En
+qai-hub-models numerics OpusMT-Es-En
+
+# Download a ready-to-deploy asset
+qai-hub-models fetch OpusMT-Es-En --runtime voice_ai --precision float
+```
+See the [CLI README](../../../../cli/README.md)
+for the full list of commands and filters.
+
 ## Deploying OpusMT-Es-En on-device
 
 This model is compatible with the Qualcomm Voice AI SDK. Download the SDK from the [Qualcomm Package Manager](https://qpm.qualcomm.com/#/main/tools/details/VoiceAI_ASR) to deploy this model on-device.

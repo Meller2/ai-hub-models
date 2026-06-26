@@ -11,6 +11,26 @@ This repository contains scripts for optimized on-device export suitable to run 
 
 Qualcomm AI Hub Models uses [Qualcomm AI Hub Workbench](https://workbench.aihub.qualcomm.com) to compile, profile, and evaluate this model. [Sign up](https://myaccount.qualcomm.com/signup) to run these models on a hosted Qualcomm® device.
 
+## Quick Start
+
+Use our lightweight command-line interface to inspect and download GR00TN1.5:
+
+```bash
+pip install qai_hub_models_cli # (the CLI is also available with the qai-hub-models package)
+
+# Inspect the model and list the available download options
+qai-hub-models info GR00TN1.5
+
+# Print performance and accuracy metrics
+qai-hub-models perf GR00TN1.5
+qai-hub-models numerics GR00TN1.5
+
+# Download a ready-to-deploy asset
+qai-hub-models fetch GR00TN1.5 --runtime qnn_context_binary --precision float
+```
+See the [CLI README](../../../../cli/README.md)
+for the full list of commands and filters.
+
 ## Setup
 ### 1. Install the package
 Install the package via pip:

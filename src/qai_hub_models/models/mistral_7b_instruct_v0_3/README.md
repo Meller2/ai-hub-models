@@ -7,6 +7,26 @@ This repository contains scripts for optimized on-device export suitable to run 
 
 Qualcomm AI Hub Models uses [Qualcomm AI Hub Workbench](https://workbench.aihub.qualcomm.com) to compile, profile, and evaluate this model. [Sign up](https://myaccount.qualcomm.com/signup) to run these models on a hosted Qualcomm® device.
 
+## Quick Start
+
+Use our lightweight command-line interface to inspect and download Mistral-7B-Instruct-v0.3:
+
+```bash
+pip install qai_hub_models_cli # (the CLI is also available with the qai-hub-models package)
+
+# Inspect the model and list the available download options
+qai-hub-models info Mistral-7B-Instruct-v0.3
+
+# Print performance and accuracy metrics
+qai-hub-models perf Mistral-7B-Instruct-v0.3
+qai-hub-models numerics Mistral-7B-Instruct-v0.3
+
+# Download a ready-to-deploy asset
+qai-hub-models fetch Mistral-7B-Instruct-v0.3 --runtime qnn_context_binary --precision w4a16
+```
+See the [CLI README](../../../../cli/README.md)
+for the full list of commands and filters.
+
 ## Getting Started
 
 This model is available for purchase. Please [contact us](mailto:ai-hub-support@qti.qualcomm.com) to learn more about licensing options.

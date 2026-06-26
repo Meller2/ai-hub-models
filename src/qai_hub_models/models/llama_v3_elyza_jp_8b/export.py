@@ -285,7 +285,7 @@ def export_model(
     skip_downloading: bool = False,
     skip_summary: bool = False,
     output_dir: str | None = None,
-    target_runtime: TargetRuntime = TargetRuntime.GENIE,
+    target_runtime: TargetRuntime = TargetRuntime.GENIEX_QAIRT,
     compile_options: str = "",
     profile_options: str = "",
     fetch_static_assets: str | None = None,

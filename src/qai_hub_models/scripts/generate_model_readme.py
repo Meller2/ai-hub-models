@@ -99,6 +99,9 @@ def generate_and_write_model_readme(model_id: str) -> Path:
             "unpublished_model_warning": UNPUBLISHED_MODEL_WARNING,
             "model_headline": model_info.headline.strip("."),
             "model_package": model_info.get_package_name(),
+            "model_assets_shareable": not model_info.restrict_model_sharing,
+            "default_runtime": model_code_gen.default_runtime.value,
+            "default_precision": str(model_code_gen.default_precision),
             "supported_precisions": supported_precisions,
             # Package installation
             "has_model_requirements": model_info.has_model_requirements(),

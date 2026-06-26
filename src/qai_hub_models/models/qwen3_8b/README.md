@@ -10,6 +10,26 @@ This repository contains scripts for optimized on-device export suitable to run 
 
 Qualcomm AI Hub Models uses [Qualcomm AI Hub Workbench](https://workbench.aihub.qualcomm.com) to compile, profile, and evaluate this model. [Sign up](https://myaccount.qualcomm.com/signup) to run these models on a hosted Qualcomm® device.
 
+## Quick Start
+
+Use our lightweight command-line interface to inspect and download Qwen3-8B:
+
+```bash
+pip install qai_hub_models_cli # (the CLI is also available with the qai-hub-models package)
+
+# Inspect the model and list the available download options
+qai-hub-models info Qwen3-8B
+
+# Print performance and accuracy metrics
+qai-hub-models perf Qwen3-8B
+qai-hub-models numerics Qwen3-8B
+
+# Download a ready-to-deploy asset
+qai-hub-models fetch Qwen3-8B --runtime genie --precision w4a16
+```
+See the [CLI README](../../../../cli/README.md)
+for the full list of commands and filters.
+
 ## Deploying Qwen3-8B on-device
 
 Please follow the [LLM on-device deployment](https://github.com/qualcomm/ai-hub-apps/tree/main/tutorials/llm_on_genie) tutorial.

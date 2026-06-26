@@ -10,6 +10,26 @@ This repository contains scripts for optimized on-device export suitable to run 
 
 Qualcomm AI Hub Models uses [Qualcomm AI Hub Workbench](https://workbench.aihub.qualcomm.com) to compile, profile, and evaluate this model. [Sign up](https://myaccount.qualcomm.com/signup) to run these models on a hosted Qualcomm® device.
 
+## Quick Start
+
+Use our lightweight command-line interface to inspect and download GPT-OSS-20B:
+
+```bash
+pip install qai_hub_models_cli # (the CLI is also available with the qai-hub-models package)
+
+# Inspect the model and list the available download options
+qai-hub-models info GPT-OSS-20B
+
+# Print performance and accuracy metrics
+qai-hub-models perf GPT-OSS-20B
+qai-hub-models numerics GPT-OSS-20B
+
+# Download a ready-to-deploy asset
+qai-hub-models fetch GPT-OSS-20B --runtime qnn_context_binary --precision mxfp4
+```
+See the [CLI README](../../../../cli/README.md)
+for the full list of commands and filters.
+
 ## License
 * The license for the original implementation of GPT-OSS-20B can be found
   [here](https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md).

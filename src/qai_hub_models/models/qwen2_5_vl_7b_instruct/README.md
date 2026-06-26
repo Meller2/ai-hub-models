@@ -7,6 +7,26 @@ This repository contains scripts for optimized on-device export suitable to run 
 
 Qualcomm AI Hub Models uses [Qualcomm AI Hub Workbench](https://workbench.aihub.qualcomm.com) to compile, profile, and evaluate this model. [Sign up](https://myaccount.qualcomm.com/signup) to run these models on a hosted Qualcomm® device.
 
+## Quick Start
+
+Use our lightweight command-line interface to inspect and download Qwen2.5-VL-7B-Instruct:
+
+```bash
+pip install qai_hub_models_cli # (the CLI is also available with the qai-hub-models package)
+
+# Inspect the model and list the available download options
+qai-hub-models info Qwen2.5-VL-7B-Instruct
+
+# Print performance and accuracy metrics
+qai-hub-models perf Qwen2.5-VL-7B-Instruct
+qai-hub-models numerics Qwen2.5-VL-7B-Instruct
+
+# Download a ready-to-deploy asset
+qai-hub-models fetch Qwen2.5-VL-7B-Instruct --runtime geniex_qairt --precision w4a16
+```
+See the [CLI README](../../../../cli/README.md)
+for the full list of commands and filters.
+
 ## Deploying Qwen2.5-VL-7B-Instruct on-device
 
 To run this model locally, you need:

@@ -6,6 +6,26 @@ This repository contains scripts for optimized on-device export suitable to run 
 
 Qualcomm AI Hub Models uses [Qualcomm AI Hub Workbench](https://workbench.aihub.qualcomm.com) to compile, profile, and evaluate this model. [Sign up](https://myaccount.qualcomm.com/signup) to run these models on a hosted Qualcomm® device.
 
+## Quick Start
+
+Use our lightweight command-line interface to inspect PLaMo-1B:
+
+```bash
+pip install qai_hub_models_cli # (the CLI is also available with the qai-hub-models package)
+
+# Inspect the model's metadata
+qai-hub-models info PLaMo-1B
+
+# Print performance and accuracy metrics
+qai-hub-models perf PLaMo-1B
+qai-hub-models numerics PLaMo-1B
+
+# Pre-exported assets are not available to download for this model due to
+# licensing restrictions. Continue to the next section to export it yourself.
+```
+See the [CLI README](../../../../cli/README.md)
+for the full list of commands and filters.
+
 ## Getting Started
 
 This model is available for purchase. Please [contact us](mailto:ai-hub-support@qti.qualcomm.com) to learn more about licensing options.

@@ -358,6 +358,19 @@ class QAIHMModelCodeGen(BaseQAIHMConfig):
     def default_precision(self) -> Precision:
         return self.supported_precisions[0]
 
+    @property
+    def default_runtime(self) -> TargetRuntime:
+        """Default runtime for export scripts and README sample commands."""
+        passing_paths = self.get_supported_paths_for_testing(only_include_passing=True)
+        if not passing_paths:
+            return TargetRuntime.QNN_CONTEXT_BINARY
+
+        runtimes = next(iter(passing_paths.values()))
+        return next(
+            (rt for rt in runtimes if rt is not TargetRuntime.GENIE),
+            runtimes[0],
+        )
+
     def get_supported_paths_for_testing(
         self, only_include_passing: bool = False
     ) -> dict[Precision, list[TargetRuntime]]:

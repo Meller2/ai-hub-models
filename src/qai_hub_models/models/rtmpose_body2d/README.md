@@ -7,6 +7,26 @@ This repository contains scripts for optimized on-device export suitable to run 
 
 Qualcomm AI Hub Models uses [Qualcomm AI Hub Workbench](https://workbench.aihub.qualcomm.com) to compile, profile, and evaluate this model. [Sign up](https://myaccount.qualcomm.com/signup) to run these models on a hosted Qualcomm® device.
 
+## Quick Start
+
+Use our lightweight command-line interface to inspect and download RTMPose-Body2d:
+
+```bash
+pip install qai_hub_models_cli # (the CLI is also available with the qai-hub-models package)
+
+# Inspect the model and list the available download options
+qai-hub-models info RTMPose-Body2d
+
+# Print performance and accuracy metrics
+qai-hub-models perf RTMPose-Body2d
+qai-hub-models numerics RTMPose-Body2d
+
+# Download a ready-to-deploy asset
+qai-hub-models fetch RTMPose-Body2d --runtime tflite --precision float
+```
+See the [CLI README](../../../../cli/README.md)
+for the full list of commands and filters.
+
 ## Setup
 ### 1. Install the package
 Install the package via pip:
