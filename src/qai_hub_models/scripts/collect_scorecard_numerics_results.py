@@ -7,6 +7,8 @@ from __future__ import annotations
 import argparse
 import datetime
 import os
+import sys
+import traceback
 from pathlib import Path
 
 import pandas as pd
@@ -48,7 +50,10 @@ from qai_hub_models.utils.numerics_yaml import (
 def _merge_existing_accuracy_data(
     new_df: pd.DataFrame, models: set[str]
 ) -> pd.DataFrame:
-    old_df = pd.read_csv(ScorecardArtifact.ACCURACY_CSV.intermediates_path)
+    # Tolerate malformed rows (e.g. unescaped commas from legacy writers).
+    old_df = pd.read_csv(
+        ScorecardArtifact.ACCURACY_CSV.intermediates_path, on_bad_lines="warn"
+    )
     old_df = old_df[~old_df.model_id.isin(models)]
     return pd.concat([old_df, new_df])
 
@@ -93,9 +98,10 @@ def main() -> None:
         print("No accuracy CSV found. Not updating any numerics files.")
         return
 
-    accuracy_df = pd.read_csv(args.accuracy_csv_path)
+    accuracy_df = pd.read_csv(args.accuracy_csv_path, on_bad_lines="warn")
     chipset_registry = get_chipset_registry()
     global_diff = NumericsDiff()
+    failed_model_ids: list[str] = []
     for model_id in sorted(pytorch_models):
         try:
             model_info = QAIHMModelInfo.from_model(model_id)
@@ -148,10 +154,16 @@ def main() -> None:
 
             numerics.to_model_yaml(model_id)
             print(f"{model_id} numerics update complete")
-        except Exception as e:
-            raise ValueError(
-                f"Failed to collect accuracy results for {model_id}"
-            ) from e
+        except Exception:
+            # Skip this model so one bad input doesn't kill the batch; the
+            # aggregate raise below still fails the job after assets land.
+            print(
+                f"Failed to collect accuracy results for {model_id}:\n"
+                f"{traceback.format_exc()}",
+                file=sys.stderr,
+            )
+            failed_model_ids.append(model_id)
+            continue
 
     # Write diff to artifacts folder
     os.makedirs(args.artifacts_dir, exist_ok=True)
@@ -173,6 +185,14 @@ def main() -> None:
             accuracy_df = _merge_existing_accuracy_data(accuracy_df, pytorch_models)
         accuracy_df.to_csv(
             ScorecardArtifact.ACCURACY_CSV.intermediates_path, index=False
+        )
+
+    # Fail loudly only AFTER all assets are on disk for downstream uploads.
+    if failed_model_ids:
+        raise RuntimeError(
+            f"{len(failed_model_ids)} model(s) failed during numerics "
+            f"collection (assets were still written; see stderr above for "
+            f"per-model tracebacks): {', '.join(failed_model_ids)}"
         )
 
 

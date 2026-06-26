@@ -10,6 +10,8 @@ import datetime
 import multiprocessing
 import os
 import shutil
+import sys
+import traceback
 from itertools import cycle
 from pathlib import Path
 
@@ -147,9 +149,12 @@ def process_model(
     sync_code_gen: bool,
     gen_perf_summary: bool,
     write_model_card: bool,
-) -> tuple[ResultsSpreadsheet, QAIHMModelPerf | None, QAIHMModelPerf | None]:
+) -> tuple[ResultsSpreadsheet, QAIHMModelPerf | None, QAIHMModelPerf | None] | None:
     """
-    Process results for a model with an end-to-end pyTorch recipe.
+    Process results for a single model.
+
+    Returns ``None`` on per-model failure (logged to stderr) so one bad model
+    doesn't take down the whole multiprocessing batch.
 
     Parameters
     ----------
@@ -186,14 +191,15 @@ def process_model(
 
     Returns
     -------
-    spreadsheet : ResultsSpreadsheet
-        Model spreadsheet, or empty spreadsheet if not gen_csv.
-    previous_perf : QAIHMModelPerf | None
-        Previous (on disk) perf yaml, or None if not gen_perf_summary.
-        Always None for static models.
-    current_perf : QAIHMModelPerf | None
-        Current (from this scorecard) perf yaml, or None if not gen_perf_summary.
-        Always None for static models.
+    result : tuple[ResultsSpreadsheet, QAIHMModelPerf | None, QAIHMModelPerf | None] | None
+        ``None`` if processing this model raised an exception. Otherwise a
+        3-tuple of:
+
+        * spreadsheet — model spreadsheet, or empty spreadsheet if not gen_csv.
+        * previous_perf — previous (on disk) perf yaml, or None if not
+          gen_perf_summary. Always None for static models.
+        * current_perf — current (from this scorecard) perf yaml, or None if
+          not gen_perf_summary. Always None for static models.
     """
     try:
         if model_id in MODEL_IDS:
@@ -227,8 +233,15 @@ def process_model(
         else:
             spreadsheet = ResultsSpreadsheet()
         return (spreadsheet, None, None)
-    except Exception as e:
-        raise ValueError(f"{model_id} result processing failed.") from e
+    except Exception:
+        # Skip this model so one bad input doesn't kill the multiprocessing
+        # pool; the aggregate raise at the end of __main__ still fails the
+        # job after assets land.
+        print(
+            f"{model_id} result processing failed:\n{traceback.format_exc()}",
+            file=sys.stderr,
+        )
+        return None
 
 
 def _get_pytorch_tags(model_info: QAIHMModelInfo) -> list[str]:
@@ -549,6 +562,9 @@ if __name__ == "__main__":
             ),
         )
         pool.close()
+        # join() ensures worker stderr is fully flushed before we print the
+        # failure summary at the end of __main__.
+        pool.join()
     else:
         # Single model option for that allows breakpoints
         model_summaries = [
@@ -585,11 +601,13 @@ if __name__ == "__main__":
                 branch += f" - {precision.value}"
         spreadsheet.set_branch(branch)
 
-    for model_id, (
-        model_spreadsheet,
-        prev_model_card,
-        curr_model_card,
-    ) in zip(model_list, model_summaries, strict=False):
+    failed_model_ids: list[str] = []
+    for model_id, model_summary in zip(model_list, model_summaries, strict=False):
+        if model_summary is None:
+            failed_model_ids.append(model_id)
+            continue
+        model_spreadsheet, prev_model_card, curr_model_card = model_summary
+
         # Combine model spreadsheet with group spreadsheet
         if spreadsheet is not None:
             spreadsheet.combine(model_spreadsheet)
@@ -671,3 +689,11 @@ if __name__ == "__main__":
             )
         except (shutil.SameFileError, FileNotFoundError):
             pass
+
+    # Fail loudly only AFTER all assets are on disk for downstream uploads.
+    if failed_model_ids:
+        raise RuntimeError(
+            f"{len(failed_model_ids)} model(s) failed during result "
+            f"collection (assets were still written; see stderr above for "
+            f"per-model tracebacks): {', '.join(failed_model_ids)}"
+        )

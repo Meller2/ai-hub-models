@@ -60,9 +60,11 @@ def _convert_runtime_name(runtime: str) -> str:
 
 def prepare_raw_data(scorecard_path: Path, accuracy_path: Path | None) -> pd.DataFrame:
     """Filter data to a single device and join accuracy data into scorecard data."""
-    scorecard_df = pd.read_csv(scorecard_path)
+    # Tolerate malformed rows (e.g. legacy accuracy.csv with unescaped commas)
+    # so we still produce results.csv.
+    scorecard_df = pd.read_csv(scorecard_path, on_bad_lines="warn")
     if accuracy_path is not None:
-        accuracy_df = pd.read_csv(accuracy_path)
+        accuracy_df = pd.read_csv(accuracy_path, on_bad_lines="warn")
     else:
         accuracy_df = pd.DataFrame(columns=get_accuracy_columns())
 

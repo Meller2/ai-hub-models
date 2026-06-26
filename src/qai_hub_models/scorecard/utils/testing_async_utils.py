@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import os
 from collections.abc import Callable, Iterator
 from datetime import datetime
@@ -157,38 +159,54 @@ def write_accuracy(
     metric_metadata: MetricMetadata | None = None,
     num_samples: int | None = None,
 ) -> None:
-    line = f"{model_name},{precision!s},{path.value},"
-    line += f"{torch_accuracy:.3g}," if torch_accuracy is not None else ","
-    line += f"{sim_accuracy:.3g}," if sim_accuracy is not None else ","
-    line += f"{device_accuracy:.3g}," if device_accuracy is not None else ","
-    if len(psnr_values) >= MAX_PSNR_VALUES:
-        line += ",".join(psnr_values[:10])
-    else:
-        # If the psnr list is empty, we only want 9 commas after
-        line += ",".join(psnr_values) + "," * min(MAX_PSNR_VALUES - len(psnr_values), 9)
-    line += f",{get_job_date()},main,{chipset}"
+    # Use csv.writer so fields containing commas (e.g. metric_description)
+    # get quoted; manual comma interpolation broke pandas.read_csv downstream.
+    row: list[str] = [
+        model_name,
+        str(precision),
+        path.value,
+        f"{torch_accuracy:.3g}" if torch_accuracy is not None else "",
+        f"{sim_accuracy:.3g}" if sim_accuracy is not None else "",
+        f"{device_accuracy:.3g}" if device_accuracy is not None else "",
+    ]
 
-    line += ","
-    if dataset_name is not None:
-        line += dataset_name
+    psnr_fields = list(psnr_values[:MAX_PSNR_VALUES])
+    psnr_fields += [""] * (MAX_PSNR_VALUES - len(psnr_fields))
+    row.extend(psnr_fields)
+
+    row.extend([get_job_date(), "main", chipset])
+    row.append(dataset_name if dataset_name is not None else "")
 
     if dataset_metadata is not None:
-        line += f",{dataset_metadata.link},{dataset_metadata.split_description}"
+        row.extend([dataset_metadata.link, dataset_metadata.split_description])
     else:
-        line += ",,"
+        row.extend(["", ""])
 
     if metric_metadata is not None:
-        line += f",{metric_metadata.name},{metric_metadata.unit},{metric_metadata.description},{metric_metadata.range[0]},{metric_metadata.range[1]},{metric_metadata.float_vs_device_threshold}"
+        row.extend(
+            [
+                metric_metadata.name,
+                metric_metadata.unit,
+                metric_metadata.description,
+                str(metric_metadata.range[0]),
+                str(metric_metadata.range[1]),
+                str(metric_metadata.float_vs_device_threshold),
+            ]
+        )
     else:
-        line += ",,,"
+        row.extend(["", "", "", "", "", ""])
 
-    line += ","
-    if num_samples is not None:
-        line += str(num_samples)
+    row.append(str(num_samples) if num_samples is not None else "")
+
+    buf = io.StringIO()
+    csv.writer(buf, lineterminator="").writerow(row)
+    line = buf.getvalue()
 
     accuracy_file = ScorecardArtifact.ACCURACY_CSV.touch()
     if accuracy_file.stat().st_size == 0:
-        append_line_to_file(accuracy_file, ",".join(get_accuracy_columns()))
+        header_buf = io.StringIO()
+        csv.writer(header_buf, lineterminator="").writerow(get_accuracy_columns())
+        append_line_to_file(accuracy_file, header_buf.getvalue())
     append_line_to_file(accuracy_file, line)
 
 

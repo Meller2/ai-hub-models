@@ -127,7 +127,9 @@ jobs:
       PR_REF_NAME: dev/qaihm_bot/update-scorecard-${{ inputs.action_id == '' && github.run_id || inputs.action_id }}
 
     outputs:
-      branch_name: ${{ steps.upload-results.conclusion == 'success' && env.PR_REF_NAME || ''}}
+      # Set unless any model-data step actually failed (skipped is fine) — gates
+      # create_pr so partial-failure runs don't push a PR.
+      branch_name: ${{ steps.upload-results.conclusion == 'success' && steps.create-perf-files.outcome != 'failure' && steps.create-numerics-files.outcome != 'failure' && steps.create-release-assets-files.outcome != 'failure' && env.PR_REF_NAME || ''}}
       performance_diff_url: ${{ steps.upload-perf-diff-summary.conclusion == 'success' && steps.upload-perf-diff-summary.outputs.artifact-url || 'N/A' }}
       numerics_diff_url: ${{ steps.upload-numerics-diff-summary.conclusion == 'success' && steps.upload-numerics-diff-summary.outputs.artifact-url || 'N/A' }}
       results_url: ${{ steps.upload-results.conclusion == 'success' && steps.upload-results.outputs.artifact-url || 'N/A' }}
@@ -319,9 +321,14 @@ jobs:
             --python="${{ steps.ci_setup.outputs.python-path }}" \
             create_release_assets
 
+      # collect_scorecard_results raises after writing assets when individual
+      # models fail collection. Steps that just consume those assets gate on
+      # `!= 'skipped'` so partial runs still produce results.csv; steps that
+      # publish externally (Tableau, PR, codegen, runtime estimates) require
+      # strict success.
       - name: Aggregate Scorecard Results
         id: aggregate-results
-        if: ${{ !cancelled() && steps.create-perf-files.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.create-perf-files.outcome != 'skipped' }}
         run: |
           python3 scripts/build_and_test.py \
           --venv="${{ env.VENV_PATH }}" \
@@ -337,7 +344,7 @@ jobs:
             --output-file ${{ env.QAIHM_TEST_ARTIFACTS_DIR }}/scorecard_failure_analysis.csv
 
       - name: Copy CSV to Tableau
-        if: ${{ !cancelled() && inputs.publish_to_tableau && steps.aggregate-results.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.publish_to_tableau && steps.aggregate-results.outcome == 'success' && steps.create-perf-files.outcome != 'failure' && steps.create-numerics-files.outcome != 'failure' && steps.create-release-assets-files.outcome != 'failure' }}
         run: |
           if [ -z "$QAIHM_TEST_TABLEAU_BRANCH_NAME" ]; then
             echo "tableau_branch_name must be set to upload to Tableau. Exiting."
@@ -354,7 +361,7 @@ jobs:
 
       - name: Refresh Model Runtime Estimates
         id: refresh-runtime-estimates
-        if: ${{ !cancelled() && inputs.create_pr && inputs.tableau_branch_name == 'weekly-prod' && inputs.action_id != '' }}
+        if: ${{ !cancelled() && inputs.create_pr && inputs.tableau_branch_name == 'weekly-prod' && inputs.action_id != '' && steps.create-perf-files.outcome != 'failure' && steps.create-numerics-files.outcome != 'failure' && steps.create-release-assets-files.outcome != 'failure' }}
         env:
           GH_TOKEN: ${{ github.token }}
           ACTION_ID: ${{ inputs.action_id }}
@@ -366,13 +373,13 @@ jobs:
             --repo "$REPO"
 
       - name: Run codegen and precommit
-        if: ${{ !cancelled() && inputs.create_pr && (steps.create-perf-files.outcome == 'success' || steps.create-numerics-files.outcome == 'success' || steps.create-release-assets-files.outcome == 'success') }}
+        if: ${{ !cancelled() && inputs.create_pr && steps.create-perf-files.outcome != 'failure' && steps.create-numerics-files.outcome != 'failure' && steps.create-release-assets-files.outcome != 'failure' }}
         run: |
           source "${{ env.VENV_PATH }}/bin/activate" && python -m qai_hub_models.scripts.run_codegen -a --no-precommit
           SKIP=mypy-src,mypy-cli pre-commit run --all-files || true
 
       - name: Commit & Push Changes
-        if: ${{ !cancelled() && inputs.create_pr && (steps.create-perf-files.outcome == 'success' || steps.create-numerics-files.outcome == 'success' || steps.create-release-assets-files.outcome == 'success') }}
+        if: ${{ !cancelled() && inputs.create_pr && steps.create-perf-files.outcome != 'failure' && steps.create-numerics-files.outcome != 'failure' && steps.create-release-assets-files.outcome != 'failure' }}
         run: |
           # Checkout branch
           git checkout -b ${{ env.PR_REF_NAME }}
@@ -423,29 +430,31 @@ jobs:
           path: ${{ env.QAIHM_TEST_ARTIFACTS_DIR }}/scorecard_failure_analysis.csv
 
       - name: Upload Job Artifact - Performance Diff
-        if: ${{ !cancelled() && steps.create-perf-files.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.create-perf-files.outcome != 'skipped' }}
         id: upload-perf-diff-summary
         uses: actions/upload-artifact@v7
         with:
           name: Scorecard Performance Diff (${{ inputs.action_id || inputs.latest_results_branch }})
           path: ${{ env.QAIHM_TEST_ARTIFACTS_DIR }}/performance-summary-*.txt
+          if-no-files-found: ignore
 
       - name: Upload Job Artifact - Numerics Diff
-        if: ${{ !cancelled() && steps.create-numerics-files.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.create-numerics-files.outcome != 'skipped' }}
         id: upload-numerics-diff-summary
         uses: actions/upload-artifact@v7
         with:
           name: Scorecard Numerics Diff (${{ inputs.action_id || inputs.latest_results_branch }})
           path: ${{ env.QAIHM_TEST_ARTIFACTS_DIR }}/numerics-summary-*.txt
+          if-no-files-found: ignore
 
       - name: Collect Perf Results
-        if: ${{ !cancelled() && steps.create-perf-files.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.create-perf-files.outcome != 'skipped' }}
         run: |
           mkdir -p ${{ env.QAIHM_TEST_ARTIFACTS_DIR }}/perf-yamls
           cp --parents -r src/qai_hub_models/models/**/perf.yaml ${{ env.QAIHM_TEST_ARTIFACTS_DIR }}/perf-yamls
 
       - name: Collect Numerics Results
-        if: ${{ !cancelled() && steps.create-numerics-files.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.create-numerics-files.outcome != 'skipped' }}
         run: |
           mkdir -p ${{ env.QAIHM_TEST_ARTIFACTS_DIR }}/numerics-yamls
           cp --parents -r src/qai_hub_models/models/**/numerics.yaml ${{ env.QAIHM_TEST_ARTIFACTS_DIR }}/numerics-yamls
@@ -579,6 +588,7 @@ jobs:
   notify_slack:
     name: Notify Slack Channel
     needs: [aggregate_scorecard_results, create_pr]
+    # Fires on partial runs too — Slack is visibility, not a publish gate.
     if: ${{ !cancelled() && inputs.notify_slack }}
     runs-on: [tetra-ubuntu-2204, self-hosted]
 
