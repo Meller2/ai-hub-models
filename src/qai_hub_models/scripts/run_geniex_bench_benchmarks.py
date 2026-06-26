@@ -45,7 +45,7 @@ ALL_GENIEX_DEVICES = (
     "cs_8_elite_gen_5_qrd",
 )
 LLAMACPP_DEVICE_ALIASES = ("cpu", "gpu", "npu")
-LLAMACPP_CONTEXT_LENGTHS = [512, 1024, 4096]
+LLAMACPP_CONTEXT_LENGTHS = [512, 4096]
 
 
 def _qairt_precisions(model_id: str) -> list[Precision]:
