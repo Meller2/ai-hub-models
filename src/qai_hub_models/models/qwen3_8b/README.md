@@ -1,6 +1,3 @@
-> [!WARNING]
-> This model is not published. Use with caution; it may not meet performance/accuracy standards and may not support some runtimes or chipsets/devices. We do not provide support for unpublished models. If this model was previously published, use earlier releases.
-
 # [Qwen3-8B: State-of-the-art large language model useful on a variety of language understanding and generation tasks](https://aihub.qualcomm.com/models/qwen3_8b)
 
 The Qwen3-8B is a state-of-the-art multilingual base language model with 8 billion parameters, excelling in language understanding, generation, coding, and mathematics.
@@ -25,7 +22,7 @@ qai-hub-models perf Qwen3-8B
 qai-hub-models numerics Qwen3-8B
 
 # Download a ready-to-deploy asset
-qai-hub-models fetch Qwen3-8B --runtime genie --precision w4a16
+qai-hub-models fetch Qwen3-8B --runtime geniex_qairt --precision w4a16
 ```
 See the [CLI README](../../../../cli/README.md)
 for the full list of commands and filters.
