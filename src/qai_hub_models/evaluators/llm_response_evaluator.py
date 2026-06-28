@@ -200,6 +200,10 @@ class LLMResponseEvaluator(LLMEvaluator):
         set_seed(self.seed)
         self._build_generation_config(generator)
 
+        # Prefer generator device (in case this has been configured different
+        # from self.device)
+        device = getattr(generator, "device", self.device)
+
         num_samples = num_samples or len(data)
         with tqdm(total=num_samples, desc="Generating responses") as pbar:
             for i, sample in enumerate(data):
@@ -207,12 +211,12 @@ class LLMResponseEvaluator(LLMEvaluator):
                 pixel_values = rest[0] if len(rest) > 0 else None
                 image_grid_thw = rest[1] if len(rest) > 1 else None
 
-                input_ids = input_ids.to(self.device)
-                attention_mask = attention_mask.to(self.device)
+                input_ids = input_ids.to(device)
+                attention_mask = attention_mask.to(device)
                 if pixel_values is not None:
-                    pixel_values = pixel_values.to(self.device)
+                    pixel_values = pixel_values.to(device)
                 if image_grid_thw is not None:
-                    image_grid_thw = image_grid_thw.to(self.device)
+                    image_grid_thw = image_grid_thw.to(device)
 
                 if pixel_values is not None:
                     with torch.no_grad():
