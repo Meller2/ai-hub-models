@@ -101,6 +101,15 @@ precisions:
                   min: 145.3414
                   max: 4650.9248
                 desired_compute_unit: npu
+            geniex_qairt:
+              llm_metrics:
+              - context_length: 4096
+                tokens_per_second: 13.51046
+                time_to_first_token_range_milliseconds:
+                  min: 313.3824
+                  max: 10028.2368
+                prefill_tokens_per_second: 408.446677
+                desired_compute_unit: npu
           Dragonwing Q-8750:
             genie:
               llm_metrics:
