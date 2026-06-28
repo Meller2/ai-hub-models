@@ -70,7 +70,7 @@ from qai_hub_models.utils.base_collection_model import (
     CollectionModel,
     WorkbenchModelCollection,
 )
-from qai_hub_models.utils.base_model import BaseModel
+from qai_hub_models.utils.base_model import WorkbenchModel
 from qai_hub_models.utils.base_multi_graph_collection_model import (
     MultiGraphCollectionModel,
     MultiGraphWorkbenchModelCollection,
@@ -147,7 +147,10 @@ JobFunc = Callable[..., hub.Job | dict[str, hub.Job]]
 
 
 QAIHMModelT: TypeAlias = (
-    BaseModel | CollectionModel | MultiGraphWorkbenchModel | MultiGraphCollectionModel
+    WorkbenchModel
+    | CollectionModel
+    | MultiGraphWorkbenchModel
+    | MultiGraphCollectionModel
 )
 
 
@@ -1365,7 +1368,7 @@ def export_test_e2e(
                 mock.MagicMock(return_value=None),
             )
         )
-    elif issubclass(model_cls, BaseModel):
+    elif issubclass(model_cls, WorkbenchModel):
         mocks.append(
             mock.patch.object(
                 model_cls,
@@ -1506,12 +1509,7 @@ def export_test_e2e(
 
 
 def on_device_inference_for_accuracy_validation(
-    model: type[
-        BaseModel
-        | CollectionModel
-        | MultiGraphWorkbenchModel
-        | MultiGraphCollectionModel
-    ],
+    model: type[QAIHMModelT],
     dataset_cls: type[BaseDataset],
     model_id: str,
     precision: Precision,
@@ -1611,7 +1609,7 @@ def torch_inference_for_accuracy_validation(
         Model ID.
 
     """
-    assert isinstance(model, BaseModel), (
+    assert isinstance(model, WorkbenchModel), (
         "This function is not yet supported for CollectionModel."
     )
     # Get the first dim of the first input. This is always the batch size.
@@ -1866,7 +1864,7 @@ def accuracy_on_sample_inputs_via_export(
 def _get_dataset_cache_patch(
     dataset_cls: type[BaseDataset],
     scorecard_path: ScorecardProfilePath,
-    model_cls: type[BaseModel | CollectionModel],
+    model_cls: type[WorkbenchModel | CollectionModel],
 ) -> mock._patch:
     dataset_dir = get_and_sync_datasets_cache_dir(
         scorecard_path.runtime.channel_last_native_execution,
@@ -1904,7 +1902,7 @@ def get_num_eval_samples(dataset_cls: type[BaseDataset]) -> int:
 
 def accuracy_on_dataset_via_evaluate_and_export(
     export_model: ExportFunc,
-    model: BaseModel,
+    model: WorkbenchModel,
     dataset_cls: type[BaseDataset],
     torch_val_outputs: list[np.ndarray],
     torch_evaluate_mock_outputs: list[torch.Tensor | tuple[torch.Tensor, ...]],
@@ -2023,7 +2021,7 @@ def accuracy_on_dataset_via_evaluate_and_export(
         ),
     )
     torch_call_patch = mock.patch(
-        "qai_hub_models.utils.evaluate.BaseModel.__call__",
+        "qai_hub_models.utils.evaluate.WorkbenchModel.__call__",
         side_effect=torch_evaluate_mock_outputs,
     )
     compare_torch_inference_patch = mock.patch(
@@ -2120,7 +2118,7 @@ def accuracy_on_dataset_via_evaluate_and_export(
 
 
 def torch_accuracy_on_dataset(
-    model: BaseModel,
+    model: WorkbenchModel,
     dataset_cls: type[BaseDataset],
     torch_evaluate_mock_outputs: list[torch.Tensor | tuple[torch.Tensor, ...]],
     model_id: str,
@@ -2175,7 +2173,7 @@ def torch_accuracy_on_dataset(
 
 
 def sim_accuracy_on_dataset(
-    model: BaseModel,
+    model: WorkbenchModel,
     dataset_cls: type[BaseDataset],
     model_id: str,
     precision: Precision,
