@@ -1,6 +1,6 @@
 name: MiniLM-v2
 id: minilm_v2
-status: pending
+status: published
 headline: Lightweight sentence embedding model for semantic similarity and search.
 domain: Multimodal
 description: All-MiniLM-L6-v2 maps sentences to a 384-dimensional dense vector space.
@@ -21,8 +21,8 @@ form_factors:
 - Phone
 - Tablet
 - IoT
-has_static_banner: false
-has_animated_banner: false
+has_static_banner: true
+has_animated_banner: true
 dataset:
 - 1B+ training pairs from multiple sources
 technical_details:

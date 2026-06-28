@@ -1,6 +1,3 @@
-> [!WARNING]
-> This model is not published. Use with caution; it may not meet performance/accuracy standards and may not support some runtimes or chipsets/devices. We do not provide support for unpublished models. If this model was previously published, use earlier releases.
-
 # [YOLO26-Pose: Real-time pose estimation optimized for mobile and edge by Ultralytics](https://aihub.qualcomm.com/models/yolo26_pose)
 
 Ultralytics YOLO26-Pose is a machine learning model that predicts human body keypoints and bounding boxes in an image.

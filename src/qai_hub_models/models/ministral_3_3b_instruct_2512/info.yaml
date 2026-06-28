@@ -26,7 +26,7 @@ form_factors:
 - Phone
 - Tablet
 has_static_banner: true
-has_animated_banner: false
+has_animated_banner: true
 license_type: apache-2.0
 dataset: []
 restrict_model_sharing: false

@@ -1,6 +1,6 @@
 name: YOLO26-Pose
 id: yolo26_pose
-status: pending
+status: published
 headline: Real-time pose estimation optimized for mobile and edge by Ultralytics.
 domain: Computer Vision
 description: Ultralytics YOLO26-Pose is a machine learning model that predicts human body keypoints and bounding boxes in an image.
@@ -22,7 +22,7 @@ form_factors:
 - Tablet
 - IoT
 - XR
-has_static_banner: false
+has_static_banner: true
 has_animated_banner: false
 dataset: []
 technical_details:

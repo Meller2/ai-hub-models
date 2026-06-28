@@ -210,6 +210,7 @@ and many more.
 | | |
 | **Super Resolution**
 | [ESRGAN](https://aihub.qualcomm.com/models/esrgan) | `qai_hub_models.models.esrgan` |
+| [NAFSSR](https://aihub.qualcomm.com/models/nafssr) | `qai_hub_models.models.nafssr` |
 | [QuickSRNetLarge](https://aihub.qualcomm.com/models/quicksrnetlarge) | `qai_hub_models.models.quicksrnetlarge` |
 | [QuickSRNetMedium](https://aihub.qualcomm.com/models/quicksrnetmedium) | `qai_hub_models.models.quicksrnetmedium` |
 | [QuickSRNetSmall](https://aihub.qualcomm.com/models/quicksrnetsmall) | `qai_hub_models.models.quicksrnetsmall` |
@@ -304,6 +305,7 @@ and many more.
 | [Posenet-Mobilenet](https://aihub.qualcomm.com/models/posenet_mobilenet) | `qai_hub_models.models.posenet_mobilenet` |
 | [RTMPose-Body2d](https://aihub.qualcomm.com/models/rtmpose_body2d) | `qai_hub_models.models.rtmpose_body2d` |
 | [SixDRepNet](https://aihub.qualcomm.com/models/sixd_repnet) | `qai_hub_models.models.sixd_repnet` |
+| [YOLO26-Pose](https://aihub.qualcomm.com/models/yolo26_pose) | `qai_hub_models.models.yolo26_pose` |
 | [YOLOv11-Pose](https://aihub.qualcomm.com/models/yolov11_pose) | `qai_hub_models.models.yolov11_pose` |
 | | |
 | **Gaze Estimation**
@@ -336,6 +338,7 @@ and many more.
 | -- | -- |
 | | |
 | [EasyOCR](https://aihub.qualcomm.com/models/easyocr) | `qai_hub_models.models.easyocr` |
+| [MiniLM-v2](https://aihub.qualcomm.com/models/minilm_v2) | `qai_hub_models.models.minilm_v2` |
 | [Nomic-Embed-Text](https://aihub.qualcomm.com/models/nomic_embed_text) | `qai_hub_models.models.nomic_embed_text` |
 | [OpenAI-Clip](https://aihub.qualcomm.com/models/openai_clip) | `qai_hub_models.models.openai_clip` |
 | [OpusMT-En-Es](https://aihub.qualcomm.com/models/opus_mt_en_es) | `qai_hub_models.models.opus_mt_en_es` |

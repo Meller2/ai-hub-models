@@ -1,6 +1,3 @@
-> [!WARNING]
-> This model is not published. Use with caution; it may not meet performance/accuracy standards and may not support some runtimes or chipsets/devices. We do not provide support for unpublished models. If this model was previously published, use earlier releases.
-
 # [MiniLM-v2: Lightweight sentence embedding model for semantic similarity and search](https://aihub.qualcomm.com/models/minilm_v2)
 
 All-MiniLM-L6-v2 maps sentences to a 384-dimensional dense vector space. Trained on 1B+ sentence pairs, it excels at semantic search, clustering, and sentence similarity tasks while being small enough to run on mobile devices.

@@ -210,6 +210,7 @@ and many more.
 | | |
 | **Super Resolution**
 | [ESRGAN](https://aihub.qualcomm.com/models/esrgan) | [qai_hub_models.models.esrgan](src/qai_hub_models/models/esrgan/README.md) |
+| [NAFSSR](https://aihub.qualcomm.com/models/nafssr) | [qai_hub_models.models.nafssr](src/qai_hub_models/models/nafssr/README.md) |
 | [QuickSRNetLarge](https://aihub.qualcomm.com/models/quicksrnetlarge) | [qai_hub_models.models.quicksrnetlarge](src/qai_hub_models/models/quicksrnetlarge/README.md) |
 | [QuickSRNetMedium](https://aihub.qualcomm.com/models/quicksrnetmedium) | [qai_hub_models.models.quicksrnetmedium](src/qai_hub_models/models/quicksrnetmedium/README.md) |
 | [QuickSRNetSmall](https://aihub.qualcomm.com/models/quicksrnetsmall) | [qai_hub_models.models.quicksrnetsmall](src/qai_hub_models/models/quicksrnetsmall/README.md) |
@@ -304,6 +305,7 @@ and many more.
 | [Posenet-Mobilenet](https://aihub.qualcomm.com/models/posenet_mobilenet) | [qai_hub_models.models.posenet_mobilenet](src/qai_hub_models/models/posenet_mobilenet/README.md) |
 | [RTMPose-Body2d](https://aihub.qualcomm.com/models/rtmpose_body2d) | [qai_hub_models.models.rtmpose_body2d](src/qai_hub_models/models/rtmpose_body2d/README.md) |
 | [SixDRepNet](https://aihub.qualcomm.com/models/sixd_repnet) | [qai_hub_models.models.sixd_repnet](src/qai_hub_models/models/sixd_repnet/README.md) |
+| [YOLO26-Pose](https://aihub.qualcomm.com/models/yolo26_pose) | [qai_hub_models.models.yolo26_pose](src/qai_hub_models/models/yolo26_pose/README.md) |
 | [YOLOv11-Pose](https://aihub.qualcomm.com/models/yolov11_pose) | [qai_hub_models.models.yolov11_pose](src/qai_hub_models/models/yolov11_pose/README.md) |
 | | |
 | **Gaze Estimation**
@@ -336,6 +338,7 @@ and many more.
 | -- | -- |
 | | |
 | [EasyOCR](https://aihub.qualcomm.com/models/easyocr) | [qai_hub_models.models.easyocr](src/qai_hub_models/models/easyocr/README.md) |
+| [MiniLM-v2](https://aihub.qualcomm.com/models/minilm_v2) | [qai_hub_models.models.minilm_v2](src/qai_hub_models/models/minilm_v2/README.md) |
 | [Nomic-Embed-Text](https://aihub.qualcomm.com/models/nomic_embed_text) | [qai_hub_models.models.nomic_embed_text](src/qai_hub_models/models/nomic_embed_text/README.md) |
 | [OpenAI-Clip](https://aihub.qualcomm.com/models/openai_clip) | [qai_hub_models.models.openai_clip](src/qai_hub_models/models/openai_clip/README.md) |
 | [OpusMT-En-Es](https://aihub.qualcomm.com/models/opus_mt_en_es) | [qai_hub_models.models.opus_mt_en_es](src/qai_hub_models/models/opus_mt_en_es/README.md) |

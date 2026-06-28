@@ -18,7 +18,7 @@ form_factors:
 - Tablet
 - IoT
 has_static_banner: true
-has_animated_banner: true
+has_animated_banner: false
 dataset:
 - coco
 technical_details:
