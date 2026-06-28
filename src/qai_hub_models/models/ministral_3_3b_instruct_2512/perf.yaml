@@ -1,0 +1,101 @@
+supported_devices:
+- Snapdragon X2 Elite CRD
+- Snapdragon 8 Elite QRD
+supported_chipsets:
+- qualcomm-snapdragon-x2-elite
+- qualcomm-snapdragon-8-elite
+precisions:
+  q4_0:
+    components:
+      Ministral-3-3B-Instruct-2512:
+        performance_metrics:
+          Snapdragon X2 Elite CRD:
+            geniex_llamacpp:
+              llm_metrics:
+              - context_length: 4096
+                tokens_per_second: 25.252779
+                time_to_first_token_range_milliseconds:
+                  min: 1270.59640625
+                  max: 40659.085
+                prefill_tokens_per_second: 100.741369
+                desired_compute_unit: cpu
+              - context_length: 512
+                tokens_per_second: 39.522372
+                time_to_first_token_range_milliseconds:
+                  min: 510.52025
+                  max: 2042.081
+                prefill_tokens_per_second: 250.753362
+                desired_compute_unit: cpu
+              - context_length: 4096
+                tokens_per_second: 25.43421
+                time_to_first_token_range_milliseconds:
+                  min: 1114.75046875
+                  max: 35672.015
+                prefill_tokens_per_second: 114.824602
+                desired_compute_unit: gpu
+              - context_length: 512
+                tokens_per_second: 33.041186
+                time_to_first_token_range_milliseconds:
+                  min: 557.9775
+                  max: 2231.91
+                prefill_tokens_per_second: 229.444855
+                desired_compute_unit: gpu
+              - context_length: 4096
+                tokens_per_second: 18.565389
+                time_to_first_token_range_milliseconds:
+                  min: 182.76975
+                  max: 5848.632
+                prefill_tokens_per_second: 700.405007
+                desired_compute_unit: npu
+              - context_length: 512
+                tokens_per_second: 26.247193
+                time_to_first_token_range_milliseconds:
+                  min: 130.388
+                  max: 521.552
+                prefill_tokens_per_second: 982.725528
+                desired_compute_unit: npu
+          Snapdragon 8 Elite QRD:
+            geniex_llamacpp:
+              llm_metrics:
+              - context_length: 4096
+                tokens_per_second: 12.565397
+                time_to_first_token_range_milliseconds:
+                  min: 2139.108875
+                  max: 68451.484
+                prefill_tokens_per_second: 59.83821
+                desired_compute_unit: cpu
+              - context_length: 512
+                tokens_per_second: 26.784283
+                time_to_first_token_range_milliseconds:
+                  min: 932.7475
+                  max: 3730.99
+                prefill_tokens_per_second: 137.234584
+                desired_compute_unit: cpu
+              - context_length: 4096
+                tokens_per_second: 10.796779
+                time_to_first_token_range_milliseconds:
+                  min: 2567.3956875
+                  max: 82156.662
+                prefill_tokens_per_second: 49.856149
+                desired_compute_unit: gpu
+              - context_length: 512
+                tokens_per_second: 25.897794
+                time_to_first_token_range_milliseconds:
+                  min: 970.31275
+                  max: 3881.251
+                prefill_tokens_per_second: 131.92364
+                desired_compute_unit: gpu
+              - context_length: 4096
+                tokens_per_second: 14.63085
+                time_to_first_token_range_milliseconds:
+                  min: 360.86071875
+                  max: 11547.543
+                prefill_tokens_per_second: 354.73182
+                desired_compute_unit: npu
+              - context_length: 512
+                tokens_per_second: 21.999012
+                time_to_first_token_range_milliseconds:
+                  min: 190.215
+                  max: 760.86
+                prefill_tokens_per_second: 673.149234
+                desired_compute_unit: npu
