@@ -104,7 +104,7 @@ jobs:
       perf_updates_url: ${{ steps.upload-perf-updates.outputs.artifact-url }}
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
 
