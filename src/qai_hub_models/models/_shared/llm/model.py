@@ -1639,10 +1639,11 @@ class DynamicSplitCollectionBase(MultiGraphWorkbenchModelCollection):
         else:
             llm_config = AutoConfig.from_pretrained(str(output_path))
 
-        # Derive context_length from the first part
+        # Derive context_lengths from the first part
         first_part = next(iter(self.components.values()))
         assert isinstance(first_part, self.part_base_cls)
-        context_length: int = first_part._presplit.context_length
+        context_lengths: list[int] = first_part._context_lengths
+        context_length: int = max(context_lengths)
 
         # Build genie_config.json
         model_list = list(metadata.model_files.keys())
@@ -1675,7 +1676,7 @@ class DynamicSplitCollectionBase(MultiGraphWorkbenchModelCollection):
             chat_template=GenieChatTemplate(**chat_spec)
             if chat_spec
             else GenieChatTemplate(),
-            context_lengths=[context_length],
+            context_lengths=context_lengths,
             supports_streaming=True,
             supports_vision=False,
             supports_thinking=self.supports_thinking,
