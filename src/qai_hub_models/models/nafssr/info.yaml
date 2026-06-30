@@ -10,7 +10,9 @@ applicable_scenarios:
 - Virtual Real Estate Tours
 - Gaming
 - ARVR
-related_models: [nafnet_denoise, nafnet_deblur]
+related_models:
+- nafnet_denoise
+- nafnet_deblur
 form_factors:
 - Phone
 - Tablet

@@ -7,13 +7,13 @@ supported_precisions:
 - float
 - w8a16
 disabled_paths:
-  float:
-    qnn_dlc:
-      scorecard_failure: 'Failing jobs: j576m1drg'
-    tflite:
-      scorecard_failure: 'Profiling jobs slower than 4000ms: jpxmq8y9g'
   w8a16:
     qnn_dlc:
       scorecard_failure: 'Profiling jobs slower than 4000ms: j56vx9yvp'
     onnx:
       scorecard_failure: 'Profiling jobs slower than 4000ms: jgomx7k45'
+  float:
+    qnn_dlc:
+      scorecard_failure: 'Failing jobs: j576m1drg'
+    tflite:
+      scorecard_failure: 'Profiling jobs slower than 4000ms: jpxmq8y9g'

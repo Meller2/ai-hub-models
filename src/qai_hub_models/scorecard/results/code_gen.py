@@ -113,6 +113,8 @@ def update_code_gen_failure_reasons(
         assert isinstance(params.path, ScorecardProfilePath)
         if params.device != default_device:
             continue
+        if not params.path.is_published:
+            continue
 
         disable_reasons = code_gen_config.disabled_paths.get_disable_reasons(
             params.precision, params.path.runtime

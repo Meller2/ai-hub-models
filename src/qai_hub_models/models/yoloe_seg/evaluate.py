@@ -35,6 +35,9 @@ def main() -> None:
         ],
         Precision.w8a8: [
             TargetRuntime.TFLITE,
+            TargetRuntime.QNN_DLC,
+            TargetRuntime.QNN_CONTEXT_BINARY,
+            TargetRuntime.PRECOMPILED_QNN_ONNX,
         ],
     }
 

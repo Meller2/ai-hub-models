@@ -25,7 +25,7 @@ qai-hub-models perf DeepSpeech2
 qai-hub-models numerics DeepSpeech2
 
 # Download a ready-to-deploy asset
-qai-hub-models fetch DeepSpeech2 --runtime tflite --precision float
+qai-hub-models fetch DeepSpeech2 --runtime qnn_context_binary --precision float
 ```
 See the [CLI README](../../../../cli/README.md)
 for the full list of commands and filters.

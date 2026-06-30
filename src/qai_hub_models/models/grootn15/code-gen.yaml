@@ -3,11 +3,15 @@ external_repos:
     repo_url: https://github.com/NVIDIA/Isaac-GR00T
     commit_sha: 4af2b622892f7dcb5aae5a3fb70bcb02dc217b96
     patches_filename: gr00t_patches.diff
-supported_precisions:
-- float
+disabled_paths:
+  float:
+    precompiled_qnn_onnx:
+      scorecard_failure: Some expected profile jobs were missing.
+    qnn_context_binary:
+      scorecard_failure: Some expected profile jobs were missing.
 default_device: Dragonwing IQ-9075 EVK
 is_collection_model: true
 requires_aot_prepare: true
-global_requirements_incompatible: true
 skip_evaluate: true
+global_requirements_incompatible: true
 test_split: pi05

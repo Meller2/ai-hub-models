@@ -1,11 +1,9 @@
 name: Segment-Anything-Model-3
 id: sam3
-status: pending
+status: published
 headline: Open-vocabulary segmentation with text and visual prompts for any concept.
 domain: Computer Vision
-description: SAM3 (Segment Anything with Concepts) extends SAM2 with open-vocabulary
-  segmentation, producing bounding boxes and masks for objects matching a natural-language
-  prompt.
+description: SAM3 (Segment Anything with Concepts) extends SAM2 with open-vocabulary segmentation, producing bounding boxes and masks for objects matching a natural-language prompt.
 use_case: Semantic Segmentation
 tags:
 - foundation

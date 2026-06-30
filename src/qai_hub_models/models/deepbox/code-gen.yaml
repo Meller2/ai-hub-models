@@ -6,5 +6,4 @@ external_repos:
 supported_precisions:
 - float
 - w8a16
-disabled_paths: {}
 is_collection_model: true

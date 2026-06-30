@@ -244,6 +244,7 @@ and many more.
 | [SalsaNext](https://aihub.qualcomm.com/models/salsanext) | [qai_hub_models.models.salsanext](src/qai_hub_models/models/salsanext/README.md) |
 | [Segformer-Base](https://aihub.qualcomm.com/models/segformer_base) | [qai_hub_models.models.segformer_base](src/qai_hub_models/models/segformer_base/README.md) |
 | [Segment-Anything-Model-2](https://aihub.qualcomm.com/models/sam2) | [qai_hub_models.models.sam2](src/qai_hub_models/models/sam2/README.md) |
+| [Segment-Anything-Model-3](https://aihub.qualcomm.com/models/sam3) | [qai_hub_models.models.sam3](src/qai_hub_models/models/sam3/README.md) |
 | [Unet-Segmentation](https://aihub.qualcomm.com/models/unet_segmentation) | [qai_hub_models.models.unet_segmentation](src/qai_hub_models/models/unet_segmentation/README.md) |
 | [YOLO26-Segmentation](https://aihub.qualcomm.com/models/yolo26_seg) | [qai_hub_models.models.yolo26_seg](src/qai_hub_models/models/yolo26_seg/README.md) |
 | [YOLOE-Segmentation](https://aihub.qualcomm.com/models/yoloe_seg) | [qai_hub_models.models.yoloe_seg](src/qai_hub_models/models/yoloe_seg/README.md) |

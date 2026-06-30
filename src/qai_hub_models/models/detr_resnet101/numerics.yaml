@@ -21,5 +21,7 @@ metrics:
         onnx:
           partial_metric: 41.8
       w8a16_mixed_int16:
+        qnn_dlc:
+          partial_metric: 41.5
         onnx:
           partial_metric: 40.7

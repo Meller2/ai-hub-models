@@ -16,6 +16,8 @@ metrics:
       w8a8:
         tflite:
           partial_metric: 32.8
+        qnn_dlc:
+          partial_metric: 30.7
       float:
         tflite:
           partial_metric: 33.2

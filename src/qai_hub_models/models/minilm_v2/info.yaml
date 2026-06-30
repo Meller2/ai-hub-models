@@ -3,9 +3,7 @@ id: minilm_v2
 status: published
 headline: Lightweight sentence embedding model for semantic similarity and search.
 domain: Multimodal
-description: All-MiniLM-L6-v2 maps sentences to a 384-dimensional dense vector space.
-  Trained on 1B+ sentence pairs, it excels at semantic search, clustering, and
-  sentence similarity tasks while being small enough to run on mobile devices.
+description: All-MiniLM-L6-v2 maps sentences to a 384-dimensional dense vector space. Trained on 1B+ sentence pairs, it excels at semantic search, clustering, and sentence similarity tasks while being small enough to run on mobile devices.
 use_case: Text Generation
 tags:
 - foundation

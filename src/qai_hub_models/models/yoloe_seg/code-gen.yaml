@@ -10,8 +10,6 @@ disabled_paths:
     onnx:
       scorecard_failure: 'Failing jobs: jgd0j80zp'
   w8a8:
-    qnn_dlc:
-      scorecard_failure: 'Failing jobs: j5qwjzzo5'
     onnx:
       scorecard_failure: 'Failing jobs: jgomjo4k5'
 outputs_to_skip_validation:

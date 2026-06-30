@@ -1,6 +1,3 @@
-> [!WARNING]
-> This model is not published. Use with caution; it may not meet performance/accuracy standards and may not support some runtimes or chipsets/devices. We do not provide support for unpublished models. If this model was previously published, use earlier releases.
-
 # [Segment-Anything-Model-3: Open-vocabulary segmentation with text and visual prompts for any concept](https://aihub.qualcomm.com/models/sam3)
 
 SAM3 (Segment Anything with Concepts) extends SAM2 with open-vocabulary segmentation, producing bounding boxes and masks for objects matching a natural-language prompt.

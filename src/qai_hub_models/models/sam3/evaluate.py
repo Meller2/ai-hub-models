@@ -15,7 +15,6 @@ from qai_hub_models import Precision, TargetRuntime
 from qai_hub_models.models.sam3 import MODEL_ID, App, Model
 from qai_hub_models.models.sam3.export import export_model
 from qai_hub_models.utils.args import evaluate_parser, get_model_kwargs
-from qai_hub_models.utils.asset_loaders import UNPUBLISHED_MODEL_WARNING, query_yes_no
 from qai_hub_models.utils.base_app import CollectionAppEvaluateProtocol
 from qai_hub_models.utils.evaluate import evaluate_on_dataset
 from qai_hub_models.utils.inference import AsyncOnDeviceModel, compile_model_from_args
@@ -24,9 +23,6 @@ from qai_hub_models.utils.input_spec import InputSpec
 
 def main() -> None:
     warnings.filterwarnings("ignore")
-    print("WARNING:", UNPUBLISHED_MODEL_WARNING)
-    if not query_yes_no("Continue?"):
-        return
     eval_dataset_classes = Model.get_eval_dataset_classes()
     supported_precision_runtimes: dict[Precision, list[TargetRuntime]] = {
         Precision.float: [
