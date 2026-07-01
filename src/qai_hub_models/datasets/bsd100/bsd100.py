@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from qai_hub_models.datasets.bsd300 import BSD300Dataset
+from qai_hub_models.datasets.bsd import BSD300Dataset
 from qai_hub_models.datasets.common import DatasetMetadata, DatasetSplit
 from qai_hub_models.utils.input_spec import InputSpec
 
