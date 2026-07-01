@@ -8,6 +8,7 @@ description: Ministral is a compact language model from Mistral AI designed for 
 use_case: Text Generation
 tags:
 - llm
+- vlm
 - generative-ai
 research_paper: https://arxiv.org/abs/2601.08584
 research_paper_title: 'Ministral 3'

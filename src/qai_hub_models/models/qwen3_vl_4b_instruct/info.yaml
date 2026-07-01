@@ -8,6 +8,7 @@ description: Qwen3-VL is a vision-language model from Alibaba Cloud capable of u
 use_case: Text Generation
 tags:
 - llm
+- vlm
 - generative-ai
 research_paper: https://arxiv.org/abs/2505.09388
 research_paper_title: "Qwen3 Technical Report"

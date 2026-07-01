@@ -8,6 +8,7 @@ description: Gemma is a family of open models built by Google DeepMind. Gemma 4 
 use_case: Text Generation
 tags:
 - llm
+- vlm
 - generative-ai
 research_paper: https://blog.google/innovation-and-ai/technology/developers-tools/gemma-4/
 research_paper_title: 'Gemma 4'

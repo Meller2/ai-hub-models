@@ -7,6 +7,7 @@ description: Qwen2.5-VL-7B-Instruct is a multimodal vision-language model with 7
 use_case: Text Generation
 tags:
 - llm
+- vlm
 - generative-ai
 applicable_scenarios:
 - Dialogue

@@ -196,6 +196,7 @@ class MODEL_TAG(Enum):
     BU_AUTO = "bu-auto"
     BU_COMPUTE = "bu-compute"
     MOE = "moe"
+    VLM = "vlm"
 
 
 @unique

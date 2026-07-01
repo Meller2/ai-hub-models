@@ -44,6 +44,28 @@ def _fake_manifest() -> ReleaseManifest:
                 supported_chipsets=["qualcomm-snapdragon-x-elite"],
                 tags=[ModelTag.MODEL_TAG_FOUNDATION],
             ),
+            ManifestModelEntry(
+                id="qwen3_5_2b",
+                display_name="Qwen3.5-2B",
+                domain=ModelDomain.MODEL_DOMAIN_GENERATIVE_AI,
+                is_quantized=True,
+                supported_runtimes=[Runtime.RUNTIME_GENIE],
+                supported_chipsets=["qualcomm-snapdragon-x-elite"],
+                tags=[ModelTag.MODEL_TAG_LLM, ModelTag.MODEL_TAG_GENERATIVE_AI],
+            ),
+            ManifestModelEntry(
+                id="qwen3_vl_4b_instruct",
+                display_name="Qwen3-VL-4B-Instruct",
+                domain=ModelDomain.MODEL_DOMAIN_GENERATIVE_AI,
+                is_quantized=True,
+                supported_runtimes=[Runtime.RUNTIME_GENIE],
+                supported_chipsets=["qualcomm-snapdragon-x-elite"],
+                tags=[
+                    ModelTag.MODEL_TAG_LLM,
+                    ModelTag.MODEL_TAG_VLM,
+                    ModelTag.MODEL_TAG_GENERATIVE_AI,
+                ],
+            ),
         ],
     )
 
@@ -90,9 +112,11 @@ def test_models_table(manifest: None, capsys: pytest.CaptureFixture[str]) -> Non
     output = capsys.readouterr().out
     assert "MobileNet V2" in output
     assert "Whisper Small" in output
+    assert "Qwen3.5-2B" in output
+    assert "Qwen3-VL-4B-Instruct" in output
     assert "Computer Vision" in output
     assert "Audio" in output
-    assert "Total: 2 models" in output
+    assert "Total: 4 models" in output
     # Use Case + Quantized + Runtimes columns.
     assert "Quantized" in output and "Runtimes" in output
     assert "tflite" in output
@@ -101,7 +125,9 @@ def test_models_table(manifest: None, capsys: pytest.CaptureFixture[str]) -> Non
 def test_models_quiet(manifest: None, capsys: pytest.CaptureFixture[str]) -> None:
     main(["models", "-q"])
     lines = capsys.readouterr().out.strip().splitlines()
-    assert lines == ["mobilenet_v2", "whisper_small"]
+    assert sorted(lines) == sorted(
+        ["mobilenet_v2", "whisper_small", "qwen3_5_2b", "qwen3_vl_4b_instruct"]
+    )
 
 
 def test_models_domain_filter(
@@ -115,7 +141,7 @@ def test_models_domain_filter(
 @pytest.mark.parametrize(
     ("args", "expected"),
     [
-        (["--quantized"], ["mobilenet_v2"]),
+        (["--quantized"], ["mobilenet_v2", "qwen3_5_2b", "qwen3_vl_4b_instruct"]),
         # Repeated -r is ANDed and accumulates: mobilenet has onnx but not qnn_dlc.
         # (A single-flag overwrite bug would wrongly keep only the last -r and match.)
         (["-r", "qnn_dlc", "-r", "onnx"], []),
@@ -123,6 +149,10 @@ def test_models_domain_filter(
         (["-d", "Samsung Galaxy S24"], ["mobilenet_v2"]),  # device resolves to chipset
         (["--aot"], ["mobilenet_v2"]),  # has tflite (AOT); whisper is onnx-only
         (["--jit"], ["mobilenet_v2", "whisper_small"]),  # both have onnx (JIT)
+        # --llm includes both text-only LLM and VLM (which is also tagged llm).
+        (["--llm"], ["qwen3_5_2b", "qwen3_vl_4b_instruct"]),
+        # --vlm is VLM-only.
+        (["--vlm"], ["qwen3_vl_4b_instruct"]),
     ],
 )
 def test_models_filters(

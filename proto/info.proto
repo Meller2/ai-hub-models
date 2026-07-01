@@ -63,6 +63,7 @@ enum ModelTag {
   MODEL_TAG_BU_AUTO = 7;
   MODEL_TAG_BU_COMPUTE = 8;
   MODEL_TAG_MOE = 9;
+  MODEL_TAG_VLM = 10;
 }
 
 enum ModelStatus {

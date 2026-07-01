@@ -41,6 +41,7 @@ from qai_hub_models_cli.fetch import fetch, get_asset_url
 from qai_hub_models_cli.find import find_matching_releases
 from qai_hub_models_cli.proto.info_pb2 import (
     MODEL_TAG_LLM,
+    MODEL_TAG_VLM,
     ModelDomain,
     ModelTag,
     ModelUseCase,
@@ -585,6 +586,7 @@ def _run_list_models(args: argparse.Namespace) -> None:
         args.chipset,
         args.device,
         args.llm,
+        args.vlm,
         args.use_case,
     )
     if any(gated_filters) and not feature_supported(
@@ -640,6 +642,9 @@ def _run_list_models(args: argparse.Namespace) -> None:
 
     if args.llm:
         predicates.append(lambda e: MODEL_TAG_LLM in e.tags)
+
+    if args.vlm:
+        predicates.append(lambda e: MODEL_TAG_VLM in e.tags)
 
     if args.chipset or args.device:
         try:
@@ -779,7 +784,12 @@ def add_list_models_parser(
     parser.add_argument(
         "--llm",
         action="store_true",
-        help="Filter to Large Language Models and Vision Language Models.",
+        help="Filter to Large Language Models that handle text input.",
+    )
+    parser.add_argument(
+        "--vlm",
+        action="store_true",
+        help="Filter to Vision Language Models that handle text and image input.",
     )
     compile_group = parser.add_mutually_exclusive_group()
     compile_group.add_argument(
