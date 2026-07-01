@@ -172,6 +172,14 @@ def test_info_minimal_model(capsys: pytest.CaptureFixture[str]) -> None:
             "qai_hub_models_cli.cli.get_model_release_assets",
             return_value=empty_assets,
         ),
+        patch(
+            "qai_hub_models_cli.cli.get_platform",
+            return_value=_fake_platform(),
+        ),
+        patch(
+            "qai_hub_models_cli.cli.get_manifest_entry",
+            return_value=_fake_manifest_entry(),
+        ),
     ):
         main(["info", "my_model"])
     output = capsys.readouterr().out

@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # ---------------------------------------------------------------------
 import argparse
+import sys
+import types
 from importlib.metadata import PackageNotFoundError
 from unittest.mock import MagicMock, patch
 
@@ -20,6 +22,25 @@ def _subcommand_choices(parser: argparse.ArgumentParser) -> set[str]:
         a for a in parser._actions if isinstance(a, argparse._SubParsersAction)
     )
     return set(subparsers_action.choices)
+
+
+def _stub_heavy_modules(
+    model_ids: set[str], run_model_script: MagicMock | None = None
+) -> dict[str, types.ModuleType]:
+    """Patch the heavy ``qai_hub_models`` modules the dispatch code imports."""
+    path_helpers = types.ModuleType("qai_hub_models.utils.path_helpers")
+    path_helpers.MODEL_IDS = model_ids  # type: ignore[attr-defined]
+    stubs = {
+        "qai_hub_models": types.ModuleType("qai_hub_models"),
+        "qai_hub_models.utils": types.ModuleType("qai_hub_models.utils"),
+        "qai_hub_models.utils.path_helpers": path_helpers,
+    }
+    if run_model_script is not None:
+        dispatch = types.ModuleType("qai_hub_models.cli.dispatch")
+        dispatch.run_model_script = run_model_script  # type: ignore[attr-defined]
+        stubs["qai_hub_models.cli"] = types.ModuleType("qai_hub_models.cli")
+        stubs["qai_hub_models.cli.dispatch"] = dispatch
+    return stubs
 
 
 @pytest.mark.parametrize(
@@ -62,6 +83,7 @@ def test_dispatch_forwards_remaining_args_to_model_parser(script: str) -> None:
     """
     fake_entry = MagicMock()
     fake_entry.id = "mobilenet_v2"
+    mock_run = MagicMock()
     with (
         patch("qai_hub_models_cli.cli._check_version_match"),
         patch("qai_hub_models_cli.cli.is_heavy_package_installed", return_value=True),
@@ -69,8 +91,10 @@ def test_dispatch_forwards_remaining_args_to_model_parser(script: str) -> None:
         patch(
             "qai_hub_models_cli.cli.get_manifest_entry", return_value=fake_entry
         ) as mock_get_entry,
-        patch("qai_hub_models.utils.path_helpers.MODEL_IDS", {"mobilenet_v2"}),
-        patch("qai_hub_models.cli.dispatch.run_model_script") as mock_run,
+        patch.dict(
+            sys.modules,
+            _stub_heavy_modules({"mobilenet_v2"}, run_model_script=mock_run),
+        ),
     ):
         main([script, "mobilenet_v2", "--target-runtime", "tflite"])
     # mobilenet_v2 is a valid installed model ID, so the manifest lookup is skipped.
@@ -109,7 +133,7 @@ def test_dispatch_model_not_in_installed_package_exits() -> None:
         patch(
             "qai_hub_models_cli.cli.get_manifest_entry", return_value=fake_entry
         ) as mock_get_entry,
-        patch("qai_hub_models.utils.path_helpers.MODEL_IDS", {"mobilenet_v2"}),
+        patch.dict(sys.modules, _stub_heavy_modules({"mobilenet_v2"})),
         pytest.raises(SystemExit) as exc_info,
     ):
         main(["export", "future_model"])
