@@ -28,6 +28,7 @@ from qai_hub_models_cli.common import (
     CLI_NAME,
     build_filter_command,
     format_command_sections,
+    is_heavy_package_installed,
     model_repo_url,
     parse_sdk_version_filters,
     sample_command,
@@ -497,6 +498,76 @@ def add_numerics_parser(
     add_model_metric_filter_args(parser)
     add_version_arg(parser)
     parser.set_defaults(func=_run_numerics)
+    return parser
+
+
+def _dispatch_export_or_evaluate(script: str, raw_args: list[str]) -> None:
+    """Run ``qai-hub-models {export,evaluate} <model> [model-args...]``.
+
+    Resolves the model name -> id, then hands the remaining args to the model's
+    own ``build_parser()``/``main()`` (via the heavy-side dispatcher) so that
+    ``--target-runtime``, ``--device``, etc. are natively parsed instead of
+    forwarded through an ``argparse.REMAINDER`` bucket.
+
+    The manifest is always read at ``CURRENT_VERSION``; ``-v/--qaihm-version``
+    isn't exposed for these subcommands because the dispatch target is the
+    locally-installed model module, not a manifest entry.
+    """
+    if not raw_args or raw_args[0] in ("-h", "--help"):
+        sys.exit(
+            f"Usage: {CLI_NAME} {script} <model> [args...]\n"
+            f"Run `{CLI_NAME} {script} <model> --help` for the model's options."
+        )
+    model_arg, forwarded = raw_args[0], list(raw_args[1:])
+
+    entry = get_manifest_entry(model_arg, CURRENT_VERSION)
+    from qai_hub_models.utils.path_helpers import MODEL_IDS
+
+    if entry.id not in MODEL_IDS:
+        sys.exit(
+            f"Model {entry.id!r} is in the v{CURRENT_VERSION} manifest but not "
+            f"in the installed qai_hub_models package. Upgrade with "
+            f"`pip install -U qai_hub_models`."
+        )
+
+    from qai_hub_models.cli.dispatch import run_model_script
+
+    run_model_script(model_id=entry.id, script=script, forwarded=forwarded)
+
+
+def add_export_parser(
+    subparsers: argparse._SubParsersAction,
+) -> argparse.ArgumentParser:
+    # Skeleton-only: arg parsing for `export <model> ...` is delegated to the
+    # model's own parser via the two-phase dispatch in `main()`. We keep a
+    # subparser here so `export` shows up in top-level help.
+    parser = subparsers.add_parser(
+        "export",
+        help="Export a model from source using AI Hub Workbench.",
+        description=(
+            f"Run `{CLI_NAME} export <model> --help` to see the model's "
+            "native export options."
+        ),
+        add_help=False,
+    )
+    parser.add_argument("model", type=str.lower)
+    return parser
+
+
+def add_evaluate_parser(
+    subparsers: argparse._SubParsersAction,
+) -> argparse.ArgumentParser:
+    # Skeleton-only: see `add_export_parser`.
+    parser = subparsers.add_parser(
+        "evaluate",
+        help="Evaluate a model from source using AI Hub Workbench.",
+        description=(
+            f"Run `{CLI_NAME} evaluate <model> --help` to see the model's "
+            "native evaluate options."
+        ),
+        add_help=False,
+    )
+    parser.add_argument("model", type=str.lower)
     return parser
 
 
@@ -1256,9 +1327,14 @@ class _GroupedHelpFormatter(argparse.RawDescriptionHelpFormatter):
         return text.rstrip() + "\n\n" + "\n\n".join(blocks) + "\n"
 
 
-def main(args: list[str] | None = None) -> None:
-    _check_version_match()
+def _build_parser() -> argparse.ArgumentParser:
+    """Build the top-level CLI parser with every subcommand registered.
 
+    Extracted from ``main`` so tests can introspect which subcommands are
+    available (e.g. that ``export``/``evaluate`` only show up when the heavy
+    ``qai_hub_models`` package is installed) without spawning a process or
+    capturing stdout.
+    """
     parser = argparse.ArgumentParser(
         prog=CLI_NAME,
         description="Qualcomm AI Hub Models CLI.",
@@ -1280,6 +1356,13 @@ def main(args: list[str] | None = None) -> None:
     add_list_runtimes_parser(subparsers)
     add_find_parser(subparsers)
     add_versions_parser(subparsers)
+    # `export`/`evaluate` are dispatched in `main()` before this parser runs;
+    # we still register their skeletons here so they appear in `--help` (and so
+    # invocations without the heavy package fall through to argparse's
+    # "invalid choice" error).
+    if is_heavy_package_installed():
+        add_export_parser(subparsers)
+        add_evaluate_parser(subparsers)
     if use_internal_releases() or is_internal_repo():
         add_validate_aws_parser(subparsers)
 
@@ -1308,6 +1391,27 @@ def main(args: list[str] | None = None) -> None:
         _GroupedHelpFormatter, subparsers_action=subparsers, sections=sections
     )
 
+    return parser
+
+
+def main(args: list[str] | None = None) -> None:
+    _check_version_match()
+
+    # `export`/`evaluate` route through the model's own parser, not ours. Sniff
+    # for them before constructing the lean parser so argparse doesn't try to
+    # consume `--help` or unknown model-specific flags at this layer.
+    raw = sys.argv[1:] if args is None else args
+    if raw and raw[0] in ("export", "evaluate") and is_heavy_package_installed():
+        try:
+            _dispatch_export_or_evaluate(raw[0], raw[1:])
+        except Exception as e:
+            if bool_envvar_value(VERBOSE_EXCEPTIONS_ENVVAR):
+                raise
+            print(e.args[0] if isinstance(e, KeyError) and e.args else e)
+            sys.exit(1)
+        return
+
+    parser = _build_parser()
     parsed = parser.parse_args(args)
     if hasattr(parsed, "func"):
         try:

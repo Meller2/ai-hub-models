@@ -4,6 +4,8 @@
 # ---------------------------------------------------------------------
 from __future__ import annotations
 
+import functools
+import importlib.util
 from pathlib import Path
 
 import platformdirs
@@ -15,6 +17,16 @@ ASSET_FOLDER = "qai-hub-models/models/{model_id}/releases/v{version}"
 
 GITHUB_REPO_URL = "https://github.com/qualcomm/ai-hub-models"
 AIHUB_MODELS_URL = "https://aihub.qualcomm.com/models"
+
+
+@functools.cache
+def is_heavy_package_installed() -> bool:
+    """Whether the heavy ``qai_hub_models`` package is importable.
+
+    Uses ``find_spec`` rather than ``try: import`` to avoid pulling torch and
+    other heavy deps into the lean CLI's process.
+    """
+    return importlib.util.find_spec("qai_hub_models") is not None
 
 
 def model_repo_url(model_id: str, version: Version) -> str:

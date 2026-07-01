@@ -2,77 +2,125 @@
 # Copyright (c) 2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: BSD-3-Clause
 # ---------------------------------------------------------------------
+import argparse
 from importlib.metadata import PackageNotFoundError
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from qai_hub_models_cli.cli import (
+    _build_parser,
     _check_version_match,
     main,
 )
 
 
-def test_cli_import() -> None:
-    """Verify the CLI entry point is importable."""
-    assert callable(main)
+def _subcommand_choices(parser: argparse.ArgumentParser) -> set[str]:
+    """Return the set of subcommand names registered on the top-level parser."""
+    subparsers_action = next(
+        a for a in parser._actions if isinstance(a, argparse._SubParsersAction)
+    )
+    return set(subparsers_action.choices)
 
 
-def test_cli_no_qai_hub_models() -> None:
-    """Verify the CLI runs without error when qai_hub_models is not installed."""
+@pytest.mark.parametrize(
+    ("cli_v", "models_v", "should_exit"),
+    [
+        ("1.0.0", "1.0.0", False),  # match
+        ("1.0.0", "2.0.0", True),  # mismatch
+        ("1.0.0", None, False),  # qai_hub_models not installed
+    ],
+)
+def test_check_version_match(
+    cli_v: str, models_v: str | None, should_exit: bool
+) -> None:
+    """`_check_version_match` exits iff cli/models versions are both installed and differ."""
 
-    def _version_without_models(pkg: str) -> str:
-        if pkg == "qai_hub_models":
+    def _version(pkg: str) -> str:
+        if pkg == "qai_hub_models_cli":
+            return cli_v
+        if models_v is None:
             raise PackageNotFoundError(pkg)
-        return "1.0.0"
+        return models_v
 
-    with (
-        patch("qai_hub_models_cli.cli.version", side_effect=_version_without_models),
-        patch.dict("sys.modules", {"qai_hub_models": None, "qai_hub_models.cli": None}),
-    ):
-        main([])  # should not raise
-
-
-def test_version_mismatch_exits() -> None:
-    """Verify sys.exit(1) is called when package versions differ."""
-    with (
-        patch(
-            "qai_hub_models_cli.cli.version",
-            side_effect=lambda pkg: "1.0.0" if pkg == "qai_hub_models_cli" else "2.0.0",
-        ),
-        pytest.raises(SystemExit),
-    ):
-        _check_version_match()
+    with patch("qai_hub_models_cli.cli.version", side_effect=_version):
+        if should_exit:
+            with pytest.raises(SystemExit):
+                _check_version_match()
+        else:
+            _check_version_match()
 
 
-def test_version_match_ok() -> None:
-    """Verify no error when package versions match."""
-    with patch(
-        "qai_hub_models_cli.cli.version",
-        return_value="1.0.0",
-    ):
-        _check_version_match()
+# ── export/evaluate gating on the heavy package ─────────────────────
 
 
-def test_version_check_models_not_installed() -> None:
-    """Verify no error when qai_hub_models is not installed."""
-
-    def _version_without_models(pkg: str) -> str:
-        if pkg == "qai_hub_models":
-            raise PackageNotFoundError(pkg)
-        return "1.0.0"
-
-    with patch("qai_hub_models_cli.cli.version", side_effect=_version_without_models):
-        _check_version_match()
+def test_export_subcommand_registered_when_heavy_installed() -> None:
+    """When qai_hub_models is installed, `export`/`evaluate` are registered."""
+    with patch("qai_hub_models_cli.cli.is_heavy_package_installed", return_value=True):
+        choices = _subcommand_choices(_build_parser())
+    assert {"export", "evaluate"}.issubset(choices)
 
 
-# ── --version flag ──────────────────────────────────────────────────
+def test_export_subcommand_absent_when_heavy_missing() -> None:
+    """When qai_hub_models is missing, `export`/`evaluate` aren't registered."""
+    with patch("qai_hub_models_cli.cli.is_heavy_package_installed", return_value=False):
+        choices = _subcommand_choices(_build_parser())
+    assert "export" not in choices
+    assert "evaluate" not in choices
 
 
-def test_version_flag() -> None:
+# ── two-phase dispatch for export/evaluate ──────────────────────────
+
+
+@pytest.mark.parametrize("script", ["export", "evaluate"])
+def test_dispatch_forwards_remaining_args_to_model_parser(script: str) -> None:
+    """`<script> <model> --flag value` hands model-specific args to dispatch verbatim,
+    and resolves the manifest entry against CURRENT_VERSION.
+    """
+    fake_entry = MagicMock()
+    fake_entry.id = "mobilenet_v2"
     with (
         patch("qai_hub_models_cli.cli._check_version_match"),
+        patch("qai_hub_models_cli.cli.is_heavy_package_installed", return_value=True),
+        patch("qai_hub_models_cli.cli.CURRENT_VERSION", "9.9.9"),
+        patch(
+            "qai_hub_models_cli.cli.get_manifest_entry", return_value=fake_entry
+        ) as mock_get_entry,
+        patch("qai_hub_models.utils.path_helpers.MODEL_IDS", {"mobilenet_v2"}),
+        patch("qai_hub_models.cli.dispatch.run_model_script") as mock_run,
+    ):
+        main([script, "mobilenet_v2", "--target-runtime", "tflite"])
+    mock_get_entry.assert_called_once_with("mobilenet_v2", "9.9.9")
+    mock_run.assert_called_once_with(
+        model_id="mobilenet_v2",
+        script=script,
+        forwarded=["--target-runtime", "tflite"],
+    )
+
+
+def test_dispatch_missing_model_arg_exits_with_usage_hint() -> None:
+    """`export` (no model) exits with our usage hint, not argparse's generic error."""
+    with (
+        patch("qai_hub_models_cli.cli._check_version_match"),
+        patch("qai_hub_models_cli.cli.is_heavy_package_installed", return_value=True),
         pytest.raises(SystemExit) as exc_info,
     ):
-        main(["--version"])
-    assert exc_info.value.code == 0
+        main(["export"])
+    assert "Usage:" in str(exc_info.value)
+    assert "export <model>" in str(exc_info.value)
+
+
+def test_dispatch_model_not_in_installed_package_exits() -> None:
+    """Manifest lists the model but it's not in MODEL_IDS -> clean error."""
+    fake_entry = MagicMock()
+    fake_entry.id = "future_model"
+    with (
+        patch("qai_hub_models_cli.cli._check_version_match"),
+        patch("qai_hub_models_cli.cli.is_heavy_package_installed", return_value=True),
+        patch("qai_hub_models_cli.cli.get_manifest_entry", return_value=fake_entry),
+        patch("qai_hub_models.utils.path_helpers.MODEL_IDS", {"mobilenet_v2"}),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        main(["export", "future_model"])
+    assert "future_model" in str(exc_info.value)
+    assert "installed qai_hub_models package" in str(exc_info.value)

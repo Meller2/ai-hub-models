@@ -4,8 +4,6 @@
 # ---------------------------------------------------------------------
 from __future__ import annotations
 
-import importlib
-import importlib.util
 import os
 from collections.abc import Callable
 from pathlib import Path
@@ -15,7 +13,7 @@ from google.protobuf.message import Message
 from packaging.version import Version
 
 from qai_hub_models_cli._internal.utils import use_internal_releases
-from qai_hub_models_cli.common import CACHE_DIR
+from qai_hub_models_cli.common import CACHE_DIR, is_heavy_package_installed
 from qai_hub_models_cli.envvars import FORCE_MANIFEST_ROOT_ENVVAR
 from qai_hub_models_cli.utils import download
 from qai_hub_models_cli.versions import (
@@ -68,7 +66,7 @@ def use_aihm_source(version: Version) -> bool:
     return (
         version == CURRENT_VERSION
         and CURRENT_VERSION.is_devrelease
-        and importlib.util.find_spec("qai_hub_models") is not None
+        and is_heavy_package_installed()
     )
 
 

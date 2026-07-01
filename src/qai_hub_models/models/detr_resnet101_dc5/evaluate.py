@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import argparse
 import warnings
 
 import qai_hub as hub
@@ -21,29 +22,50 @@ from qai_hub_models.utils.inference import AsyncOnDeviceModel, compile_model_fro
 from qai_hub_models.utils.input_spec import InputSpec
 from qai_hub_models.utils.kwarg_helpers import filter_kwargs
 
+SUPPORTED_PRECISION_RUNTIMES: dict[Precision, list[TargetRuntime]] = {
+    Precision.float: [
+        TargetRuntime.TFLITE,
+        TargetRuntime.QNN_DLC,
+        TargetRuntime.QNN_CONTEXT_BINARY,
+        TargetRuntime.ONNX,
+        TargetRuntime.PRECOMPILED_QNN_ONNX,
+    ],
+}
 
-def main() -> None:
-    warnings.filterwarnings("ignore")
-    eval_dataset_classes = Model.get_eval_dataset_classes()
-    supported_precision_runtimes: dict[Precision, list[TargetRuntime]] = {
-        Precision.float: [
-            TargetRuntime.TFLITE,
-            TargetRuntime.QNN_DLC,
-            TargetRuntime.QNN_CONTEXT_BINARY,
-            TargetRuntime.ONNX,
-            TargetRuntime.PRECOMPILED_QNN_ONNX,
-        ],
-    }
 
-    parser = evaluate_parser(
+DEFAULT_EVAL_DEVICE = "Samsung Galaxy S25 (Family)"
+
+
+def build_parser(cli_mode: bool = False) -> argparse.ArgumentParser:
+    """Build the argparse parser for this model's evaluate script.
+
+    Exposed so the qai-hub-models CLI dispatcher can reuse the model's native
+    parser without re-running main(). When *cli_mode* is True, runtime,
+    precision, and device/chipset must be explicitly specified.
+    """
+    return evaluate_parser(
         model_cls=Model,
-        supported_dataset_classes=eval_dataset_classes,
-        supported_precision_runtimes=supported_precision_runtimes,
+        supported_dataset_classes=Model.get_eval_dataset_classes(),
+        supported_precision_runtimes=SUPPORTED_PRECISION_RUNTIMES,
         uses_quantize_job=False,
-        default_device="Samsung Galaxy S25 (Family)",
+        default_device=DEFAULT_EVAL_DEVICE,
+        cli_mode=cli_mode,
     )
-    args = parser.parse_args()
 
+
+def main(args: argparse.Namespace | None = None) -> None:
+    eval_dataset_classes = Model.get_eval_dataset_classes()
+    if args is None:
+        warnings.warn(
+            "Running `python -m qai_hub_models.models.detr_resnet101_dc5.evaluate` is "
+            "deprecated and will be removed in a future release. "
+            "Use `qai-hub-models evaluate detr_resnet101_dc5` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        args = build_parser().parse_args()
+
+    warnings.filterwarnings("ignore")
     model_kwargs = get_model_kwargs(Model, vars(args))
     input_spec_kwargs = filter_kwargs(Model.get_input_spec, vars(args))
 

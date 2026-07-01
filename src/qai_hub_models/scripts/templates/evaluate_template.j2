@@ -3,6 +3,7 @@
 
 
 from __future__ import annotations
+import argparse
 import warnings
 
 import qai_hub as hub
@@ -26,27 +27,49 @@ from qai_hub_models.models.{{ model_name }}.export import export_model
 from qai_hub_models.utils.asset_loaders import query_yes_no, UNPUBLISHED_MODEL_WARNING
 {%- endif %}
 
-def main() -> None:
-    warnings.filterwarnings("ignore")
+SUPPORTED_PRECISION_RUNTIMES : {{ common.write_supported_precision_runtimes(supported_precision_runtimes) }}
+
+DEFAULT_EVAL_DEVICE = "{{ default_device }}"
+
+
+def build_parser(cli_mode: bool = False) -> argparse.ArgumentParser:
+    """Build the argparse parser for this model's evaluate script.
+
+    Exposed so the qai-hub-models CLI dispatcher can reuse the model's native
+    parser without re-running main(). When *cli_mode* is True, runtime,
+    precision, and device/chipset must be explicitly specified.
+    """
+    return evaluate_parser(
+        model_cls=Model,
+        supported_dataset_classes=Model.get_eval_dataset_classes(),
+        supported_precision_runtimes=SUPPORTED_PRECISION_RUNTIMES,
+        {%- if not can_use_quantize_job or not supports_quantization %}uses_quantize_job=False,{% endif %}
+        {%- if can_use_quantize_job and supports_quantization and num_calibration_samples %}
+        num_calibration_samples = {{ num_calibration_samples }},
+        {%- endif %}
+        default_device=DEFAULT_EVAL_DEVICE,
+        cli_mode=cli_mode,
+    )
+
+
+def main(args: argparse.Namespace | None = None) -> None:
 {%- if model_status != "published" %}
     print("WARNING:", UNPUBLISHED_MODEL_WARNING)
     if not query_yes_no("Continue?"):
         return
 {%- endif %}
     eval_dataset_classes = Model.get_eval_dataset_classes()
-    supported_precision_runtimes : {{ common.write_supported_precision_runtimes(supported_precision_runtimes) }}
-    parser = evaluate_parser(
-        model_cls=Model,
-        supported_dataset_classes=eval_dataset_classes,
-        supported_precision_runtimes=supported_precision_runtimes,
-        {%- if not can_use_quantize_job or not supports_quantization %}uses_quantize_job=False,{% endif %}
-        {%- if can_use_quantize_job and supports_quantization and num_calibration_samples %}
-        num_calibration_samples = {{ num_calibration_samples }},
-        {%- endif %}
-        default_device="{{ default_device }}",
-    )
-    args = parser.parse_args()
+    if args is None:
+        warnings.warn(
+            "Running `python -m qai_hub_models.models.{{ model_name }}.evaluate` is "
+            "deprecated and will be removed in a future release. "
+            "Use `qai-hub-models evaluate {{ model_name }}` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        args = build_parser().parse_args()
 
+    warnings.filterwarnings("ignore")
     model_kwargs = get_model_kwargs(Model, vars(args))
     {%- if not is_collection_model %}
     input_spec_kwargs = filter_kwargs(Model.get_input_spec, vars(args))

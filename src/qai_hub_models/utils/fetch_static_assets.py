@@ -10,6 +10,7 @@ from tempfile import TemporaryDirectory
 
 import qai_hub as hub
 import requests
+from packaging.version import Version
 from packaging.version import parse as packaging_parse_version
 from pydantic import ValidationError
 
@@ -174,7 +175,7 @@ def _load_chipsets_from_previous_release(
       - the yaml schema has changed and can't be read by the current AI Hub Models version
     """
     chipsets_url = asset_config.get_qaihm_repo_download_url(
-        None, "devices_and_chipsets.yaml", qaihm_version_tag
+        None, "devices_and_chipsets.yaml", Version(qaihm_version_tag)
     )
     with TemporaryDirectory() as tmpdir:
         try:

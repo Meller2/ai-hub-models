@@ -35,12 +35,14 @@ import requests
 import ruamel.yaml
 import torch
 from inputimeout import TimeoutOccurred, inputimeout
+from packaging.version import Version
 from PIL import Image
 from qai_hub.util.dataset_entries_converters import h5_to_dataset_entries
 from schema import And, Schema, SchemaError
 from tqdm import tqdm
 
 from qai_hub_models import Precision, TargetRuntime
+from qai_hub_models._version import version
 from qai_hub_models.utils.aws import can_access_private_s3
 from qai_hub_models.utils.envvars import DevModeEnvvar, IsOnCIEnvvar
 from qai_hub_models.utils.version_helpers import QAIHMVersion
@@ -586,7 +588,7 @@ class ModelZooAssetConfig:
         self,
         model_id: str | None,
         relative: bool = True,
-        qaihm_version_tag: str | None = None,
+        qaihm_version: Version | None = None,
     ) -> Path | str:
         relative_path = (
             Path(self.qaihm_repo.lstrip("/").format(model_id=model_id))
@@ -594,14 +596,20 @@ class ModelZooAssetConfig:
             else Path("qai_hub_models")
         )
         repo_url = self.repo_url
-        if qaihm_version_tag:
-            repo_url = repo_url.replace("/blob/main", f"/refs/tags/{qaihm_version_tag}")
+        qaihm_version = qaihm_version or Version(version)
+        qaihm_version_tag = (
+            "main" if qaihm_version.is_devrelease else f"v{qaihm_version}"
+        )
+        repo_url = repo_url.replace("/blob/main", f"/blob/{qaihm_version_tag}")
         if not relative:
             return f"{repo_url.rstrip('/')}/{relative_path.as_posix()}"
         return relative_path
 
     def get_qaihm_repo_download_url(
-        self, model_id: str | None, file_name: str, qaihm_version_tag: str | None = None
+        self,
+        model_id: str | None,
+        file_name: str,
+        qaihm_version_tag: Version | None = None,
     ) -> str:
         repo_url = self.get_qaihm_repo(model_id, False, qaihm_version_tag)
         repo_url = os.path.join(str(repo_url), file_name)

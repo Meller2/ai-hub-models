@@ -62,7 +62,7 @@ By default, the demo will run locally in PyTorch. Pass `--eval-mode on-device` t
 To run the model on Qualcomm® devices, you must export the model for use with an edge runtime such as
 TensorFlow Lite, ONNX Runtime, or Qualcomm AI Engine Direct. Use the following command to export the model:
 ```bash
-python -m qai_hub_models.models.face_det_lite.export { --quantize w8a16_mixed_int16, w8a16, w8a8 }
+qai-hub-models export face_det_lite --target-runtime tflite --precision float
 ```
 Additional options are documented with the `--help` option.
 

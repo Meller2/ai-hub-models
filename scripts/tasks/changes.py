@@ -93,6 +93,7 @@ MANUAL_EDGES = {
     "src/qai_hub_models/scorecard/utils/testing_export_eval.py": REPRESENTATIVE_EXPORT_FILES,
     "src/qai_hub_models/utils/asset_loaders.py": REPRESENTATIVE_EXPORT_FILES,
     "src/qai_hub_models/utils/aws.py": REPRESENTATIVE_EXPORT_FILES,
+    "src/qai_hub_models/utils/args.py": REPRESENTATIVE_EXPORT_FILES,
     "src/qai_hub_models/utils/base_config.py": REPRESENTATIVE_EXPORT_FILES,
     "src/qai_hub_models/utils/base_dataset.py": REPRESENTATIVE_EXPORT_FILES,
     "src/qai_hub_models/utils/base_evaluator.py": REPRESENTATIVE_EXPORT_FILES,

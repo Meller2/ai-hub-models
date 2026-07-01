@@ -333,6 +333,7 @@ def _add_device_args(
     parser: QAIHMArgumentParser,
     default_device: str | None = None,
     default_chipset: str | None = None,
+    required: bool = False,
 ) -> QAIHMArgumentParser:
     # This is an assertion because this is a logic error; it shouldn't be possible to get this at runtime.
     assert not (default_device and default_chipset), (
@@ -342,9 +343,10 @@ def _add_device_args(
     parser.default_device = default_device
     parser.default_chipset = default_chipset
     device_group = parser.add_argument_group("Device Selection")
-    device_mutex_group = device_group.add_mutually_exclusive_group()
+    device_mutex_group = device_group.add_mutually_exclusive_group(required=required)
     device_mutex_group.add_argument(
         "--device",
+        "-d",
         dest="device_str",
         type=str,
         help="The name of the device used to run this script. Run `qai-hub list-devices` to see the list of options."
@@ -352,6 +354,7 @@ def _add_device_args(
     )
     device_mutex_group.add_argument(
         "--chipset",
+        "-c",
         type=str,
         help="If set, will choose a random device with this chipset. Run `qai-hub list-devices` to see the list of options."
         + (f" If not set, defaults to `{default_chipset}`." if default_chipset else ""),
@@ -390,14 +393,19 @@ def add_target_runtime_arg(
     helpmsg: str,
     available_target_runtimes: list[TargetRuntime] | None = None,
     default: TargetRuntime | None = None,
+    required: bool = False,
 ) -> ParserT:
     if available_target_runtimes is None:
         available_target_runtimes = list(TargetRuntime.__members__.values())
     parser.add_argument(
+        "--runtime",
         "--target-runtime",
+        "-r",
         type=str,
+        dest="target_runtime",
         action=partial(ParseEnumAction, enum_type=TargetRuntime),  # type: ignore[arg-type]
         default=default,
+        required=required,
         metavar=f"{{{', '.join(rt.value for rt in available_target_runtimes)}}}",
         help=helpmsg,
     )
@@ -409,14 +417,16 @@ def add_precision_arg(
     supported_precisions: set[Precision],
     default_if_arg_explicitly_passed: Precision,  # the default value if --precision is passed explicitly
     default: Precision,  # the default value if --precision is not passed
+    required: bool = False,
 ) -> argparse.ArgumentParser:
     precision_help = "Desired precision to which the model should be quantized."
     if Precision.float in supported_precisions:
         precision_help += " If set to 'float', the model will not be quantized, and inference will run in fp32 or fp16 (depending on compute unit)."
 
-    group = parser.add_mutually_exclusive_group()
+    group = parser.add_mutually_exclusive_group(required=required)
     group.add_argument(
         "--precision",
+        "-p",
         action=get_quantize_action_with_default(default),
         default=default,
         metavar=f"{{{', '.join(str(p) for p in supported_precisions)}}}",
@@ -1002,8 +1012,14 @@ def _evaluate_export_common_parser(
     model_cls: type[FromPretrainedTypeVar],
     supported_precision_runtimes: dict[Precision, list[TargetRuntime]],
     omit_precision: bool = False,
+    cli_mode: bool = False,
 ) -> QAIHMArgumentParser:
-    """Common arguments between export and evaluate scripts."""
+    """Common arguments between export and evaluate scripts.
+
+    When *cli_mode* is True, ``--target-runtime`` and ``--precision`` have no
+    default and must be explicitly specified. Used by the ``qai-hub-models``
+    CLI dispatcher so users can't run an export without picking a target.
+    """
     # Set handler to resolve, to allow from_pretrained and get_input_spec
     # to have the same argument names.
     parser = get_parser(
@@ -1024,6 +1040,7 @@ def _evaluate_export_common_parser(
         parser,
         available_target_runtimes=available_runtimes_list,
         default=None,
+        required=cli_mode,
         helpmsg="The runtime for which to export. Default is chosen based on the precision.",
     )
     if issubclass(model_cls, FromPretrainedProtocol):
@@ -1052,6 +1069,7 @@ def _evaluate_export_common_parser(
                     )
                     else next(iter(supported_precisions))
                 ),
+                required=cli_mode,
             )
 
     return parser
@@ -1147,6 +1165,7 @@ def export_parser(
     force_fetch_static_assets: bool = False,
     zip_assets: bool = False,
     omit_precision: bool = False,
+    cli_mode: bool = False,
 ) -> QAIHMArgumentParser:
     """
     Arg parser to be used in export scripts.
@@ -1166,13 +1185,17 @@ def export_parser(
     supported_precision_runtimes
         The list of supported (precision, runtime) pairs for this model.
     default_export_device
-        Default device to set for export.
+        Default device to set for export. Ignored when *cli_mode* is True.
     force_fetch_static_assets
         If set, fetch_static_assets is always enabled and cannot be turned off.
     zip_assets
         Zips downloaded assets. If set, adds --zip-assets argument to the parser.
     omit_precision
         Do not register --precision.
+    cli_mode
+        If True, ``--target-runtime``, ``--precision`` (unless *omit_precision*),
+        and ``--device``/``--chipset`` are required and have no defaults. Used
+        by the ``qai-hub-models`` CLI dispatcher.
 
     Returns
     -------
@@ -1187,9 +1210,14 @@ def export_parser(
         model_cls=model_cls,
         supported_precision_runtimes=supported_precision_runtimes,
         omit_precision=omit_precision,
+        cli_mode=cli_mode,
     )
     add_export_function_args(export_fn, parser, force_fetch_static_assets, zip_assets)
-    _add_device_args(parser, default_device=default_export_device)
+    _add_device_args(
+        parser,
+        default_device=None if cli_mode else default_export_device,
+        required=cli_mode,
+    )
     if components is not None or issubclass(model_cls, CollectionModel):
         parser.add_argument(
             "--components",
@@ -1209,6 +1237,7 @@ def evaluate_parser(
     uses_quantize_job: bool = True,
     num_calibration_samples: int | None = None,
     default_device: str | None = None,
+    cli_mode: bool = False,
 ) -> QAIHMArgumentParser:
     """
     Arg parser to be used in evaluate scripts.
@@ -1227,7 +1256,11 @@ def evaluate_parser(
         How many samples to calibrate on when quantizing by default.
         If not set, defers to the dataset to decide the number.
     default_device:
-        The default device to use for export + eval.
+        The default device to use for export + eval. Ignored when *cli_mode* is True.
+    cli_mode
+        If True, ``--target-runtime``, ``--precision``, and ``--device``/``--chipset``
+        are required and have no defaults. Used by the ``qai-hub-models`` CLI
+        dispatcher.
 
     Returns
     -------
@@ -1239,6 +1272,7 @@ def evaluate_parser(
     parser = _evaluate_export_common_parser(
         model_cls=model_cls,
         supported_precision_runtimes=supported_precision_runtimes,
+        cli_mode=cli_mode,
     )
     parser.set_supported_dataset_classes(supported_dataset_classes)
     parser.add_argument(
@@ -1261,7 +1295,11 @@ def evaluate_parser(
             help="Additional options to pass when submitting the quantize job.",
         )
 
-    _add_device_args(parser, default_device)
+    _add_device_args(
+        parser,
+        default_device=None if cli_mode else default_device,
+        required=cli_mode,
+    )
     if not parser._dataset_name_to_cls:
         return parser
     supported_dataset_names = list(parser._dataset_name_to_cls.keys())

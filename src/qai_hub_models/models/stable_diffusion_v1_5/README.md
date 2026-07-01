@@ -71,7 +71,7 @@ By default, the demo will run locally in PyTorch. Pass `--eval-mode on-device` t
 To run the model on Qualcomm® devices, you must export the model for use with an edge runtime such as
 TensorFlow Lite, ONNX Runtime, or Qualcomm AI Engine Direct. Use the following command to export the model:
 ```bash
-python -m qai_hub_models.models.stable_diffusion_v1_5.export --device "Samsung Galaxy S25 (Family)"
+qai-hub-models export stable_diffusion_v1_5 --target-runtime qnn_context_binary --precision w8a16 --device "Samsung Galaxy S25 (Family)"
 ```
 Additional options are documented with the `--help` option.
 

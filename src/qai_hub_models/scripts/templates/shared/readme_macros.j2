@@ -230,6 +230,12 @@ Navigate to [docs](https://workbench.aihub.qualcomm.com/docs/) for more informat
         sections are nested (one level deeper) under a single "## Export"
         parent. Used by genie LLM models whose local-device deployment section
         links to the "#export" anchor.
+    default_runtime : str, optional
+        CLI runtime name (e.g., "tflite") rendered into the sample
+        ``qai-hub-models export`` command, which now requires an explicit runtime.
+    default_precision : str, optional
+        CLI precision name (e.g., "float") rendered into the sample
+        ``qai-hub-models export`` command, which now requires an explicit precision.
 #}
 {%- macro example_and_usage(
     model_id,
@@ -245,7 +251,9 @@ Navigate to [docs](https://workbench.aihub.qualcomm.com/docs/) for more informat
     readme_install_system_deps=None,
     is_hf_readme=False,
     readme_export_device=None,
-    local_device_deployment=False
+    local_device_deployment=False,
+    default_runtime=None,
+    default_precision=None
 ) -%}
 {%- set precisions_str = "{ --quantize " ~ (supported_precisions | reject('equalto', 'float') | join(', ')) ~ " }" if supported_precisions and supported_precisions|length > 1 else "" -%}
 {%- set step = namespace(num=1) -%}
@@ -292,7 +300,7 @@ By default, the demo will run locally in PyTorch. Pass `--eval-mode on-device` t
 To run the model on Qualcomm® devices, you must export the model for use with an edge runtime such as
 TensorFlow Lite, ONNX Runtime, or Qualcomm AI Engine Direct. Use the following command to export the model:
 ```bash
-python -m {{ model_package }}.export{{ ' --device "' ~ readme_export_device ~ '"' if readme_export_device else '' }}{{ ' ' ~ precisions_str if precisions_str else '' }}
+qai-hub-models export {{ model_id }}{{ ' --target-runtime ' ~ default_runtime if default_runtime else '' }}{{ ' --precision ' ~ default_precision if default_precision else '' }}{{ ' --device "' ~ readme_export_device ~ '"' if readme_export_device else '' }}
 ```
 Additional options are documented with the `--help` option.
 {%- endmacro -%}

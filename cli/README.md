@@ -49,12 +49,16 @@ next step from the output itself.
 | `runtimes` | List all runtimes a model can be compiled to              | `qai-hub-models runtimes`                           |
 | `find`     | Search past releases for a matching asset *               | `qai-hub-models find mobilenet_v2 -s qairt=2.45` |
 | `versions` | List AI Hub Models versions supported by this CLI         | `qai-hub-models versions`                           |
+| `export` † | Export a model to a Qualcomm runtime via AI Hub Workbench | `qai-hub-models export mobilenet_v2 -r tflite -p float -d "Samsung Galaxy S25 (Family)"` |
+| `evaluate` † | Evaluate a model's accuracy on a dataset via AI Hub Workbench | `qai-hub-models evaluate mobilenet_v2 -r tflite -p float -d "Samsung Galaxy S25 (Family)"` |
 
 Run `qai-hub-models <command> --help` (e.g. `qai-hub-models fetch --help`) for
 the full flag list of any command.
 
 \* These commands accept filter flags to be passed, to narrow their results — see
 [Filtering](#filtering).
+
+† `export` and `evaluate` require the full `qai_hub_models` package (`pip install qai_hub_models`).
 
 ## Common flags
 

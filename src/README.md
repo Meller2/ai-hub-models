@@ -74,7 +74,7 @@ Qualcomm® device:
 ```shell
 pip install "qai_hub_models[yolov7]"
 
-python -m qai_hub_models.models.yolov7.export [--target-runtime ...] [--device ...] [--help]
+qai-hub-models export yolov7 --target-runtime tflite --precision float --device "Samsung Galaxy S25 (Family)"
 ```
 
 _Using Qualcomm® AI Hub Workbench_, the export script will:

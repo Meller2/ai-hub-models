@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import argparse
 import os
 import shutil
 import tempfile
@@ -514,23 +515,45 @@ def export_model(
     )
 
 
-def main() -> None:
-    warnings.filterwarnings("ignore")
-    supported_precision_runtimes: dict[Precision, list[TargetRuntime]] = {
-        Precision.w4a16: [
-            TargetRuntime.GENIE,
-            TargetRuntime.GENIEX_QAIRT,
-        ],
-    }
+SUPPORTED_PRECISION_RUNTIMES: dict[Precision, list[TargetRuntime]] = {
+    Precision.w4a16: [
+        TargetRuntime.GENIE,
+        TargetRuntime.GENIEX_QAIRT,
+    ],
+}
 
-    parser = export_parser(
+
+DEFAULT_EXPORT_DEVICE = "Samsung Galaxy S25 (Family)"
+
+
+def build_parser(cli_mode: bool = False) -> argparse.ArgumentParser:
+    """Build the argparse parser for this model's export script.
+
+    Exposed so the qai-hub-models CLI dispatcher can reuse the model's native
+    parser without re-running main(). When *cli_mode* is True, runtime,
+    precision, and device/chipset must be explicitly specified.
+    """
+    return export_parser(
         model_cls=Model,
         export_fn=export_model,
-        supported_precision_runtimes=supported_precision_runtimes,
-        default_export_device="Samsung Galaxy S25 (Family)",
+        supported_precision_runtimes=SUPPORTED_PRECISION_RUNTIMES,
+        default_export_device=DEFAULT_EXPORT_DEVICE,
         omit_precision=True,
+        cli_mode=cli_mode,
     )
-    args = parser.parse_args()
+
+
+def main(args: argparse.Namespace | None = None) -> None:
+    if args is None:
+        warnings.warn(
+            "Running `python -m qai_hub_models.models.llama_v3_1_sea_lion_3_5_8b_r.export` is "
+            "deprecated and will be removed in a future release. "
+            "Use `qai-hub-models export llama_v3_1_sea_lion_3_5_8b_r` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        args = build_parser().parse_args()
+    warnings.filterwarnings("ignore")
     export_model(**vars(args))
 
 

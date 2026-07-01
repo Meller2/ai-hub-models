@@ -245,8 +245,8 @@ class TestCommon:
                 Version("0.45.0.dev1"),
             ),
             patch(
-                "qai_hub_models_cli.proto_helpers._common.importlib.util.find_spec",
-                return_value=MagicMock(),
+                "qai_hub_models_cli.proto_helpers._common.is_heavy_package_installed",
+                return_value=True,
             ),
         ):
             assert use_aihm_source(Version("0.45.0.dev1")) is True
@@ -269,8 +269,8 @@ class TestCommon:
                 Version("0.45.0.dev1"),
             ),
             patch(
-                "qai_hub_models_cli.proto_helpers._common.importlib.util.find_spec",
-                return_value=None,
+                "qai_hub_models_cli.proto_helpers._common.is_heavy_package_installed",
+                return_value=False,
             ),
         ):
             assert use_aihm_source(Version("0.45.0.dev1")) is False
