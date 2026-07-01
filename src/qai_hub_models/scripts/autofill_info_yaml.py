@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import importlib
 import os
 import subprocess
 import sys
@@ -20,8 +21,7 @@ from tflite import Model as TFModel
 from qai_hub_models import TargetRuntime
 from qai_hub_models.configs.info_yaml import QAIHMModelInfo
 from qai_hub_models.utils.asset_loaders import qaihm_temp_dir
-from qai_hub_models.utils.export.dispatch import resolve_export_model
-from qai_hub_models.utils.export.result import (
+from qai_hub_models.utils.export_result import (
     CollectionExportResult,
     ExportResult,
     LegacyCollectionExportResult,
@@ -195,9 +195,11 @@ def main() -> None:
                             ["pip", "install", "-r", requirements_file], check=False
                         )
 
-                    export_model = resolve_export_model(model_name)
-                    results = export_model(
-                        model_name,
+                    # imports the module from the given path
+                    model_module = importlib.import_module(
+                        f"qai_hub_models.models.{model_name}.export"
+                    )
+                    results = model_module.export_model(
                         device=hub.Device("Samsung Galaxy S25 (Family)"),
                         skip_downloading=True,
                         skip_profiling=True,

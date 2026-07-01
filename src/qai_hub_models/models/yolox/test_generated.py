@@ -17,6 +17,15 @@ import torch
 
 from qai_hub_models import Precision, TargetRuntime
 from qai_hub_models.models.yolox import MODEL_ID, Model
+from qai_hub_models.models.yolox.export import (
+    compile_model,
+    export_model,
+    inference_model,
+    link_model,
+    profile_model,
+    quantize_model,
+    upload_model,
+)
 from qai_hub_models.scorecard import (
     ScorecardCompilePath,
     ScorecardDevice,
@@ -52,13 +61,6 @@ from qai_hub_models.scorecard.utils.testing_export_eval import (
     torch_inference_for_accuracy_validation_outputs,
 )
 from qai_hub_models.utils.args import get_model_kwargs
-from qai_hub_models.utils.export.compile import run_compile as compile_model
-from qai_hub_models.utils.export.dispatch import resolve_export_model
-from qai_hub_models.utils.export.inference import run_inference as inference_model
-from qai_hub_models.utils.export.link import run_link as link_model
-from qai_hub_models.utils.export.profile import run_profile as profile_model
-from qai_hub_models.utils.export.quantize import run_quantize as quantize_model
-from qai_hub_models.utils.export.upload import upload_source as upload_model
 from qai_hub_models.utils.input_spec import InputSpec
 from qai_hub_models.utils.validation import perform_runtime_model_validation
 
@@ -113,7 +115,6 @@ PASSING_PRECISION_RUNTIMES: dict[Precision, list[TargetRuntime]] = {
 
 EVAL_DEVICE = ScorecardDevice.get("Samsung Galaxy S25 (Family)")
 HAS_EVAL_DATASET = len(Model.get_eval_dataset_classes()) > 0
-export_model = resolve_export_model(MODEL_ID)
 
 
 @pytest.mark.compile

@@ -34,7 +34,6 @@ from qai_hub_models.utils.args import (
 from qai_hub_models.utils.base_collection_model import CollectionModel
 from qai_hub_models.utils.base_model import WorkbenchModel
 from qai_hub_models.utils.compare import METRICS_FUNCTIONS, torch_inference
-from qai_hub_models.utils.export.dispatch import resolve_export_model
 from qai_hub_models.utils.kwarg_helpers import filter_kwargs
 from qai_hub_models.utils.path_helpers import MODEL_IDS
 from qai_hub_models.utils.printing import print_inference_metrics
@@ -89,7 +88,7 @@ def compare_inference(
         Additional kwargs for model.from_pretrained and model.get_input_spec.
     """
     model_module = load_model_module(model_id)
-    export_model = resolve_export_model(model_id)
+    export_module = importlib.import_module(f"qai_hub_models.models.{model_id}.export")
     model_cls = model_module.Model
 
     # Validate component argument
@@ -111,8 +110,7 @@ def compare_inference(
 
     # Run export with inference
     if issubclass(model_cls, CollectionModel):
-        export_result = export_model(
-            model_id,
+        export_result = export_module.export_model(
             device=device,
             target_runtime=target_runtime,
             precision=precision,
@@ -132,8 +130,7 @@ def compare_inference(
         if not isinstance(model, WorkbenchModel):
             raise TypeError(f"Component {component} is not a WorkbenchModel")
     else:
-        export_result = export_model(
-            model_id,
+        export_result = export_module.export_model(
             device=device,
             target_runtime=target_runtime,
             precision=precision,

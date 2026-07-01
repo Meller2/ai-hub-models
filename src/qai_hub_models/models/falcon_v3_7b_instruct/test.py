@@ -32,6 +32,9 @@ from qai_hub_models.models._shared.llm.perf_collection import (
 )
 from qai_hub_models.models.falcon_v3_7b_instruct import Model
 from qai_hub_models.models.falcon_v3_7b_instruct.demo import falcon_3_7b_chat_demo
+from qai_hub_models.models.falcon_v3_7b_instruct.export import (
+    export_model,
+)
 from qai_hub_models.models.falcon_v3_7b_instruct.model import (
     HF_REPO_NAME,
     MODEL_ID,
@@ -48,10 +51,7 @@ from qai_hub_models.scorecard.device import cs_x_elite
 from qai_hub_models.scorecard.utils.testing_export_eval import run_llm_compile
 from qai_hub_models.utils.asset_loaders import ASSET_CONFIG
 from qai_hub_models.utils.checkpoint import CheckpointSpec
-from qai_hub_models.utils.export.dispatch import resolve_export_model
-from qai_hub_models.utils.export.result import MultiGraphCollectionExportResult
-
-export_model = resolve_export_model(MODEL_ID)
+from qai_hub_models.utils.export_result import MultiGraphCollectionExportResult
 
 DEFAULT_EVAL_SEQLEN = 2048
 
