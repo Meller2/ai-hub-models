@@ -7,11 +7,16 @@ import sys
 from collections.abc import Generator
 from importlib.abc import MetaPathFinder
 from importlib.machinery import ModuleSpec
+from pathlib import Path
 from typing import Any
 
 import pytest
 
-from qai_hub_models_cli.versions import get_published_versions, get_supported_versions
+from qai_hub_models_cli.versions import (
+    CURRENT_VERSION,
+    get_published_versions,
+    get_supported_versions,
+)
 
 _HEAVY_PACKAGE = "qai_hub_models"
 
@@ -41,6 +46,22 @@ def _block_heavy_import() -> Generator[None, None, None]:
         yield
     finally:
         sys.meta_path.remove(finder)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_cache_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point every on-disk cache at a per-test temp dir. Tests should never read or write the real user cache."""
+    cache_dir = tmp_path / "cache"
+    versions_cache = cache_dir / "published-versions.txt"
+    monkeypatch.setattr("qai_hub_models_cli.common.CACHE_DIR", cache_dir)
+    monkeypatch.setattr("qai_hub_models_cli.versions.CACHE_DIR", cache_dir)
+    monkeypatch.setattr("qai_hub_models_cli.versions._VERSIONS_CACHE", versions_cache)
+    monkeypatch.setattr("qai_hub_models_cli.proto_helpers._common.CACHE_DIR", cache_dir)
+
+    # Seed the upgrade-notice check cache so (print_upgrade_notice -> get_published_versions)
+    # reads it instead of querying PyPI.
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    versions_cache.write_text(str(CURRENT_VERSION))
 
 
 @pytest.fixture(autouse=True)

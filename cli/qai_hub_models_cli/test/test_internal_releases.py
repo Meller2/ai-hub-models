@@ -127,10 +127,17 @@ def test_fetch_end_to_end_s3(
 
 def test_internal_cache_dir_separate_from_public() -> None:
     """Internal and public registries use different cache directories."""
+    from qai_hub_models_cli.common import CACHE_DIR
     from qai_hub_models_cli.proto_helpers._common import get_release_cache_dir
 
-    public = get_release_cache_dir(Version("0.50.1"), internal=False)
-    internal = get_release_cache_dir(Version("0.50.1"), internal=True)
+    # Compare the path segments each adds under the (temp) cache root, not the
+    # absolute path -- the temp dir name itself may contain "internal".
+    public = get_release_cache_dir(Version("0.50.1"), internal=False).relative_to(
+        CACHE_DIR
+    )
+    internal = get_release_cache_dir(Version("0.50.1"), internal=True).relative_to(
+        CACHE_DIR
+    )
     assert public != internal
     assert "internal" not in str(public)
     assert "internal" in str(internal)
