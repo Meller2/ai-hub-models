@@ -28,9 +28,7 @@ def pytest_configure(config: pytest.Config) -> None:
 # Instantiate the model only once for all tests.
 # Mock from_pretrained to always return the initialized model.
 # This speeds up tests and limits memory leaks.
-cached_from_pretrained = make_cached_from_pretrained_fixture(
-    Model, skip_clone_repo=True
-)
+cached_from_pretrained = make_cached_from_pretrained_fixture(Model)
 
 
 @pytest.fixture(scope="module", autouse=True)

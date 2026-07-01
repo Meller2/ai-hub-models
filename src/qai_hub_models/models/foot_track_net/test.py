@@ -17,7 +17,6 @@ from qai_hub_models.models.foot_track_net.model import (
 )
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_close,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import (
     CachedWebModelAsset,
@@ -35,7 +34,6 @@ OUTPUT_RST_ADDRESS = CachedWebModelAsset.from_asset_store(
 
 
 # Verify that the output from Torch is as expected. bbox, landmark, visibility
-@skip_clone_repo_check
 def test_task() -> None:
     # error tolerance
     diff_tol = 0.1
@@ -98,7 +96,6 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     # error tolerance
     diff_tol = 0.1
@@ -160,6 +157,5 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

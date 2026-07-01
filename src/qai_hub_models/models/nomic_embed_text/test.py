@@ -13,7 +13,6 @@ from qai_hub_models.models.nomic_embed_text.model import (
     MODEL_ID,
     NomicEmbedText,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_numpy
 
 EMBEDDINGS_GT = CachedWebModelAsset.from_asset_store(
@@ -23,7 +22,6 @@ EMBEDDINGS_GT = CachedWebModelAsset.from_asset_store(
 SAMPLE_TEXT = "Hello world!"
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     model = NomicEmbedText.from_pretrained()
     app = NomicEmbedTextApp(model, model.seq_length)
@@ -34,7 +32,6 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     model = NomicEmbedText.from_pretrained()
     app = NomicEmbedTextApp(model.convert_to_torchscript(), model.seq_length)
@@ -44,6 +41,5 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True, default_text=SAMPLE_TEXT)

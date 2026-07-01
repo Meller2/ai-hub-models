@@ -11,7 +11,6 @@ from qai_hub_models.models.sesr_m5.demo import main as demo_main
 from qai_hub_models.models.sesr_m5.model import MODEL_ASSET_VERSION, MODEL_ID, SESR_M5
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_same,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 
@@ -21,7 +20,6 @@ OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     image = load_image(IMAGE_ADDRESS)
     model = SESR_M5.from_pretrained()
@@ -35,6 +33,5 @@ def test_task() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

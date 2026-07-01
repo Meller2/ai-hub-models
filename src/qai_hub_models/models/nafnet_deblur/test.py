@@ -16,7 +16,6 @@ from qai_hub_models.models.nafnet_deblur.model import (
     MODEL_ID,
     NafNetDeBlur,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 from qai_hub_models.utils.image_processing import preprocess_PIL_image
 
@@ -25,7 +24,6 @@ OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     warnings.filterwarnings("ignore")
     image = load_image(IMAGE_ADDRESS)
@@ -45,7 +43,6 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     image = load_image(IMAGE_ADDRESS)
     output_image = load_image(OUTPUT_IMAGE_ADDRESS)
@@ -64,6 +61,5 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

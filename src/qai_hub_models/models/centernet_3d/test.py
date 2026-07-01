@@ -14,7 +14,6 @@ from qai_hub_models.models.centernet_3d.model import (
     MODEL_ID,
     CenterNet3D,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import (
     CachedWebModelAsset,
     load_image,
@@ -24,7 +23,6 @@ from qai_hub_models.utils.asset_loaders import (
 OUTPUT = CachedWebModelAsset.from_asset_store(MODEL_ID, MODEL_ASSET_VERSION, "dets.npy")
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     model = CenterNet3D.from_pretrained()
     app = CenterNet3DApp(model, model.decode)
@@ -39,7 +37,6 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     model = CenterNet3D.from_pretrained()
     input_spec = model.get_input_spec()
@@ -56,7 +53,6 @@ def test_trace() -> None:
     np.testing.assert_allclose(np.array(dets), expected, rtol=1e-03, atol=1e-02)
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     # Verify demo does not crash
     demo_main(is_test=True)

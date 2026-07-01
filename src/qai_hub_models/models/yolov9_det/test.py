@@ -19,7 +19,6 @@ from qai_hub_models.models.yolov9_det.model import (
     MODEL_ID,
     YoloV9Detector,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 from qai_hub_models.utils.image_processing import preprocess_PIL_image
 from qai_hub_models.utils.set_env import set_temp_env
@@ -30,7 +29,6 @@ OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 WEIGHTS = "yolov9t.pt"
 
 
-@skip_clone_repo_check
 def test_numerical() -> None:
     """Verify that raw (numeric) outputs of both (QAIHM and non-qaihm) networks are the same."""
     processed_sample_image = preprocess_PIL_image(load_image(IMAGE_ADDRESS))
@@ -52,7 +50,6 @@ def test_numerical() -> None:
             assert np.allclose(source_out_postprocessed[i], qaihm_out_postprocessed[i])
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     image = load_image(IMAGE_ADDRESS)
     output_image = load_image(OUTPUT_IMAGE_ADDRESS)
@@ -60,6 +57,5 @@ def test_task() -> None:
     assert np.allclose(app.predict_boxes_from_image(image)[0], np.asarray(output_image))
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

@@ -33,17 +33,8 @@ HEADER = "# THIS FILE WAS AUTO-GENERATED. DO NOT EDIT MANUALLY."
 def _is_auto_generated(path: Path) -> bool:
     """Return True if the file was created by codegen."""
     with open(path) as f:
-        first_line = f.readline()
-    return HEADER in first_line
-
-
-def _skip_clone_repo_check(model_dir: Path) -> bool:
-    original_test_path = model_dir / "test.py"
-    if not original_test_path.exists():
-        return False
-    with open(original_test_path) as f:
-        original_file_contents = f.read()
-    return "skip_clone_repo_check" in original_file_contents
+        head = f.read(2048)
+    return HEADER in head
 
 
 def _get_steps(export_options: QAIHMModelCodeGen) -> dict[str, str]:
@@ -323,7 +314,6 @@ def generate_code_for_model(model_name: str) -> list[str]:
     should_generate_tests = not export_options.skip_hub_tests_and_scorecard
     test_path = model_dir / "test_generated.py"
     if should_generate_tests:
-        export_options_dict["skip_clone_repo"] = _skip_clone_repo_check(model_dir)
         generated_files.append(
             _generate_unit_tests(
                 environment, model_name, export_options_dict, test_path

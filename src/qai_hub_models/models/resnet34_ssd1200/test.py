@@ -14,7 +14,6 @@ from qai_hub_models.models.resnet34_ssd1200.model import (
 )
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_same,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import (
     CachedWebModelAsset,
@@ -26,7 +25,6 @@ EXP_IMG = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     image = load_image(INPUT_IMAGE_ADDRESS)
     exp_img = load_image(EXP_IMG)
@@ -35,13 +33,11 @@ def test_task() -> None:
     assert_most_same(np.asarray(pred_img), np.asarray(exp_img), diff_tol=0.02)
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     image = load_image(INPUT_IMAGE_ADDRESS)
     exp_img = load_image(EXP_IMG)

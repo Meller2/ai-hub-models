@@ -15,7 +15,6 @@ from qai_hub_models.models.salsanext.model import (
 )
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_same,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset
 
@@ -24,7 +23,6 @@ OUTPUT_LIDAR_ADDRESS = CachedWebModelAsset.from_asset_store(
 ).fetch()
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     model = SalsaNext.from_pretrained()
     app = SalsaNextApp(model)
@@ -33,6 +31,5 @@ def test_task() -> None:
     assert_most_same(np.asarray(pred_output), np.asarray(expected_output), diff_tol=0.0)
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

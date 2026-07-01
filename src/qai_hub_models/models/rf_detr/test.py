@@ -16,7 +16,6 @@ from qai_hub_models.models.rf_detr.model import (
 )
 from qai_hub_models.utils.args import get_model_cli_parser, model_from_cli_args
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
-from qai_hub_models.utils.testing import skip_clone_repo_check
 
 EXPECTED_OUTPUT = {75, 17}
 
@@ -25,7 +24,6 @@ IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     net = RF_DETR.from_pretrained(variant="base")
     img = load_image(IMAGE_ADDRESS)
@@ -66,7 +64,6 @@ def test_trace() -> None:
     assert set(label.numpy()) == EXPECTED_OUTPUT
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     # Run demo and verify it does not crash
     demo_main(is_test=True)

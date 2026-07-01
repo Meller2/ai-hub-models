@@ -14,7 +14,6 @@ from qai_hub_models.models.deeplabv3_resnet50.model import (
     MODEL_ID,
     DeepLabV3_ResNet50,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import (
     CachedWebModelAsset,
     load_image,
@@ -26,7 +25,6 @@ OUTPUT_IMAGE_MASK = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     image = load_image(INPUT_IMAGE_ADDRESS)
     app = DeepLabV3App(DeepLabV3_ResNet50.from_pretrained(), num_classes=NUM_CLASSES)
@@ -36,7 +34,6 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     image = load_image(INPUT_IMAGE_ADDRESS)
     app = DeepLabV3App(
@@ -48,6 +45,5 @@ def test_trace() -> None:
     assert (output_mask == output_mask_gt).mean() > 0.95
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

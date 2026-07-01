@@ -9,7 +9,6 @@ from qai_hub_models.models.eyegaze.app import EyeGazeApp
 from qai_hub_models.models.eyegaze.demo import INPUT_IMAGE_ADDRESS
 from qai_hub_models.models.eyegaze.demo import main as demo_main
 from qai_hub_models.models.eyegaze.model import MODEL_ASSET_VERSION, MODEL_ID, EyeGaze
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import (
     CachedWebModelAsset,
     load_image,
@@ -21,7 +20,6 @@ EXCEPTED_OUTPUT = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     image = load_image(INPUT_IMAGE_ADDRESS)
     model = EyeGaze.from_pretrained()
@@ -35,6 +33,5 @@ def test_task() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

@@ -18,7 +18,6 @@ from qai_hub_models.models.statetransformer.model import (
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_close,
     assert_most_same,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import (
     CachedWebModelAsset,
@@ -33,7 +32,6 @@ DEMO_ASSET = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     model = StateTransformer.from_pretrained(MODEL_PATH)
     app = App(model)
@@ -49,13 +47,11 @@ def test_task() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     model = StateTransformer.from_pretrained(MODEL_PATH).convert_to_torchscript()
     app = App(model)

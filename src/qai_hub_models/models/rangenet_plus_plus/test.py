@@ -19,11 +19,9 @@ from qai_hub_models.models.rangenet_plus_plus.model import (
 )
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_same,
-    skip_clone_repo_check,
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     model = RangeNetPlusPlus.from_pretrained()
     app = RangeNetApp(model)
@@ -44,7 +42,6 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     model = RangeNetPlusPlus.from_pretrained().convert_to_torchscript()
     app = RangeNetApp(model)
@@ -60,6 +57,5 @@ def test_trace() -> None:
     assert_most_same(mask, expected_mask, diff_tol=0.0)
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

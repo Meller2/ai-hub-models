@@ -23,7 +23,7 @@ from qai_hub_models.models.yolo_world.model import (
 )
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 from qai_hub_models.utils.image_processing import app_to_net_image_inputs, resize_pad
-from qai_hub_models.utils.testing import assert_most_close, skip_clone_repo_check
+from qai_hub_models.utils.testing import assert_most_close
 
 WEIGHTS = DEFAULT_WEIGHTS
 PROMPT_TEXT = "bus,person"
@@ -33,7 +33,6 @@ OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     image = load_image(IMAGE_ADDRESS)
     output_image = load_image(OUTPUT_IMAGE_ADDRESS)
@@ -49,7 +48,6 @@ def test_task() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_numerical() -> None:
     """Verify that raw (numeric) outputs of both (QAIHM and non-qaihm) networks are the same."""
     _, nchw = app_to_net_image_inputs(load_image(IMAGE_ADDRESS))
@@ -83,7 +81,6 @@ def test_numerical() -> None:
             ), f"Output mismatch at index {i}"
 
 
-@skip_clone_repo_check
 @pytest.mark.trace
 def test_trace() -> None:
     """Verify that the pt2 export of the detector produces numerically correct output."""
@@ -109,7 +106,6 @@ def test_trace() -> None:
     assert pytorch_out[0].shape[-1] == 4  # xyxy boxes
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     """Run demo and verify it does not crash."""
     demo_main(is_test=True)

@@ -12,7 +12,6 @@ from qai_hub_models.models.openai_clip.model import (
     MODEL_ID,
     OpenAIClip,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 
 IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
@@ -21,7 +20,6 @@ IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 TEXT = "pyramid in desert"
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     """Verify that raw (numeric) outputs of both networks are the same."""
     source_clip_model = OpenAIClip.from_pretrained()
@@ -47,6 +45,5 @@ def test_task() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

@@ -21,7 +21,6 @@ from qai_hub_models.models.mask2former.model import (
 )
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_close,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 from qai_hub_models.utils.image_processing import (
@@ -35,7 +34,6 @@ OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     """Verify that raw (numeric) outputs of both (QAIHM and non-qaihm) networks are the same."""
     source_model = Mask2FormerForUniversalSegmentation.from_pretrained(WEIGHTS)
@@ -54,7 +52,6 @@ def test_task() -> None:
             assert np.allclose(source_out[i], qaihm_out[i], atol=0.001, rtol=0.001)
 
 
-@skip_clone_repo_check
 @pytest.mark.trace
 def test_trace() -> None:
     net = Mask2Former.from_pretrained(WEIGHTS)
@@ -79,7 +76,6 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     # Run demo and verify it does not crash
     demo_main(is_test=True)

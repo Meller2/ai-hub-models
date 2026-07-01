@@ -16,7 +16,6 @@ from qai_hub_models.models.yolov7.model import (
     YoloV7,
     _load_yolov7_source_model_from_weights,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 from qai_hub_models.utils.image_processing import preprocess_PIL_image
 
@@ -26,7 +25,6 @@ OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 WEIGHTS = "yolov7-tiny.pt"
 
 
-@skip_clone_repo_check
 def test_numerical() -> None:
     """Verify that raw (numeric) outputs of both (QAIHM and non-qaihm) networks are the same."""
     processed_sample_image = preprocess_PIL_image(load_image(IMAGE_ADDRESS))
@@ -46,7 +44,6 @@ def test_numerical() -> None:
             assert np.allclose(source_out_postprocessed[i], qaihm_out_postprocessed[i])
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     image = load_image(IMAGE_ADDRESS)
     output_image = load_image(OUTPUT_IMAGE_ADDRESS).convert("RGB")
@@ -54,12 +51,10 @@ def test_task() -> None:
     assert np.allclose(app.predict_boxes_from_image(image)[0], np.asarray(output_image))
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)
 
 
-@skip_clone_repo_check
 def test_app_with_larger_image() -> None:
     """Test that app resizes larger image to model size and transforms boxes back."""
     model = YoloV7.from_pretrained(WEIGHTS)
@@ -84,7 +79,6 @@ def test_app_with_larger_image() -> None:
     np.testing.assert_allclose(boxes[0].numpy(), expected_boxes, rtol=1e-3)
 
 
-@skip_clone_repo_check
 def test_app_with_non_square_image() -> None:
     """Test that app correctly pads non-square images."""
     model = YoloV7.from_pretrained(WEIGHTS)

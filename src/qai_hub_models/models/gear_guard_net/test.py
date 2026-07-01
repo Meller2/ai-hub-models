@@ -13,7 +13,6 @@ from qai_hub_models.models.gear_guard_net.model import (
     MODEL_ID,
     GearGuardNet,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import (
     CachedWebModelAsset,
     load_image,
@@ -29,7 +28,6 @@ GROUND_TRUTH_RESULT = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     app = GearGuardNetApp(GearGuardNet.from_pretrained(), nms_score_threshold=0.9)
     image = load_image(INPUT_IMAGE_ADDRESS.fetch())
@@ -46,7 +44,6 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     app = GearGuardNetApp(
         GearGuardNet.from_pretrained().convert_to_torchscript(), nms_score_threshold=0.9
@@ -63,6 +60,5 @@ def test_trace() -> None:
     assert get_iou(boxes_pd, boxes_gt) > 0.5
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

@@ -9,10 +9,8 @@ import torch
 from qai_hub_models.models.dncnn.demo import main as demo_main
 from qai_hub_models.models.dncnn.demo import make_noisy_image
 from qai_hub_models.models.dncnn.model import DnCNN
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     """Verify DnCNN reduces noise (PSNR improvement)."""
     model = DnCNN.from_pretrained()
@@ -44,6 +42,5 @@ def test_task() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

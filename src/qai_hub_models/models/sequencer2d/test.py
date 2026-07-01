@@ -15,10 +15,8 @@ from qai_hub_models.models.sequencer2d.model import (
     MODEL_ID,
     Sequencer2D,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     run_imagenet_classifier_test(
         Sequencer2D.from_pretrained(),
@@ -29,11 +27,9 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     run_imagenet_classifier_trace_test(Sequencer2D.from_pretrained(), check_trace=False)
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

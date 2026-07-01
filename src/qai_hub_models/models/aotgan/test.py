@@ -12,7 +12,6 @@ from qai_hub_models.models.aotgan.demo import main as demo_main
 from qai_hub_models.models.aotgan.model import AOTGAN, MODEL_ASSET_VERSION, MODEL_ID
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_close,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 
@@ -21,7 +20,6 @@ OUTPUT_ADDRESS = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     app = RepaintMaskApp(AOTGAN.from_pretrained())
 
@@ -40,7 +38,6 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     net = AOTGAN.from_pretrained()
     input_spec = net.get_input_spec()
@@ -61,7 +58,6 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     # Run demo and verify it does not crash
     demo_main(is_test=True)

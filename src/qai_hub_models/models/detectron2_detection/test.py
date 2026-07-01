@@ -20,7 +20,6 @@ from qai_hub_models.models.detectron2_detection.model import (
 )
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_close,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import load_image
 
@@ -41,7 +40,6 @@ def run_source_model() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     return exp_boxes.tensor, exp_scores, exp_labels
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     exp_boxes, exp_scores, exp_labels = run_source_model()
     wrapper = Detectron2Detection.from_pretrained()
@@ -74,7 +72,6 @@ def test_task() -> None:
     )
 
 
-@skip_clone_repo_check
 @pytest.mark.trace
 def test_trace() -> None:
     exp_boxes, exp_scores, exp_labels = run_source_model()
@@ -114,7 +111,6 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     # Run demo and verify it does not crash
     demo_main(is_test=True)

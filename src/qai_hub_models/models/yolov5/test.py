@@ -20,12 +20,10 @@ from qai_hub_models.models.yolov5.model import (
     DEFAULT_WEIGHTS,
     YoloV5,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import load_image
 from qai_hub_models.utils.image_processing import preprocess_PIL_image
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     # source model
     source_model = cast(DetectionModel, ultralytics_YOLO(DEFAULT_WEIGHTS).model)
@@ -46,6 +44,5 @@ def test_task() -> None:
             assert np.allclose(source_out_postprocessed[i], qaihm_out_postprocessed[i])
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

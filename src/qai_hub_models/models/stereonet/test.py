@@ -15,7 +15,6 @@ from qai_hub_models.models.stereonet.demo import main as demo_main
 from qai_hub_models.models.stereonet.model import DEFAULT_CKPT, StereoNet
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_close,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import load_image
 from qai_hub_models.utils.image_processing import (
@@ -68,19 +67,16 @@ def _run_test(model: StereoNet | torch.jit.ScriptModule, spec_model: StereoNet) 
     )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     model = StereoNet.from_pretrained()
     _run_test(model, model)
 
 
-@skip_clone_repo_check
 @pytest.mark.trace
 def test_trace() -> None:
     model = StereoNet.from_pretrained()
     _run_test(model.convert_to_torchscript(), model)
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

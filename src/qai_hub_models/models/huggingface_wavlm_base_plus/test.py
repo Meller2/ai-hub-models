@@ -13,7 +13,6 @@ from qai_hub_models.models.huggingface_wavlm_base_plus.model import (
     SAMPLE_INPUTS,
     HuggingFaceWavLMBasePlus,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import load_numpy
 
 
@@ -25,13 +24,11 @@ def _test_impl(app: HuggingFaceWavLMBasePlusApp) -> None:
     assert app_output == expected_text
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     _test_impl(HuggingFaceWavLMBasePlusApp(HuggingFaceWavLMBasePlus.from_pretrained()))
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     _test_impl(
         HuggingFaceWavLMBasePlusApp(
@@ -40,6 +37,5 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

@@ -6,11 +6,9 @@
 from qai_hub_models.models.yamnet.app import YamNetApp
 from qai_hub_models.models.yamnet.demo import main as demo_main
 from qai_hub_models.models.yamnet.model import INPUT_AUDIO_ADDRESS, YamNet
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 
 
 # Verify that the output from Torch is as expected.
-@skip_clone_repo_check
 def test_task() -> None:
     yamnet_app = YamNetApp(model=YamNet.from_pretrained())
     dst_path = INPUT_AUDIO_ADDRESS.fetch()

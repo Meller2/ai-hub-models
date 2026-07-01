@@ -16,10 +16,8 @@ from qai_hub_models.models.mobile_bert_uncased_google.demo import main as demo_m
 from qai_hub_models.models.mobile_bert_uncased_google.model import (
     MobileBertUncasedGoogle,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     model_cls = MobileBertUncasedGoogle.from_pretrained()
     tokenizer = cast(PreTrainedTokenizer, model_cls.tokenizer)
@@ -29,6 +27,5 @@ def test_task() -> None:
     assert app_output == expected_text
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

@@ -14,7 +14,6 @@ from qai_hub_models.models.maskrcnn.demo import main as demo_main
 from qai_hub_models.models.maskrcnn.model import MaskRCNN
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_close,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import load_image
 from qai_hub_models.utils.image_processing import preprocess_PIL_image
@@ -49,7 +48,6 @@ def run_source_model() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.
     return exp_boxes, exp_scores, exp_labels, exp_masks
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     """Verify that raw (numeric) outputs of both (QAIHM and torchvision) networks are similar."""
     exp_boxes, exp_scores, exp_labels, exp_masks = run_source_model()
@@ -101,7 +99,6 @@ def test_task() -> None:
     )
 
 
-@skip_clone_repo_check
 @pytest.mark.trace
 def test_trace() -> None:
     """Test that the traced model produces similar outputs to the original."""
@@ -160,7 +157,6 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     """Run demo and verify it does not crash."""
     demo_main(is_test=True)

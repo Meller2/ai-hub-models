@@ -16,7 +16,6 @@ from qai_hub_models.models.pspnet.model import (
 )
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_same,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 from qai_hub_models.utils.image_processing import (
@@ -30,7 +29,6 @@ OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 
 
 # Verify that the output from Torch is as expected.
-@skip_clone_repo_check
 def test_task() -> None:
     model = PSPNet.from_pretrained()
     app = SegmentationApp(model)
@@ -49,7 +47,6 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     model = PSPNet.from_pretrained()
     app = SegmentationApp(model.convert_to_torchscript())
@@ -67,6 +64,5 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

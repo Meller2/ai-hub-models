@@ -13,7 +13,6 @@ from qai_hub_models.models.mediapipe_pose.model import (
     MODEL_ID,
     MediaPipePose,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 
 OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
@@ -25,7 +24,6 @@ OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 # no numerical tests are included for the model; only for the app.
 
 
-@skip_clone_repo_check
 def test_pose_app() -> None:
     image = load_image(
         INPUT_IMAGE_ADDRESS,
@@ -41,7 +39,6 @@ def test_pose_app() -> None:
     np.testing.assert_allclose(actual_output, np.asarray(expected_output))
 
 
-@skip_clone_repo_check
 def test_pose_app_with_detect_postprocessing() -> None:
     image = load_image(
         INPUT_IMAGE_ADDRESS,
@@ -57,6 +54,5 @@ def test_pose_app_with_detect_postprocessing() -> None:
     np.testing.assert_allclose(actual_output, np.asarray(expected_output))
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

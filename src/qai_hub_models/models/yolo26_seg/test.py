@@ -15,14 +15,12 @@ from qai_hub_models.models._shared.yolo.model import yolo_segment_postprocess
 from qai_hub_models.models.yolo26_seg.demo import IMAGE_ADDRESS
 from qai_hub_models.models.yolo26_seg.demo import main as demo_main
 from qai_hub_models.models.yolo26_seg.model import Yolo26Segmentor
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import load_image
 from qai_hub_models.utils.image_processing import preprocess_PIL_image
 
 WEIGHTS = "yolo26n-seg.pt"
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     qaihm_model = Yolo26Segmentor.from_pretrained(WEIGHTS)
     qaihm_app = YoloSegmentationApp(qaihm_model, nms_score_threshold=0.25)
@@ -48,7 +46,6 @@ def test_task() -> None:
             assert np.allclose(source_out_postprocessed[i], qaihm_out_postprocessed[i])
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     # Run demo and verify it does not crash
     demo_main(is_test=True)

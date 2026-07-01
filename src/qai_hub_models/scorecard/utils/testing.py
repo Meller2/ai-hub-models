@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import contextlib
-import functools
 import inspect
 import shutil
 from collections import defaultdict
@@ -31,7 +30,6 @@ from qai_hub_models.scorecard.artifacts import ScorecardArtifact
 from qai_hub_models.scorecard.envvars import ArtifactsDirEnvvar, DeploymentEnvvar
 from qai_hub_models.scorecard.utils.testing_async_utils import append_line_to_file
 from qai_hub_models.utils.asset_loaders import (
-    always_answer_prompts,
     load_yaml,
     qaihm_temp_dir,
 )
@@ -79,8 +77,6 @@ __all__ = [
     "mock_on_device_model_call",
     "mock_tabulate_fn",
     "patch_qai_hub",
-    "skip_clone_repo_check",
-    "skip_clone_repo_check_fixture",
     "skip_invalid_runtime_device",
 ]
 
@@ -94,35 +90,8 @@ AnyModel = (
 AnyModelCls = type[AnyModel]
 
 
-def skip_clone_repo_check(func: Callable) -> Callable:
-    """
-    When running QAI Hub Models functions, the user sometimes needs to type "y"
-    before the repo is cloned. When testing in CI, we want to skip this check.
-
-    Add this function as a decorator to any test function that needs to bypass this.
-
-    @skip_clone_repo_check
-    def test_fn():
-        ...
-    """
-
-    @functools.wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        with always_answer_prompts(True):
-            return func(*args, **kwargs)
-
-    return wrapper
-
-
-@pytest.fixture
-def skip_clone_repo_check_fixture() -> Generator[None, None, None]:
-    with always_answer_prompts(True):
-        yield
-
-
 def make_cached_from_pretrained_fixture(
     model_cls: type[FromPretrainedProtocol],
-    skip_clone_repo: bool = False,
 ) -> Callable[[], Generator[pytest.MonkeyPatch, None, None]]:
     """Build the module-scoped autouse fixture that memoizes
     ``model_cls.from_pretrained``.
@@ -177,8 +146,6 @@ def make_cached_from_pretrained_fixture(
                 pretrained_cache[cache_key] = non_none_model
                 return non_none_model
 
-            if skip_clone_repo:
-                _cached_from_pretrained = skip_clone_repo_check(_cached_from_pretrained)
             _cached_from_pretrained.__signature__ = sig  # type: ignore[attr-defined]
 
             mp.setattr(model_cls, "from_pretrained", _cached_from_pretrained)

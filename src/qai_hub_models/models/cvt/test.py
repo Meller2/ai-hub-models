@@ -10,7 +10,6 @@ from qai_hub_models.models.cvt.app import CVTApp
 from qai_hub_models.models.cvt.demo import CAM_METADATA, CAMERAS
 from qai_hub_models.models.cvt.demo import main as demo_main
 from qai_hub_models.models.cvt.model import CVT, MODEL_ASSET_VERSION, MODEL_ID
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import (
     CachedWebModelAsset,
     load_image,
@@ -23,7 +22,6 @@ EXPECTED_OUTPUT = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     model = CVT.from_pretrained(ckpt_name="vehicles_50k")
     app = CVTApp(model, ckpt_name="vehicles_50k")
@@ -39,7 +37,6 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     model = CVT.from_pretrained(ckpt_name="vehicles_50k")
     input_spec = model.get_input_spec()
@@ -57,6 +54,5 @@ def test_trace() -> None:
     np.testing.assert_allclose(np.array(bev), expected, rtol=1e-02, atol=1e-02)
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

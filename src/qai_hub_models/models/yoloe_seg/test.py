@@ -23,7 +23,6 @@ from qai_hub_models.models.yoloe_seg.model import (
 )
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_close,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 from qai_hub_models.utils.image_processing import preprocess_PIL_image
@@ -35,7 +34,6 @@ OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     """Verify that raw (numeric) outputs of both (QAIHM and non-qaihm) networks are the same."""
     qaihm_model = YoloESegmentor.from_pretrained(PROMPT_TEXT, WEIGHTS)
@@ -70,7 +68,6 @@ def test_task() -> None:
             ), f"Output mismatch at index {i}"
 
 
-@skip_clone_repo_check
 @pytest.mark.trace
 def test_trace() -> None:
     """Verify that the TorchScript trace of the model runs and produces valid output."""
@@ -92,13 +89,11 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     """Run demo and verify it does not crash."""
     demo_main(is_test=True)
 
 
-@skip_clone_repo_check
 def test_app_with_larger_image() -> None:
     """Test that app resizes larger image to model size and resizes masks back."""
     model = YoloESegmentor.from_pretrained(PROMPT_TEXT, WEIGHTS)
@@ -133,7 +128,6 @@ def test_app_with_larger_image() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_app_with_non_square_image() -> None:
     """Test that app correctly handles non-square images."""
     model = YoloESegmentor.from_pretrained(PROMPT_TEXT, WEIGHTS)

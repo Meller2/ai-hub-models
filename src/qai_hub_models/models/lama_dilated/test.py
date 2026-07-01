@@ -16,7 +16,6 @@ from qai_hub_models.models.lama_dilated.model import (
 )
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_close,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 
@@ -25,7 +24,6 @@ OUTPUT_ADDRESS = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     app = RepaintMaskApp(LamaDilated.from_pretrained())
 
@@ -44,7 +42,6 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     net = LamaDilated.from_pretrained()
     input_spec = net.get_input_spec()
@@ -65,7 +62,6 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     # Run demo and verify it does not crash
     demo_main(is_test=True)

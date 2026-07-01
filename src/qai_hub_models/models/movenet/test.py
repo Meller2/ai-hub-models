@@ -11,7 +11,6 @@ from qai_hub_models.models.movenet.app import MovenetApp
 from qai_hub_models.models.movenet.demo import IMAGE_ADDRESS
 from qai_hub_models.models.movenet.demo import main as demo_main
 from qai_hub_models.models.movenet.model import MODEL_ASSET_VERSION, MODEL_ID, Movenet
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import (
     CachedWebModelAsset,
     load_image,
@@ -23,7 +22,6 @@ KEYPOINT_SCORES_GT = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     image = load_image(IMAGE_ADDRESS)
     model = Movenet.from_pretrained()
@@ -34,6 +32,5 @@ def test_task() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

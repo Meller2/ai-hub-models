@@ -18,7 +18,6 @@ from qai_hub_models.models.nafssr.model import (
     NAFSSR,
     SCALING_FACTOR,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 from qai_hub_models.utils.image_processing import preprocess_PIL_image
 
@@ -30,7 +29,6 @@ SR_IMAGE_R = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     warnings.filterwarnings("ignore")
     l_img = load_image(LR_IMAGE_L)
@@ -58,7 +56,6 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     l_img = load_image(LR_IMAGE_L)
     r_img = load_image(LR_IMAGE_R)
@@ -88,6 +85,5 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

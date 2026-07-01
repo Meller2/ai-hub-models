@@ -17,7 +17,6 @@ from qai_hub_models.models.sixd_repnet.model import (
     MODEL_ID,
     SixDRepNet,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_numpy
 
 EXPECTED_OUTPUT = CachedWebModelAsset.from_asset_store(
@@ -25,7 +24,6 @@ EXPECTED_OUTPUT = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     """Test that SixDRepNet predicts head pose angles matching the expected output."""
     image = PILImageModule.fromarray(astronaut())
@@ -44,7 +42,6 @@ def test_task() -> None:
     np.testing.assert_allclose(angles, expected, rtol=0.01, atol=1.0)
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     """Test that the SixDRepNet demo runs without error."""
     demo_main(is_test=True)

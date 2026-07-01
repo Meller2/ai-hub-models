@@ -15,10 +15,8 @@ from qai_hub_models.models.efficientvit_l2_cls.model import (
     MODEL_ID,
     EfficientViT,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     run_imagenet_classifier_test(
         EfficientViT.from_pretrained(),
@@ -29,11 +27,9 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     run_imagenet_classifier_trace_test(EfficientViT.from_pretrained())
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

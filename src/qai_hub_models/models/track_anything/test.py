@@ -18,7 +18,6 @@ from qai_hub_models.models.track_anything.model import (
 )
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_close,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_numpy
 
@@ -30,7 +29,6 @@ OUTPUT_MASK = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_app() -> None:
     wrapper = TrackAnythingWrapper.from_pretrained()
     app = TrackAnythingApp(
@@ -51,6 +49,5 @@ def test_app() -> None:
     assert_most_close(output, expected, 0.005, rtol=0.001, atol=0.001)
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

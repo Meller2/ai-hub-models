@@ -17,12 +17,10 @@ from qai_hub_models.models.yolov6.model import (
     YoloV6,
     _load_yolov6_source_model_from_weights,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 from qai_hub_models.utils.image_processing import preprocess_PIL_image
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     model_path = f"{WEIGHTS_PATH}{DEFAULT_WEIGHTS}"
     asset = CachedWebModelAsset(
@@ -47,6 +45,5 @@ def test_task() -> None:
             assert np.allclose(source_out_postprocessed[i], qaihm_out_postprocessed[i])
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

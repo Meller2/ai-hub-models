@@ -18,7 +18,6 @@ from qai_hub_models.models.yolov11_seg.demo import main as demo_main
 from qai_hub_models.models.yolov11_seg.model import YoloV11Segmentor
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_close,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import load_image
 from qai_hub_models.utils.image_processing import preprocess_PIL_image
@@ -26,7 +25,6 @@ from qai_hub_models.utils.image_processing import preprocess_PIL_image
 WEIGHTS = "yolo11n-seg.pt"
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     """Verify that raw (numeric) outputs of both (QAIHM and non-qaihm) networks are the same."""
     qaihm_model = YoloV11Segmentor.from_pretrained(WEIGHTS)
@@ -49,7 +47,6 @@ def test_task() -> None:
             assert np.allclose(source_out_postprocessed[i], qaihm_out_postprocessed[i])
 
 
-@skip_clone_repo_check
 @pytest.mark.trace
 def test_trace() -> None:
     net = YoloV11Segmentor.from_pretrained(WEIGHTS)
@@ -71,7 +68,6 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     # Run demo and verify it does not crash
     demo_main(is_test=True)

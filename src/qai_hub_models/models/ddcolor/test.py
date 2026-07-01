@@ -11,7 +11,6 @@ from qai_hub_models.models.ddcolor.demo import main as demo_main
 from qai_hub_models.models.ddcolor.model import MODEL_ASSET_VERSION, MODEL_ID, DDColor
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_close,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 
@@ -20,7 +19,6 @@ OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     img = load_image(INPUT_IMAGE_ADDRESS)
     model = DDColor.from_pretrained()
@@ -30,7 +28,6 @@ def test_task() -> None:
     assert_most_close(np.array(out), np.array(expected_out), 0.005, 0.0, 1e-4)
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     # Verify demo does not crash
     demo_main(is_test=True)

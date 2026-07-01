@@ -9,7 +9,6 @@ from qai_hub_models.models.bevfusion_det.app import BEVFusionApp
 from qai_hub_models.models.bevfusion_det.demo import CAMERAS, INPUTS
 from qai_hub_models.models.bevfusion_det.demo import main as demo_main
 from qai_hub_models.models.bevfusion_det.model import MODEL_ID, BEVFusion
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import (
     CachedWebModelAsset,
     load_image,
@@ -20,7 +19,6 @@ from qai_hub_models.utils.asset_loaders import (
 OUTPUT = CachedWebModelAsset.from_asset_store(MODEL_ID, 5, "outputs/corners.npy")
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     model = BEVFusion.from_pretrained()
     heads = model.decoder.heads
@@ -44,7 +42,6 @@ def test_task() -> None:
     np.testing.assert_allclose(np.array(corners), expected, rtol=1e-02, atol=1e-02)
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     # Verify demo does not crash
     demo_main(is_test=True)

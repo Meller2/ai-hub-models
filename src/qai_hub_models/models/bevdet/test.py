@@ -22,7 +22,6 @@ from qai_hub_models.models.bevdet.demo import (
 )
 from qai_hub_models.models.bevdet.demo import main as demo_main
 from qai_hub_models.models.bevdet.model import MODEL_ASSET_VERSION, MODEL_ID, BEVDet
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import (
     CachedWebModelAsset,
     load_image,
@@ -57,7 +56,6 @@ def _get_expected_output() -> np.ndarray:
     return load_numpy(OUTPUT_PYTORCH_34MINUS.fetch())
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     model = BEVDet.from_pretrained()
     app = BEVDetApp(model, model.bboxcoder)
@@ -107,7 +105,6 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     model = BEVDet.from_pretrained()
     input_spec = model.get_input_spec()
@@ -158,7 +155,6 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     # Verify demo does not crash
     demo_main(is_test=True)

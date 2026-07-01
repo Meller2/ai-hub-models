@@ -10,7 +10,6 @@ from qai_hub_models.models.pointnet.demo import main as demo_main
 from qai_hub_models.models.pointnet.model import MODEL_ASSET_VERSION, MODEL_ID
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_same,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_torch
 
@@ -19,7 +18,6 @@ OUTPUT_TEST_ADDRESS = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     model = Model.from_pretrained()
     app = App(model)
@@ -29,6 +27,5 @@ def test_task() -> None:
     assert_most_same(np.asarray(pred_output), np.asarray(expected_output), diff_tol=0.0)
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

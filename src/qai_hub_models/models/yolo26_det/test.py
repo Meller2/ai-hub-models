@@ -14,7 +14,6 @@ from qai_hub_models.models.yolo26_det.model import (
     MODEL_ID,
     Yolo26Detector,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import (
     CachedWebModelAsset,
     load_image,
@@ -26,7 +25,6 @@ OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 WEIGHTS = "yolo26n.pt"
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     image = load_image(IMAGE_ADDRESS)
     output_image = load_image(OUTPUT_IMAGE_ADDRESS)
@@ -36,6 +34,5 @@ def test_task() -> None:
     assert np.allclose(app.predict_boxes_from_image(image)[0], np.asarray(output_image))
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

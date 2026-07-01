@@ -13,7 +13,6 @@ from qai_hub_models.models.mediapipe_face.model import (
     MODEL_ID,
     MediaPipeFace,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 
 OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
@@ -23,7 +22,6 @@ OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 
 # Because we have not made a modification to the pytorch source network,
 # no numerical tests are included for the model; only for the app.
-@skip_clone_repo_check
 def test_face_app() -> None:
     image = load_image(
         INPUT_IMAGE_ADDRESS,
@@ -39,7 +37,6 @@ def test_face_app() -> None:
     assert np.allclose(actual_output, np.asarray(expected_output))
 
 
-@skip_clone_repo_check
 def test_face_app_with_det_postprocessing() -> None:
     image = load_image(
         INPUT_IMAGE_ADDRESS,
@@ -55,6 +52,5 @@ def test_face_app_with_det_postprocessing() -> None:
     assert np.allclose(actual_output, np.asarray(expected_output))
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

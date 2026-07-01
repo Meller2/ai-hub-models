@@ -23,7 +23,6 @@ from qai_hub_models.models.edgetam.model import (
 )
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_close,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_numpy
 from qai_hub_models.utils.image_processing import app_to_net_image_inputs
@@ -47,7 +46,6 @@ def _make_app(model: EdgeTAM) -> EdgeTAMVideoApp:
     )
 
 
-@skip_clone_repo_check
 def test_e2e_numerical() -> None:
     """Verify encoder and decoder components individually against the source model."""
     model = EdgeTAM.from_pretrained()
@@ -106,7 +104,6 @@ def test_e2e_numerical() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_app() -> None:
     """Verify full pipeline output matches golden masks."""
     model = EdgeTAM.from_pretrained()
@@ -122,7 +119,6 @@ def test_app() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_image_mode() -> None:
     """Verify EdgeTAMApp.predict (single-frame image path) produces correct output."""
     model = EdgeTAM.from_pretrained()
@@ -162,12 +158,10 @@ def test_image_mode() -> None:
     assert painted.dtype == np.uint8
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)
 
 
-@skip_clone_repo_check
 def test_demo_image_mode() -> None:
     """Exercise the demo's --image code path end-to-end."""
     frames = generate_frames_from_video(str(VIDEO_ADDRESS.fetch()))[:1]

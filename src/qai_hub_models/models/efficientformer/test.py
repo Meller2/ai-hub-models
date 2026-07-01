@@ -15,10 +15,8 @@ from qai_hub_models.models.efficientformer.model import (
     MODEL_ID,
     EfficientFormer,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     run_imagenet_classifier_test(
         EfficientFormer.from_pretrained(),
@@ -29,7 +27,6 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     # check_trace=False: EfficientFormer uses dynamic control flow that
     # produces non-deterministic trace outputs, causing trace check to fail.
@@ -38,6 +35,5 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

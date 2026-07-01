@@ -17,7 +17,6 @@ from qai_hub_models.models.crestereo.model import (
 )
 from qai_hub_models.scorecard.utils.testing import (
     assert_most_close,
-    skip_clone_repo_check,
 )
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 
@@ -44,17 +43,14 @@ def _run_test(model: CREStereo | torch.jit.ScriptModule) -> None:
     )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     _run_test(CREStereo.from_pretrained())
 
 
-@skip_clone_repo_check
 @pytest.mark.trace
 def test_trace() -> None:
     _run_test(CREStereo.from_pretrained().convert_to_torchscript())
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

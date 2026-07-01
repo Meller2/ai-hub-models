@@ -6,7 +6,6 @@
 from qai_hub_models.models.rtmdet.app import RTMDetApp
 from qai_hub_models.models.rtmdet.demo import main as demo_main
 from qai_hub_models.models.rtmdet.model import MODEL_ASSET_VERSION, MODEL_ID, RTMDet
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import (
     CachedWebModelAsset,
     load_image,
@@ -21,7 +20,6 @@ GT_BOXES = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     image = load_image(IMAGE_ADDRESS)
     app = RTMDetApp(RTMDet.from_pretrained(), nms_score_threshold=0.5)
@@ -35,6 +33,5 @@ def test_task() -> None:
         assert iou > 0.95
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

@@ -14,7 +14,6 @@ from qai_hub_models.models.easyocr.model import (
     MODEL_ID,
     EasyOCR,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 
 OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
@@ -28,7 +27,6 @@ ENGLISH_INPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     model = EasyOCR.from_pretrained(LANG_LIST)
     detector_shape = tuple(model.detector.get_input_spec()["image"][0][2:4])

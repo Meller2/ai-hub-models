@@ -14,7 +14,6 @@ from qai_hub_models.models.depth_anything_v3.model import (
     MODEL_ID,
     DepthAnythingV3,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 
 OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
@@ -23,7 +22,6 @@ OUTPUT_IMAGE_ADDRESS = CachedWebModelAsset.from_asset_store(
 
 
 # Verify that the output from Torch is as expected.
-@skip_clone_repo_check
 def test_task() -> None:
     model = DepthAnythingV3.from_pretrained()
     (_, _, height, width) = model.get_input_spec()["image"][0]
@@ -38,7 +36,6 @@ def test_task() -> None:
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     model = DepthAnythingV3.from_pretrained()
     (_, _, height, width) = model.get_input_spec()["image"][0]
@@ -52,6 +49,5 @@ def test_trace() -> None:
     )
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

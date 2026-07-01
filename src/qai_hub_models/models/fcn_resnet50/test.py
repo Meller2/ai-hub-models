@@ -14,7 +14,6 @@ from qai_hub_models.models.fcn_resnet50.model import (
     MODEL_ID,
     FCN_ResNet50,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import CachedWebModelAsset, load_image
 
 OUTPUT_IMAGE_LOCAL_PATH = "fcn_demo_output.png"
@@ -36,17 +35,14 @@ def _test_impl(app: FCN_ResNet50App) -> None:
     )
 
 
-@skip_clone_repo_check
 def test_task() -> None:
     _test_impl(FCN_ResNet50App(FCN_ResNet50.from_pretrained()))
 
 
 @pytest.mark.trace
-@skip_clone_repo_check
 def test_trace() -> None:
     _test_impl(FCN_ResNet50App(FCN_ResNet50.from_pretrained().convert_to_torchscript()))
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)

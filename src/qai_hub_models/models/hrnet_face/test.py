@@ -13,7 +13,6 @@ from qai_hub_models.models.hrnet_face.model import (
     MODEL_ID,
     HRNetFace,
 )
-from qai_hub_models.scorecard.utils.testing import skip_clone_repo_check
 from qai_hub_models.utils.asset_loaders import (
     CachedWebModelAsset,
     load_image,
@@ -23,7 +22,6 @@ from qai_hub_models.utils.asset_loaders import (
 
 # Because we have not made a modification to the pytorch source network,
 # no numerical tests are included for the model; only for the app.
-@skip_clone_repo_check
 def test_face_app() -> None:
     image = load_image(
         IMAGE_ADDRESS,
@@ -41,6 +39,5 @@ def test_face_app() -> None:
     assert np.allclose(actual_output, np.asarray(expected_out))
 
 
-@skip_clone_repo_check
 def test_demo() -> None:
     demo_main(is_test=True)
