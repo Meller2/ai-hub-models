@@ -25,10 +25,15 @@ qai-hub-models perf GPT-OSS-20B
 qai-hub-models numerics GPT-OSS-20B
 
 # Download a ready-to-deploy asset
-qai-hub-models fetch GPT-OSS-20B --runtime qnn_context_binary --precision mxfp4
+qai-hub-models fetch GPT-OSS-20B --runtime geniex_llamacpp --precision mxfp4
 ```
 See the [CLI README](../../../../cli/README.md)
 for the full list of commands and filters.
+
+## Deploying GPT-OSS-20B on-device
+
+Follow the [GenieX quickstart](https://geniex.aihub.qualcomm.com/en/get-started/quickstart) to install GenieX and deploy the model on a target device.
+
 
 ## License
 * The license for the original implementation of GPT-OSS-20B can be found

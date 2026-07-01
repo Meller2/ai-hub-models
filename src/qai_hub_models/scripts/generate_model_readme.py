@@ -9,9 +9,12 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
+from qai_hub_models import TargetRuntime
 from qai_hub_models.configs.info_yaml import QAIHMModelInfo
 from qai_hub_models.utils.asset_loaders import ASSET_CONFIG, UNPUBLISHED_MODEL_WARNING
 from qai_hub_models.utils.path_helpers import MODEL_IDS
+
+GENIEX_RUNTIMES = (TargetRuntime.GENIEX_QAIRT, TargetRuntime.GENIEX_LLAMACPP)
 
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
 jinja_env = Environment(
@@ -60,6 +63,23 @@ def get_shared_template_args(model_info: QAIHMModelInfo) -> dict[str, Any]:
             "{genie_url} and {geniex_url} placeholders. Use only one."
         )
 
+    orchestrator_runtimes = set(model_code_gen.orchestrator_runtimes)
+    has_geniex_runtime = any(r in orchestrator_runtimes for r in GENIEX_RUNTIMES)
+    has_genie_runtime = TargetRuntime.GENIE in orchestrator_runtimes
+    # restrict_model_sharing means artifacts cannot be redistributed, so the
+    # user must run the export step themselves before pointing GenieX at a
+    # local path. That is exactly what needs_local_export gates in the README.
+    needs_local_export = model_info.restrict_model_sharing
+
+    # The macro and additional_readme_section both emit a "Deploying X
+    # on-device" heading; rendering both would produce duplicate sections.
+    if has_geniex_runtime and additional_readme_section:
+        raise ValueError(
+            f"{model_info.id}: has both a GenieX orchestrator runtime and an "
+            "additional_readme_section. Remove the additional_readme_section "
+            "so the deploying_on_device macro renders the deployment guidance."
+        )
+
     return {
         # Model info
         "model_id": model_info.id,
@@ -78,6 +98,13 @@ def get_shared_template_args(model_info: QAIHMModelInfo) -> dict[str, Any]:
         "include_gen_ai_terms": model_info.is_gen_ai_model,
         "voice_ai_compatible": model_info.voice_ai_compatible,
         "voice_ai_url": ASSET_CONFIG.voice_ai_url,
+        # On-device deployment section (driven by orchestrator_runtimes)
+        "has_geniex_runtime": has_geniex_runtime,
+        "has_genie_runtime": has_genie_runtime,
+        "needs_local_export": has_geniex_runtime and needs_local_export,
+        "geniex_url": ASSET_CONFIG.geniex_url,
+        "geniex_quickstart_url": ASSET_CONFIG.geniex_quickstart_url,
+        "genie_url": ASSET_CONFIG.genie_url,
     }
 
 

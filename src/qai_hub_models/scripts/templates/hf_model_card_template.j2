@@ -4,7 +4,7 @@
     Generates the README.md for models published to Hugging Face.
     Includes performance tables, getting started guide, and model details.
 #}
-{% from 'shared/readme_macros.j2' import model_intro, license, references, community, usage_and_limitations %}
+{% from 'shared/readme_macros.j2' import model_intro, license, references, community, usage_and_limitations, deploying_on_device %}
 {% from 'shared/hf_macros.j2' import getting_started, model_details_section, performance_table %}
 {#
     Render the Hugging Face model card.
@@ -81,7 +81,13 @@
     is_llm,
     is_precompiled=False,
     restrict_model_sharing=False,
-    show_purchase_statement=False
+    show_purchase_statement=False,
+    has_geniex_runtime=False,
+    needs_local_export=False,
+    has_genie_runtime=False,
+    geniex_url="",
+    geniex_quickstart_url="",
+    genie_url=""
 ) %}
 ---
 {{ hugging_face_metadata }}
@@ -97,6 +103,10 @@
 {% if additional_readme_section %}
 
 {{ additional_readme_section }}
+{%- endif %}
+{% if has_geniex_runtime %}
+
+{{ deploying_on_device(model_name, needs_local_export, has_genie_runtime, geniex_url, geniex_quickstart_url, genie_url) }}
 {%- endif %}
 {% if voice_ai_compatible %}
 

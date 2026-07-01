@@ -33,6 +33,7 @@ def _make_asset_config(tmpdir: str) -> ModelZooAssetConfig:
         models_website_relative_path="",
         genie_url="",
         geniex_url="",
+        geniex_quickstart_url="",
         voice_ai_url="",
         global_release_asset_folder="",
         released_asset_folder="",

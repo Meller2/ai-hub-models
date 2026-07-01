@@ -4,7 +4,7 @@
     Generates the README.md for each model in the qai_hub_models repository.
     Includes installation instructions, usage examples, and model documentation.
 #}
-{% from 'shared/readme_macros.j2' import model_intro, license, references, community, usage_and_limitations, example_and_usage, download_assets %}
+{% from 'shared/readme_macros.j2' import model_intro, license, references, community, usage_and_limitations, example_and_usage, download_assets, deploying_on_device %}
 {#
     Render the model README.
 
@@ -97,7 +97,13 @@
     unpublished_model_warning="",
     model_assets_shareable=False,
     default_runtime=None,
-    default_precision=None
+    default_precision=None,
+    has_geniex_runtime=False,
+    needs_local_export=False,
+    has_genie_runtime=False,
+    geniex_url="",
+    geniex_quickstart_url="",
+    genie_url=""
 ) %}
 {% if model_status != "published" %}
 > [!WARNING]
@@ -114,6 +120,10 @@
 {% if additional_readme_section %}
 
 {{ additional_readme_section }}
+{% endif %}
+{% if has_geniex_runtime %}
+
+{{ deploying_on_device(model_name, needs_local_export, has_genie_runtime, geniex_url, geniex_quickstart_url, genie_url) }}
 {% endif %}
 {% if voice_ai_compatible %}
 

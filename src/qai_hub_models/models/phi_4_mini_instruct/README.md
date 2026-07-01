@@ -25,10 +25,15 @@ qai-hub-models perf Phi-4-Mini-Instruct
 qai-hub-models numerics Phi-4-Mini-Instruct
 
 # Download a ready-to-deploy asset
-qai-hub-models fetch Phi-4-Mini-Instruct --runtime qnn_context_binary --precision q4_0
+qai-hub-models fetch Phi-4-Mini-Instruct --runtime geniex_llamacpp --precision q4_0
 ```
 See the [CLI README](../../../../cli/README.md)
 for the full list of commands and filters.
+
+## Deploying Phi-4-Mini-Instruct on-device
+
+Follow the [GenieX quickstart](https://geniex.aihub.qualcomm.com/en/get-started/quickstart) to install GenieX and deploy the model on a target device.
+
 
 ## License
 * The license for the original implementation of Phi-4-Mini-Instruct can be found

@@ -40,5 +40,8 @@ genie_url: https://github.com/qualcomm/ai-hub-apps/tree/main/tutorials/llm_on_ge
 # GenieX local-model quickstart URL
 geniex_url: https://geniex.aihub.qualcomm.com/en/run/cli/quickstart/#run-a-local-model
 
+# GenieX get-started quickstart URL (install + first run)
+geniex_quickstart_url: https://geniex.aihub.qualcomm.com/en/get-started/quickstart
+
 # Voice AI SDK download URL
 voice_ai_url: https://qpm.qualcomm.com/#/main/tools/details/VoiceAI_ASR

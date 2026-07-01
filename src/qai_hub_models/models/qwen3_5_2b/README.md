@@ -25,10 +25,15 @@ qai-hub-models perf Qwen3.5-2B
 qai-hub-models numerics Qwen3.5-2B
 
 # Download a ready-to-deploy asset
-qai-hub-models fetch Qwen3.5-2B --runtime qnn_context_binary --precision q4_0
+qai-hub-models fetch Qwen3.5-2B --runtime geniex_llamacpp --precision q4_0
 ```
 See the [CLI README](../../../../cli/README.md)
 for the full list of commands and filters.
+
+## Deploying Qwen3.5-2B on-device
+
+Follow the [GenieX quickstart](https://geniex.aihub.qualcomm.com/en/get-started/quickstart) to install GenieX and deploy the model on a target device.
+
 
 ## License
 * The license for the original implementation of Qwen3.5-2B can be found

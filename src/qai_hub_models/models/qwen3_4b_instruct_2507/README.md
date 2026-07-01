@@ -29,11 +29,9 @@ for the full list of commands and filters.
 
 ## Deploying Qwen3-4B-Instruct-2507 on-device
 
-To run this model locally, you need:
+Follow the [GenieX quickstart](https://geniex.aihub.qualcomm.com/en/get-started/quickstart) to install GenieX and deploy the model on a target device.
 
-1. **An exported context binary** — produced by the [Export](#export) step below.
-2. **GenieX**, AI Hub's on-device Gen AI inference runtime — runs the exported model on device.
-   See [Run a Local Model with GenieX](https://geniex.aihub.qualcomm.com/en/run/cli/quickstart/#run-a-local-model) for installation and usage.
+See the [LLM-on-Genie](https://github.com/qualcomm/ai-hub-apps/tree/main/tutorials/llm_on_genie) tutorial to run with the Genie runtime. Note: Genie support will be deprecated soon.
 
 
 ## Export

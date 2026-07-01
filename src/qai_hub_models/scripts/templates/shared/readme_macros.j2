@@ -350,6 +350,35 @@ Additional options are documented with the `--help` option.
 {%- endmacro -%}
 
 
+{#
+    "Deploying X on-device" section for GenieX models. Call sites must guard
+    on has_geniex_runtime. needs_local_export adds the export-to-local-path
+    line for models whose artifacts cannot be redistributed (i.e.
+    restrict_model_sharing), so the user must run the export step themselves.
+    has_genie_runtime adds the Genie deprecation note.
+#}
+{%- macro deploying_on_device(
+    model_name,
+    needs_local_export,
+    has_genie_runtime,
+    geniex_url,
+    geniex_quickstart_url,
+    genie_url
+) -%}
+## Deploying {{ model_name }} on-device
+
+Follow the [GenieX quickstart]({{ geniex_quickstart_url }}) to install GenieX and deploy the model on a target device.
+{% if needs_local_export %}
+
+You'll need to export the model artifact using the steps below, then follow [Run a Local Model with GenieX]({{ geniex_url }}).
+{% endif %}
+{% if has_genie_runtime %}
+
+See the [LLM-on-Genie]({{ genie_url }}) tutorial to run with the Genie runtime. Note: Genie support will be deprecated soon.
+{% endif %}
+{%- endmacro -%}
+
+
 {#  Generate the community section with Slack and support links.  #}
 {%- macro community() -%}
 ## Community
