@@ -15,13 +15,28 @@ from qai_hub_models.configs.devices_and_chipsets_yaml import DevicesAndChipsetsY
 from qai_hub_models.configs.info_yaml import NumericsAccuracyBenchmark
 from qai_hub_models.configs.numerics_yaml import QAIHMModelNumerics
 from qai_hub_models.scorecard.device import ScorecardDevice
+from qai_hub_models.scorecard.params import ScJobParams
 from qai_hub_models.scorecard.path_profile import ScorecardProfilePath
+from qai_hub_models.scorecard.results.yaml import InferenceScorecardJobYaml
 
 
 class NumericsDiff:
     """Generates Numerics Difference between two numerics.yaml"""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        current_inference_jobs: InferenceScorecardJobYaml | None = None,
+        previous_inference_jobs: InferenceScorecardJobYaml | None = None,
+    ) -> None:
+        # Inference job ID lookup yamls. Empty defaults are safe —
+        # _inference_job_id_for() returns "null" on miss.
+        self._current_inference_jobs = (
+            current_inference_jobs or InferenceScorecardJobYaml()
+        )
+        self._previous_inference_jobs = (
+            previous_inference_jobs or InferenceScorecardJobYaml()
+        )
+
         self.missing_models: list[str] = []
         self.new_models: list[str] = []
         self.empty_models: list[str] = []
@@ -48,7 +63,9 @@ class NumericsDiff:
             tuple[str, str, str, ScorecardDevice, Precision, ScorecardProfilePath]
         ] = []
 
-        # tuple<Model ID, Dataset Name, Metric Name, Device, Precision, Path, FP Accuracy, Device Accuracy, Previous FP Accuracy, Previous Device Accuracy>
+        # tuple<Model ID, Dataset Name, Metric Name, Device, Precision, Path,
+        #       FP Accuracy, Device Accuracy, Previous FP Accuracy, Previous Device Accuracy,
+        #       Inference Job ID, Previous Inference Job ID>
         # Progression == Accuracy is closer to target than previous. Regression == Accuracy is further from target than previous.
         self.progressions: list[
             tuple[
@@ -58,6 +75,8 @@ class NumericsDiff:
                 ScorecardDevice,
                 Precision,
                 ScorecardProfilePath,
+                str,
+                str,
                 str,
                 str,
                 str,
@@ -72,6 +91,8 @@ class NumericsDiff:
                 ScorecardDevice,
                 Precision,
                 ScorecardProfilePath,
+                str,
+                str,
                 str,
                 str,
                 str,
@@ -121,6 +142,28 @@ class NumericsDiff:
                 bool,
             ]
         ] = []
+
+    def _inference_job_id_for(
+        self,
+        inference_jobs: InferenceScorecardJobYaml,
+        model_id: str,
+        precision: Precision,
+        path: ScorecardProfilePath,
+        device: ScorecardDevice,
+    ) -> str:
+        """Return the inference-job ID for these params, or "null" if missing.
+
+        The linkifier renders "null" as N/A. Component / graph_name are
+        intentionally not threaded through — numerics regressions don't track
+        them today, so component-model lookups will miss and render N/A.
+        """
+        params = ScJobParams(
+            model_id=model_id,
+            path=path,
+            precision=precision,
+            device=device,
+        )
+        return inference_jobs.get_job_id(params) or "null"
 
     def merge_from(self, other: NumericsDiff) -> None:
         self.missing_models.extend(other.missing_models)
@@ -295,6 +338,20 @@ class NumericsDiff:
                         f"{new_metric.partial_metric} {new_metric_details.metric_unit}",
                         f"{previous_metric_details.partial_torch_metric} {previous_metric_details.metric_unit}",
                         f"{prev_metric.partial_metric} {previous_metric_details.metric_unit}",
+                        self._inference_job_id_for(
+                            self._current_inference_jobs,
+                            model_id,
+                            precision,
+                            path,
+                            device,
+                        ),
+                        self._inference_job_id_for(
+                            self._previous_inference_jobs,
+                            model_id,
+                            precision,
+                            path,
+                            device,
+                        ),
                     )
                 )
 
@@ -563,6 +620,8 @@ class NumericsDiff:
                 str,
                 str,
                 str,
+                str,
+                str,
             ]
         ],
     ) -> PrettyTable:
@@ -574,13 +633,17 @@ class NumericsDiff:
         data
             List of tuples containing model id, dataset name, metric name, device,
             precision, path, FP accuracy, device accuracy, previous FP accuracy,
-            and previous device accuracy.
+            previous device accuracy, inference job id, and previous inference
+            job id.
 
         Returns
         -------
         table : PrettyTable
             Summary table for the given data.
         """
+        # Column names are canonical (no env suffix). The issue-body builder
+        # re-tags them with the deployment of each side at render time, since
+        # 'previous' isn't always prod.
         table = PrettyTable(
             [
                 "Model ID",
@@ -593,6 +656,8 @@ class NumericsDiff:
                 "Device Accuracy",
                 "Previous FP Accuracy",
                 "Previous Device Accuracy",
+                "Inference Job ID",
+                "Previous Inference Job ID",
             ]
         )
         data.sort(key=lambda k: k[0])  # sort by model id

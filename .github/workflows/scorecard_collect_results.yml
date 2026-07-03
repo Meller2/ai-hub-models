@@ -129,7 +129,7 @@ jobs:
     outputs:
       # Set unless any model-data step actually failed (skipped is fine) — gates
       # create_pr so partial-failure runs don't push a PR.
-      branch_name: ${{ steps.upload-results.conclusion == 'success' && steps.create-perf-files.outcome != 'failure' && steps.create-numerics-files.outcome != 'failure' && steps.create-release-assets-files.outcome != 'failure' && env.PR_REF_NAME || ''}}
+      branch_name: ${{ steps.upload-results.conclusion == 'success' && steps.create-perf-files.outcome != 'failure' && steps.create-release-assets-files.outcome != 'failure' && env.PR_REF_NAME || ''}}
       performance_diff_url: ${{ steps.upload-perf-diff-summary.conclusion == 'success' && steps.upload-perf-diff-summary.outputs.artifact-url || 'N/A' }}
       numerics_diff_url: ${{ steps.upload-numerics-diff-summary.conclusion == 'success' && steps.upload-numerics-diff-summary.outputs.artifact-url || 'N/A' }}
       results_url: ${{ steps.upload-results.conclusion == 'success' && steps.upload-results.outputs.artifact-url || 'N/A' }}
@@ -285,23 +285,14 @@ jobs:
           hub-private-user-token-dev: ${{ secrets.HUB_PRIVATE_USER_TOKEN_DEV }}
           aws-role-arn: ${{ secrets.QAIHM_CI_AWS_ROLE_ARN }}
 
-      - name: Create Performance files for models
+      - name: Create Performance and numerics files for models
         id: create-perf-files
         if: ${{ !cancelled() }}
         run: |
           python3 scripts/build_and_test.py \
             --venv="${{ env.VENV_PATH }}" \
             --python="${{ steps.ci_setup.outputs.python-path }}" \
-            create_perfs
-
-      - name: Update numerics files for models
-        id: create-numerics-files
-        if: ${{ !cancelled() && steps.download-accuracy-artifact.outcome == 'success' }}
-        run: |
-          python3 scripts/build_and_test.py \
-            --venv="${{ env.VENV_PATH }}" \
-            --python="${{ steps.ci_setup.outputs.python-path }}" \
-            create_numerics
+            create_perfs_and_numerics
 
       - name: Combine Per-Split Release Assets
         id: combine-release-assets
@@ -344,7 +335,7 @@ jobs:
             --output-file ${{ env.QAIHM_TEST_ARTIFACTS_DIR }}/scorecard_failure_analysis.csv
 
       - name: Copy CSV to Tableau
-        if: ${{ !cancelled() && inputs.publish_to_tableau && steps.aggregate-results.outcome == 'success' && steps.create-perf-files.outcome != 'failure' && steps.create-numerics-files.outcome != 'failure' && steps.create-release-assets-files.outcome != 'failure' }}
+        if: ${{ !cancelled() && inputs.publish_to_tableau && steps.aggregate-results.outcome == 'success' && steps.create-perf-files.outcome != 'failure' && steps.create-release-assets-files.outcome != 'failure' }}
         run: |
           if [ -z "$QAIHM_TEST_TABLEAU_BRANCH_NAME" ]; then
             echo "tableau_branch_name must be set to upload to Tableau. Exiting."
@@ -361,7 +352,7 @@ jobs:
 
       - name: Refresh Model Runtime Estimates
         id: refresh-runtime-estimates
-        if: ${{ !cancelled() && inputs.create_pr && inputs.tableau_branch_name == 'weekly-prod' && inputs.action_id != '' && steps.create-perf-files.outcome != 'failure' && steps.create-numerics-files.outcome != 'failure' && steps.create-release-assets-files.outcome != 'failure' }}
+        if: ${{ !cancelled() && inputs.create_pr && inputs.tableau_branch_name == 'weekly-prod' && inputs.action_id != '' && steps.create-perf-files.outcome != 'failure' && steps.create-release-assets-files.outcome != 'failure' }}
         env:
           GH_TOKEN: ${{ github.token }}
           ACTION_ID: ${{ inputs.action_id }}
@@ -373,13 +364,13 @@ jobs:
             --repo "$REPO"
 
       - name: Run codegen and precommit
-        if: ${{ !cancelled() && inputs.create_pr && steps.create-perf-files.outcome != 'failure' && steps.create-numerics-files.outcome != 'failure' && steps.create-release-assets-files.outcome != 'failure' }}
+        if: ${{ !cancelled() && inputs.create_pr && steps.create-perf-files.outcome != 'failure' && steps.create-release-assets-files.outcome != 'failure' }}
         run: |
           source "${{ env.VENV_PATH }}/bin/activate" && python -m qai_hub_models.scripts.run_codegen -a --no-precommit
           SKIP=mypy-src,mypy-cli pre-commit run --all-files || true
 
       - name: Commit & Push Changes
-        if: ${{ !cancelled() && inputs.create_pr && steps.create-perf-files.outcome != 'failure' && steps.create-numerics-files.outcome != 'failure' && steps.create-release-assets-files.outcome != 'failure' }}
+        if: ${{ !cancelled() && inputs.create_pr && steps.create-perf-files.outcome != 'failure' && steps.create-release-assets-files.outcome != 'failure' }}
         run: |
           # Checkout branch
           git checkout -b ${{ env.PR_REF_NAME }}
@@ -439,7 +430,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload Job Artifact - Numerics Diff
-        if: ${{ !cancelled() && steps.create-numerics-files.outcome != 'skipped' }}
+        if: ${{ !cancelled() && steps.create-perf-files.outcome != 'skipped' }}
         id: upload-numerics-diff-summary
         uses: actions/upload-artifact@v7
         with:
@@ -454,7 +445,7 @@ jobs:
           cp --parents -r src/qai_hub_models/models/**/perf.yaml ${{ env.QAIHM_TEST_ARTIFACTS_DIR }}/perf-yamls
 
       - name: Collect Numerics Results
-        if: ${{ !cancelled() && steps.create-numerics-files.outcome != 'skipped' }}
+        if: ${{ !cancelled() && steps.create-perf-files.outcome != 'skipped' }}
         run: |
           mkdir -p ${{ env.QAIHM_TEST_ARTIFACTS_DIR }}/numerics-yamls
           cp --parents -r src/qai_hub_models/models/**/numerics.yaml ${{ env.QAIHM_TEST_ARTIFACTS_DIR }}/numerics-yamls
@@ -471,6 +462,16 @@ jobs:
         run: |
           DEPLOYMENT=${{ env.QAIHM_TEST_DEPLOYMENT }}
           DEPLOYMENT_URL=$( [ "$DEPLOYMENT" = "prod" ] && echo "workbench" || echo "$DEPLOYMENT" )
+          # The previous baseline is whichever branch we just checked out for
+          # the comparison. main = prod scorecard's baseline, anything else =
+          # same deployment as the current run (per scorecard.yml passing
+          # github.ref_name as previous_results_branch). Map accordingly.
+          PREV_BRANCH="${{ inputs.previous_results_branch }}"
+          if [ "$PREV_BRANCH" = "main" ]; then
+            PREVIOUS_DEPLOYMENT_URL="workbench"
+          else
+            PREVIOUS_DEPLOYMENT_URL="$DEPLOYMENT_URL"
+          fi
           TEST_ARGS=""
           if [ "${{ inputs.test_mode }}" = "true" ]; then
             TEST_ARGS="--labels P3,scorecard,test --title-prefix [TEST] "
@@ -482,6 +483,7 @@ jobs:
             --perf-diff-url "${{ steps.upload-perf-diff-summary.outputs.artifact-url || 'N/A' }}" \
             --numerics-diff-url "${{ steps.upload-numerics-diff-summary.outputs.artifact-url || 'N/A' }}" \
             --deployment "$DEPLOYMENT_URL" \
+            --previous-deployment "$PREVIOUS_DEPLOYMENT_URL" \
             --output "${{ env.QAIHM_TEST_ARTIFACTS_DIR }}/regression-issue.json" \
             $TEST_ARGS
 

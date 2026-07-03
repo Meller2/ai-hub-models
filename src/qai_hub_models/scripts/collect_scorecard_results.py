@@ -15,11 +15,13 @@ import traceback
 from itertools import cycle
 from pathlib import Path
 
+import pandas as pd
 import ruamel.yaml
 
 from qai_hub_models.configs.code_gen_yaml import QAIHMModelCodeGen
 from qai_hub_models.configs.devices_and_chipsets_yaml import load_similar_devices
 from qai_hub_models.configs.info_yaml import QAIHMModelInfo
+from qai_hub_models.configs.numerics_yaml import QAIHMModelNumerics
 from qai_hub_models.configs.perf_yaml import QAIHMModelPerf
 from qai_hub_models.scorecard.artifacts import ScorecardArtifact
 from qai_hub_models.scorecard.device import ScorecardDevice
@@ -36,9 +38,13 @@ from qai_hub_models.scorecard.envvars import (
     StaticModelsDirEnvvar,
 )
 from qai_hub_models.scorecard.results.code_gen import (
+    remove_numerics_failures,
+    remove_perf_failures,
+    update_code_gen_accuracy_failure_reasons,
     update_code_gen_failure_reasons,
     update_model_publish_status,
 )
+from qai_hub_models.scorecard.results.numerics_diff import NumericsDiff
 from qai_hub_models.scorecard.results.performance_diff import PerformanceDiff
 from qai_hub_models.scorecard.results.scorecard_summary import (
     ModelTestConfig,
@@ -67,6 +73,10 @@ from qai_hub_models.utils.hub_clients import (
     get_scorecard_client_or_raise,
     set_default_hub_client,
 )
+from qai_hub_models.utils.numerics_yaml import (
+    create_numerics_yaml,
+    get_chipset_registry,
+)
 from qai_hub_models.utils.path_helpers import MODEL_IDS
 
 # If the precision is any one of these two values, add it to the branch column
@@ -86,6 +96,14 @@ def write_jobs_config(config: dict, path: str) -> None:
     yaml = ruamel.yaml.YAML()
     with open(path, "w") as file:
         yaml.dump(config, file)
+
+
+def _merge_existing_accuracy_data(
+    new_df: pd.DataFrame, models: set[str]
+) -> pd.DataFrame:
+    old_df = pd.read_csv(ScorecardArtifact.ACCURACY_CSV.intermediates_path)
+    old_df = old_df[~old_df.model_id.isin(models)]
+    return pd.concat([old_df, new_df])
 
 
 def remove_failed_jobs(config: dict) -> None:
@@ -130,6 +148,12 @@ def parse_args() -> argparse.Namespace:
     BranchEnvvar.add_arg(parser)
     DateFormatEnvvar.add_arg_group(parser)
     ArtifactsDirEnvvar.add_arg(parser)
+    parser.add_argument(
+        "--accuracy-csv-path",
+        type=str,
+        default=str(ScorecardArtifact.ACCURACY_CSV.path),
+        help="Accuracy CSV input. When present and non-empty, drives numerics-yaml updates.",
+    )
     return parser.parse_args()
 
 
@@ -525,6 +549,14 @@ if __name__ == "__main__":
         profile_job_yamls = ProfileScorecardJobYaml()
         inference_job_yamls = InferenceScorecardJobYaml()
 
+    # Capture the previous (pre-merge) compile- and inference-job yamls for
+    # the regression reports' "Previous *" columns before the in-memory merge
+    # below makes current and previous indistinguishable.
+    previous_compile_jobs = CompileScorecardJobYaml(dict(compile_job_yamls.mapping))
+    previous_inference_jobs = InferenceScorecardJobYaml(
+        dict(inference_job_yamls.mapping)
+    )
+
     # Append job results from test artifacts
     component_names_yaml.mapping.update(
         ComponentNamesYaml.from_test_artifacts().mapping
@@ -536,6 +568,8 @@ if __name__ == "__main__":
     link_job_yamls.update(LinkScorecardJobYaml.from_test_artifacts())
     profile_job_yamls.update(ProfileScorecardJobYaml.from_test_artifacts())
     inference_job_yamls.update(InferenceScorecardJobYaml.from_test_artifacts())
+    current_compile_jobs = CompileScorecardJobYaml.from_test_artifacts()
+    current_inference_jobs = InferenceScorecardJobYaml.from_test_artifacts()
 
     # Extract Data from Models
     if len(model_list) > 1:
@@ -587,8 +621,12 @@ if __name__ == "__main__":
             )
         ]
 
-    # Collect Model Results
-    perf_report = PerformanceDiff() if args.gen_perf_summary else None
+    perf_report: PerformanceDiff | None = None
+    if args.gen_perf_summary:
+        perf_report = PerformanceDiff(
+            current_compile_jobs=current_compile_jobs,
+            previous_compile_jobs=previous_compile_jobs,
+        )
     spreadsheet = ResultsSpreadsheet() if args.gen_csv else None
     if spreadsheet is not None:
         spreadsheet.set_date(date)
@@ -600,6 +638,21 @@ if __name__ == "__main__":
             if isinstance(precision, SpecialPrecisionSetting):
                 branch += f" - {precision.value}"
         spreadsheet.set_branch(branch)
+
+    # Numerics setup. Skipped (no-op) when the accuracy CSV is missing/empty —
+    # this is the perf-only run path.
+    accuracy_path = Path(args.accuracy_csv_path)
+    accuracy_csv_present = accuracy_path.exists() and accuracy_path.stat().st_size > 0
+    accuracy_df = pd.read_csv(accuracy_path) if accuracy_csv_present else None
+    chipset_registry = get_chipset_registry() if accuracy_csv_present else None
+    global_numerics_diff: NumericsDiff | None = (
+        NumericsDiff(
+            current_inference_jobs=current_inference_jobs,
+            previous_inference_jobs=previous_inference_jobs,
+        )
+        if accuracy_csv_present
+        else None
+    )
 
     failed_model_ids: list[str] = []
     for model_id, model_summary in zip(model_list, model_summaries, strict=False):
@@ -622,13 +675,84 @@ if __name__ == "__main__":
                 new_report=curr_model_card,
             )
 
+        # Numerics is pytorch-only; static models don't have inference jobs.
+        if not (accuracy_csv_present and model_id in pytorch_models):
+            continue
+        assert accuracy_df is not None
+        assert chipset_registry is not None
+        assert global_numerics_diff is not None
+        try:
+            model_info = QAIHMModelInfo.from_model(model_id)
+            if (
+                model_info.code_gen_config.skip_hub_tests_and_scorecard
+                or model_info.code_gen_config.skip_scorecard
+                or model_info.code_gen_config.freeze_perf_yaml
+            ):
+                continue
+
+            model_diff = NumericsDiff(
+                current_inference_jobs=current_inference_jobs,
+                previous_inference_jobs=previous_inference_jobs,
+            )
+            numerics = create_numerics_yaml(
+                model_id,
+                accuracy_df,
+                chipset_registry,
+                model_diff,
+                benchmark=model_info.numerics_benchmark,
+            )
+            global_numerics_diff.merge_from(model_diff)
+            if numerics is None:
+                QAIHMModelNumerics().to_model_yaml(model_id)  # deletes existing file
+                continue
+
+            if numerics.metrics:
+                # Update failure reasons according to what NumericsDiff says is
+                # above the acceptable accuracy threshold.
+                update_code_gen_accuracy_failure_reasons(
+                    model_id, model_info.code_gen_config, model_diff
+                )
+
+                # Update numerics.yaml to remove failing paths
+                numerics = remove_numerics_failures(
+                    numerics, model_info.code_gen_config.disabled_paths
+                )
+
+                if args.sync_code_gen and using_prod_hub:
+                    # If sync-code-gen is on, save the updated failure reasons to disk.
+                    model_info.code_gen_config.to_model_yaml(model_id)
+
+                    # Update perf.yaml to remove failing paths
+                    perf = remove_perf_failures(
+                        perf=QAIHMModelPerf.from_model(model_id, not_exists_ok=True),
+                        failure_reason=model_info.code_gen_config.disabled_paths,
+                    )
+                    perf.apply_similar_devices(load_similar_devices())
+                    perf.to_model_yaml(model_id)
+
+                    # Un-publish or re-publish the model if needed by updating info.yaml.
+                    if update_model_publish_status(model_info):
+                        model_info.to_model_yaml(write_code_gen=False)
+
+            numerics.to_model_yaml(model_id)
+            print(f"{model_id} numerics update complete")
+        except Exception:
+            # Skip this model so one bad input doesn't kill the batch; the
+            # aggregate raise at the end of __main__ still fails the job
+            # after assets land.
+            print(
+                f"{model_id} numerics update failed:\n{traceback.format_exc()}",
+                file=sys.stderr,
+            )
+            failed_model_ids.append(model_id)
+
     # Write spreadsheet to disk
     if spreadsheet is not None:
         summary_path = os.path.join(args.artifacts_dir, "export-summary.csv")
         spreadsheet.to_csv(summary_path)
         print(f"Spreadsheet written to {os.path.realpath(summary_path)}")
 
-    # Write summary to disk
+    # Write performance summary to disk
     if perf_report is not None:
         report_path = os.path.join(
             args.artifacts_dir, f"performance-summary-{now_str}.txt"
@@ -651,7 +775,33 @@ if __name__ == "__main__":
         )
         perf_report.dump_severe_regressions_json(regressions_path)
 
-    # Write jobs and environment to intermediates folder
+    # Write numerics summary to disk
+    if global_numerics_diff is not None:
+        numerics_summary_path = os.path.join(
+            args.artifacts_dir, f"numerics-summary-{now_str}.txt"
+        )
+        global_numerics_diff.dump_summary(numerics_summary_path)
+
+        numerics_regressions_path = os.path.join(
+            args.artifacts_dir, f"numerics-regressions-{now_str}.json"
+        )
+        global_numerics_diff.dump_regressions_json(numerics_regressions_path)
+
+        # Write accuracy to intermediates folder
+        if args.sync_code_gen and using_prod_hub:
+            assert accuracy_df is not None
+            if args.models not in (
+                {SpecialModelSetting.PYTORCH},
+                {SpecialModelSetting.ALL},
+            ):
+                accuracy_df = _merge_existing_accuracy_data(accuracy_df, pytorch_models)
+            accuracy_df.to_csv(
+                ScorecardArtifact.ACCURACY_CSV.intermediates_path, index=False
+            )
+    else:
+        print("No accuracy CSV found. Skipping numerics-yaml updates.")
+
+    # Write jobs and environment to intermediates folder.
     if using_prod_hub:
         component_names_yaml.to_file()
         graph_names_yaml.to_file()

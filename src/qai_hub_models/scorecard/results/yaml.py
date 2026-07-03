@@ -168,6 +168,10 @@ class ScorecardJobYaml(ScorecardYamlFile[str], Generic[ScorecardJobTypeVar]):
         """
         self.mapping[self.get_job_key(params)] = job_id
 
+    def get_job_id(self, params: ScJobParams) -> str | None:
+        """Return the raw job ID string for *params*, or None if not present."""
+        return self.mapping.get(self.get_job_key(params))
+
     def update(self, other: ScorecardJobYaml) -> None:
         """Merge the other YAML into this YAML, overwriting any existing jobs with the same job name"""
         if type(other) is not type(self):

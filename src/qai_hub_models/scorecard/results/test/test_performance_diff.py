@@ -5,15 +5,18 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from qai_hub_models import Precision
 from qai_hub_models.configs.perf_yaml import QAIHMModelPerf
 from qai_hub_models.configs.tool_versions import ToolVersions
 from qai_hub_models.scorecard.device import ScorecardDevice, cs_8_gen_3
+from qai_hub_models.scorecard.params import ScJobParams
 from qai_hub_models.scorecard.path_profile import ScorecardProfilePath
 from qai_hub_models.scorecard.results.performance_diff import PerformanceDiff
 from qai_hub_models.scorecard.results.yaml import (
+    CompileScorecardJobYaml,
     ToolVersionChange,
     ToolVersionsByPathYaml,
 )
@@ -21,6 +24,8 @@ from qai_hub_models.scorecard.results.yaml import (
 MODEL_ID = "dummy"
 PREV_JOB_ID = "jgzr270o5"
 JOB_ID = "jp4kr0kvg"
+PREV_COMPILE_JOB_ID = "jcprev9aa"
+COMPILE_JOB_ID = "jcnewa11b"
 COMPONENT_ID = "dummy_component"
 
 
@@ -41,7 +46,8 @@ def get_basic_speedup_report(
                                     inference_time_milliseconds=onnx_tf_inference_time,
                                 ),
                                 ScorecardProfilePath.ONNX: QAIHMModelPerf.PerformanceDetails(
-                                    job_id=job_id, inference_time_milliseconds=5.0
+                                    job_id=job_id,
+                                    inference_time_milliseconds=5.0,
                                 ),
                                 ScorecardProfilePath.QNN_DLC: QAIHMModelPerf.PerformanceDetails(
                                     job_id=job_id,
@@ -54,6 +60,24 @@ def get_basic_speedup_report(
             )
         }
     )
+
+
+def _compile_mapping_for(
+    compile_job_id: str,
+    path: ScorecardProfilePath,
+    device: ScorecardDevice = cs_8_gen_3,
+) -> CompileScorecardJobYaml:
+    """Build a CompileScorecardJobYaml that matches what
+    PerformanceDiff._compile_job_id_for() looks up.
+    """
+    params = ScJobParams(
+        model_id=MODEL_ID,
+        path=path,
+        precision=Precision.float,
+        device=device,
+        component=COMPONENT_ID,
+    )
+    return CompileScorecardJobYaml({params.compile_job_id: compile_job_id})
 
 
 def validate_perf_diff_is_empty(perf_diff: PerformanceDiff) -> None:
@@ -71,13 +95,22 @@ def validate_perf_diff_is_empty(perf_diff: PerformanceDiff) -> None:
 def test_model_inference_run_toggle() -> None:
     # Test model inference fail/pass toggle is captured
     prev_perf_metrics = get_basic_speedup_report(
-        PREV_JOB_ID, onnx_tf_inference_time=None, onnx_ort_qnn_inference_time=10.0
+        PREV_JOB_ID,
+        onnx_tf_inference_time=None,
+        onnx_ort_qnn_inference_time=10.0,
     )
     new_perf_metrics = get_basic_speedup_report(
         onnx_tf_inference_time=10.0, onnx_ort_qnn_inference_time=None
     )
 
-    perf_diff = PerformanceDiff()
+    perf_diff = PerformanceDiff(
+        current_compile_jobs=_compile_mapping_for(
+            COMPILE_JOB_ID, ScorecardProfilePath.TFLITE
+        ),
+        previous_compile_jobs=_compile_mapping_for(
+            PREV_COMPILE_JOB_ID, ScorecardProfilePath.TFLITE
+        ),
+    )
     validate_perf_diff_is_empty(perf_diff)
 
     # Update perf summary
@@ -95,19 +128,30 @@ def test_model_inference_run_toggle() -> None:
             float("inf"),
             JOB_ID,
             PREV_JOB_ID,
+            COMPILE_JOB_ID,
+            PREV_COMPILE_JOB_ID,
         )
     ]
 
 
 def test_perf_progression_basic() -> None:
     prev_perf_metrics = get_basic_speedup_report(
-        PREV_JOB_ID, onnx_tf_inference_time=10.0, onnx_ort_qnn_inference_time=5.123
+        PREV_JOB_ID,
+        onnx_tf_inference_time=10.0,
+        onnx_ort_qnn_inference_time=5.123,
     )
     new_perf_metrics = get_basic_speedup_report(
         onnx_tf_inference_time=0.5, onnx_ort_qnn_inference_time=5.123
     )
 
-    perf_diff = PerformanceDiff()
+    perf_diff = PerformanceDiff(
+        current_compile_jobs=_compile_mapping_for(
+            COMPILE_JOB_ID, ScorecardProfilePath.TFLITE
+        ),
+        previous_compile_jobs=_compile_mapping_for(
+            PREV_COMPILE_JOB_ID, ScorecardProfilePath.TFLITE
+        ),
+    )
     validate_perf_diff_is_empty(perf_diff)
 
     # Update perf summary
@@ -125,6 +169,8 @@ def test_perf_progression_basic() -> None:
             20.0,
             JOB_ID,
             PREV_JOB_ID,
+            COMPILE_JOB_ID,
+            PREV_COMPILE_JOB_ID,
         )
     ]
 
@@ -132,13 +178,22 @@ def test_perf_progression_basic() -> None:
 def test_perf_regression_basic() -> None:
     # Test regression in perf numbers
     prev_perf_metrics = get_basic_speedup_report(
-        PREV_JOB_ID, onnx_tf_inference_time=10.0, onnx_ort_qnn_inference_time=5.123
+        PREV_JOB_ID,
+        onnx_tf_inference_time=10.0,
+        onnx_ort_qnn_inference_time=5.123,
     )
     new_perf_metrics = get_basic_speedup_report(
         onnx_tf_inference_time=20.0, onnx_ort_qnn_inference_time=5.123
     )
 
-    perf_diff = PerformanceDiff()
+    perf_diff = PerformanceDiff(
+        current_compile_jobs=_compile_mapping_for(
+            COMPILE_JOB_ID, ScorecardProfilePath.TFLITE
+        ),
+        previous_compile_jobs=_compile_mapping_for(
+            PREV_COMPILE_JOB_ID, ScorecardProfilePath.TFLITE
+        ),
+    )
     validate_perf_diff_is_empty(perf_diff)
 
     # Update perf summary
@@ -156,6 +211,8 @@ def test_perf_regression_basic() -> None:
             2.0,
             JOB_ID,
             PREV_JOB_ID,
+            COMPILE_JOB_ID,
+            PREV_COMPILE_JOB_ID,
         ),
     ]
 
@@ -279,13 +336,22 @@ def test_small_regression_excluded() -> None:
 def test_get_severe_regressions() -> None:
     """get_severe_regressions returns structured dicts for 2x+ regressions."""
     prev = get_basic_speedup_report(
-        PREV_JOB_ID, onnx_tf_inference_time=10.0, onnx_ort_qnn_inference_time=5.123
+        PREV_JOB_ID,
+        onnx_tf_inference_time=10.0,
+        onnx_ort_qnn_inference_time=5.123,
     )
     new = get_basic_speedup_report(
         onnx_tf_inference_time=20.0, onnx_ort_qnn_inference_time=5.123
     )
 
-    perf_diff = PerformanceDiff()
+    perf_diff = PerformanceDiff(
+        current_compile_jobs=_compile_mapping_for(
+            COMPILE_JOB_ID, ScorecardProfilePath.TFLITE
+        ),
+        previous_compile_jobs=_compile_mapping_for(
+            PREV_COMPILE_JOB_ID, ScorecardProfilePath.TFLITE
+        ),
+    )
     perf_diff.update_summary(MODEL_ID, prev, new)
 
     results = perf_diff.get_severe_regressions(min_factor=2.0)
@@ -293,12 +359,19 @@ def test_get_severe_regressions() -> None:
     assert results[0].model_id == MODEL_ID
     assert results[0].prev_inference_time == "10.0"
     assert results[0].new_inference_time == "20.0"
+    # Compile job IDs are routed into the new aliases.
+    assert results[0].job_id == JOB_ID
+    assert results[0].compile_job_id == COMPILE_JOB_ID
+    assert results[0].previous_job_id == PREV_JOB_ID
+    assert results[0].previous_compile_job_id == PREV_COMPILE_JOB_ID
 
 
 def test_get_severe_regressions_excludes_small() -> None:
     """Regressions below the min_factor threshold are excluded."""
     prev = get_basic_speedup_report(
-        PREV_JOB_ID, onnx_tf_inference_time=10.0, onnx_ort_qnn_inference_time=5.123
+        PREV_JOB_ID,
+        onnx_tf_inference_time=10.0,
+        onnx_ort_qnn_inference_time=5.123,
     )
     new = get_basic_speedup_report(
         onnx_tf_inference_time=15.0, onnx_ort_qnn_inference_time=5.123
@@ -314,16 +387,23 @@ def test_get_severe_regressions_excludes_small() -> None:
 
 def test_dump_severe_regressions_json(tmp_path: Path) -> None:
     """dump_severe_regressions_json writes valid JSON."""
-    import json
-
     prev = get_basic_speedup_report(
-        PREV_JOB_ID, onnx_tf_inference_time=10.0, onnx_ort_qnn_inference_time=5.123
+        PREV_JOB_ID,
+        onnx_tf_inference_time=10.0,
+        onnx_ort_qnn_inference_time=5.123,
     )
     new = get_basic_speedup_report(
         onnx_tf_inference_time=20.0, onnx_ort_qnn_inference_time=5.123
     )
 
-    perf_diff = PerformanceDiff()
+    perf_diff = PerformanceDiff(
+        current_compile_jobs=_compile_mapping_for(
+            COMPILE_JOB_ID, ScorecardProfilePath.TFLITE
+        ),
+        previous_compile_jobs=_compile_mapping_for(
+            PREV_COMPILE_JOB_ID, ScorecardProfilePath.TFLITE
+        ),
+    )
     perf_diff.update_summary(MODEL_ID, prev, new)
 
     json_path = str(tmp_path / "regressions.json")
@@ -333,6 +413,11 @@ def test_dump_severe_regressions_json(tmp_path: Path) -> None:
         data = json.load(f)
     assert len(data) == 1
     assert data[0]["Model ID"] == MODEL_ID
+    # The dumped JSON uses the canonical alias names (no env suffix) — the
+    # issue-body builder appends (env) at render time based on each side's
+    # deployment, since 'previous' isn't always prod.
+    assert data[0]["Compile Job ID"] == COMPILE_JOB_ID
+    assert data[0]["Previous Compile Job ID"] == PREV_COMPILE_JOB_ID
 
 
 def test_tool_versions_diff_detects_changes() -> None:

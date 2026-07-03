@@ -31,6 +31,8 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
+from qai_hub_models.utils.hub_clients import deployment_is_prod
+
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 # GitHub's hard limit on issue bodies is 65536 characters. Leave a small margin
@@ -64,38 +66,104 @@ def _job_link(job_id: str, deployment: str = "workbench") -> str:
 
 
 _DEPLOYMENT_SUFFIX_RE = re.compile(r"\((prod|dev|staging)\)")
-# Map suffix tokens to AI Hub URL subdomains.
-_DEPLOYMENT_SUBDOMAIN = {"prod": "workbench", "dev": "dev", "staging": "staging"}
+
+
+def _env_label(deployment: str) -> str:
+    """Map an AI Hub URL subdomain to its env name shown in column headers.
+
+    For non-prod deployments the subdomain and env name are identical
+    (dev/staging); only prod maps subdomain "workbench" -> env "prod".
+    """
+    return "prod" if deployment_is_prod(deployment) else deployment.lower()
+
+
+def _subdomain_for_env(env: str) -> str:
+    """Inverse of _env_label: env name -> AI Hub URL subdomain."""
+    return "workbench" if deployment_is_prod(env) else env.lower()
 
 
 def _deployment_for_column(column_name: str, default: str) -> str:
     """Pick the AI Hub subdomain to use for a Job ID column's links.
 
-    A "Previous Job ID (prod)" column always references prod baselines, even on
-    a dev scorecard run — so the link must use the prod subdomain regardless of
-    which deployment this run is. Columns without a (prod|dev|staging) suffix
-    fall back to the run's deployment.
+    Columns may carry a (prod|dev|staging) suffix recorded by an earlier
+    pipeline stage; that suffix wins. Columns without a suffix fall back to
+    the caller-supplied default — typically the current run's deployment for
+    new-run columns, and the previous baseline's deployment for "Previous *"
+    columns.
     """
     match = _DEPLOYMENT_SUFFIX_RE.search(column_name)
     if match:
-        return _DEPLOYMENT_SUBDOMAIN[match.group(1)]
+        return _subdomain_for_env(match.group(1))
     return default
 
 
-def _linkify_job_ids(rows: list[dict], deployment: str = "workbench") -> list[dict]:
+# Canonical job-id column prefixes. The order matters — 'Previous *' must come
+# first so the prefix-match below doesn't classify 'Previous Job ID' as 'Job ID'.
+_PREVIOUS_PREFIXES = (
+    "Previous Job ID",
+    "Previous Compile Job ID",
+    "Previous Inference Job ID",
+)
+_NEW_PREFIXES = ("Job ID", "Compile Job ID", "Inference Job ID")
+
+
+def _is_previous_column(column_name: str) -> bool:
+    return any(column_name.startswith(p) for p in _PREVIOUS_PREFIXES)
+
+
+def _retag_columns(
+    rows: list[dict], deployment: str, previous_deployment: str
+) -> list[dict]:
+    """Append a (env) suffix to canonical job-id columns based on which side
+    of the comparison they describe.
+
+    The diff scripts emit canonical column names with no env suffix
+    ('Job ID', 'Previous Compile Job ID', etc). We add the suffix here
+    because only the issue builder knows both deployments.
+    """
+    new_env = _env_label(deployment)
+    prev_env = _env_label(previous_deployment)
+    out = []
+    for row in rows:
+        new_row = {}
+        for key, val in row.items():
+            if _DEPLOYMENT_SUFFIX_RE.search(key):
+                # Already tagged (e.g. historical S3 JSON); leave it.
+                new_row[key] = val
+            elif _is_previous_column(key):
+                new_row[f"{key} ({prev_env})"] = val
+            elif any(key == p or key.startswith(p + " ") for p in _NEW_PREFIXES):
+                new_row[f"{key} ({new_env})"] = val
+            else:
+                new_row[key] = val
+        out.append(new_row)
+    return out
+
+
+def _linkify_job_ids(
+    rows: list[dict],
+    deployment: str = "workbench",
+    previous_deployment: str | None = None,
+) -> list[dict]:
     """Convert job ID values to markdown links in-place.
 
-    Any column whose name contains "Job ID" gets its value converted
-    from a plain ID string to a markdown link. The link's deployment subdomain
-    is derived from the column name when it carries a (prod|dev|staging)
-    suffix, so e.g. "Previous Job ID (prod)" always points to prod.
+    Any column whose name contains "Job ID" gets its value converted from a
+    plain ID string to a markdown link. The link's deployment subdomain is
+    derived from the column name when it carries a (prod|dev|staging) suffix;
+    otherwise it falls back to `previous_deployment` for "Previous *" columns
+    and to `deployment` for the rest.
     """
+    if previous_deployment is None:
+        previous_deployment = deployment
     result = []
     for row in rows:
         new_row = {}
         for key, val in row.items():
             if "Job ID" in key:
-                col_deployment = _deployment_for_column(key, deployment)
+                fallback = (
+                    previous_deployment if _is_previous_column(key) else deployment
+                )
+                col_deployment = _deployment_for_column(key, fallback)
                 new_row[key] = _job_link(str(val), col_deployment)
             else:
                 new_row[key] = val
@@ -133,6 +201,7 @@ def build_issue_body(
     perf_diff_url: str,
     numerics_diff_url: str,
     deployment: str = "workbench",
+    previous_deployment: str | None = None,
 ) -> str:
     """Build the GitHub issue body with regression tables.
 
@@ -141,9 +210,15 @@ def build_issue_body(
     fits, and append a note pointing readers to the linked diff artifacts for
     the full list.
     """
+    if previous_deployment is None:
+        previous_deployment = deployment
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    perf = _linkify_job_ids(perf_regressions, deployment)
-    numerics = list(numerics_regressions)
+    perf_tagged = _retag_columns(perf_regressions, deployment, previous_deployment)
+    numerics_tagged = _retag_columns(
+        numerics_regressions, deployment, previous_deployment
+    )
+    perf = _linkify_job_ids(perf_tagged, deployment, previous_deployment)
+    numerics = _linkify_job_ids(numerics_tagged, deployment, previous_deployment)
 
     body = _render(today, perf, numerics, run_url, perf_diff_url, numerics_diff_url)
     perf_dropped = numerics_dropped = 0
@@ -226,7 +301,17 @@ def main() -> None:
     parser.add_argument(
         "--deployment",
         default="workbench",
-        help="AI Hub deployment subdomain for job URLs (default: workbench)",
+        help="AI Hub deployment subdomain for the new scorecard run's job URLs (default: workbench)",
+    )
+    parser.add_argument(
+        "--previous-deployment",
+        default=None,
+        help=(
+            "AI Hub deployment subdomain for the previous baseline's job URLs. "
+            "Defaults to --deployment, since most runs compare against the same "
+            "deployment's prior run. Override when the baseline came from a "
+            "different deployment (e.g. dev run comparing against main/prod)."
+        ),
     )
     parser.add_argument(
         "--labels",
@@ -264,7 +349,7 @@ def main() -> None:
         return
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    env_label = "Prod" if args.deployment == "workbench" else "Dev"
+    env_label = _env_label(args.deployment).capitalize()
     title = f"[Scorecard - {env_label}] 2x+ Regressions Detected - {today}"
 
     body = build_issue_body(
@@ -274,6 +359,7 @@ def main() -> None:
         args.perf_diff_url,
         args.numerics_diff_url,
         deployment=args.deployment,
+        previous_deployment=args.previous_deployment,
     )
 
     perf_count = len(perf_regressions)

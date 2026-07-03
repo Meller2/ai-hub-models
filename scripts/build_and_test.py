@@ -468,9 +468,11 @@ class TaskLibrary:
             ),
         )
 
-    @public_task("Generate perf.yamls.")
+    @public_task("Generate perf.yamls and numerics.yamls.")
     @depends(["install_deps"])
-    def create_perfs(self, plan: Plan, step_id: str = "generate_perfs") -> str:
+    def create_perfs_and_numerics(
+        self, plan: Plan, step_id: str = "generate_perfs_and_numerics"
+    ) -> str:
         return plan.add_step(
             step_id,
             RunCommandsWithVenvTask(
@@ -478,20 +480,6 @@ class TaskLibrary:
                 venv=self.venv_path,
                 commands=[
                     "python -m qai_hub_models.scripts.collect_scorecard_results --gen-csv --gen-perf-summary --sync-code-gen"
-                ],
-            ),
-        )
-
-    @public_task("Generate numerics.yamls.")
-    @depends(["install_deps"])
-    def create_numerics(self, plan: Plan, step_id: str = "generate_numerics") -> str:
-        return plan.add_step(
-            step_id,
-            RunCommandsWithVenvTask(
-                group_name=None,
-                venv=self.venv_path,
-                commands=[
-                    "python -m qai_hub_models.scripts.collect_scorecard_numerics_results --sync-code-gen"
                 ],
             ),
         )

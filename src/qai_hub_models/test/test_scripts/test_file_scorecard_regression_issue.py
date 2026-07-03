@@ -15,7 +15,9 @@ from qai_hub_models.scripts.file_scorecard_regression_issue import (
 )
 
 # --- Fixtures ---
-# Keys match PrettyTable column names from performance_diff.py and numerics_diff.py
+# Keys match the canonical PrettyTable column names emitted by
+# performance_diff.py and numerics_diff.py (no env suffix). The issue builder
+# re-tags them with the deployment of each side at render time.
 
 PERF_REGRESSIONS = [
     {
@@ -27,8 +29,10 @@ PERF_REGRESSIONS = [
         "Prev Inference time": "10.0",
         "New Inference time": "20.0",
         "Kx slower": "2.0",
-        "Job ID (prod)": "jnew789",
-        "Previous Job ID (prod)": "jprev789",
+        "Job ID": "jnew789",
+        "Compile Job ID": "jcnew789",
+        "Previous Job ID": "jprev789",
+        "Previous Compile Job ID": "jcprev789",
     },
     {
         "Model ID": "mobilenet",
@@ -39,8 +43,10 @@ PERF_REGRESSIONS = [
         "Prev Inference time": "5.0",
         "New Inference time": "15.0",
         "Kx slower": "3.0",
-        "Job ID (prod)": "jnew012",
-        "Previous Job ID (prod)": "jprev012",
+        "Job ID": "jnew012",
+        "Compile Job ID": "jcnew012",
+        "Previous Job ID": "jprev012",
+        "Previous Compile Job ID": "jcprev012",
     },
 ]
 
@@ -56,6 +62,8 @@ NUMERICS_REGRESSIONS = [
         "Device Accuracy": "38.1 mAP",
         "Previous FP Accuracy": "45.2 mAP",
         "Previous Device Accuracy": "42.5 mAP",
+        "Inference Job ID": "jinew_yolo",
+        "Previous Inference Job ID": "jiprev_yolo",
     },
 ]
 
@@ -123,38 +131,81 @@ def test_build_issue_body_truncates_numerics_table() -> None:
     assert "[Numerics Diff](https://num)" in body
 
 
-def test_dev_run_links_previous_prod_jobs_to_workbench() -> None:
-    """A dev scorecard's "Previous Job ID (prod)" link must point to prod.
+def test_dev_run_default_previous_deployment_links_to_dev() -> None:
+    """A dev scorecard run with no --previous-deployment override links the
+    previous columns to the dev subdomain.
 
-    Regression test for tetracode#19428. The current-run job and the previous-
-    prod baseline are independent deployments — applying the run's deployment
-    uniformly to both produces broken links from dev runs to prod jobs.
+    Default workflow plumbing: scorecard.yml passes github.ref_name as
+    previous_results_branch, so on a dev branch the previous baseline is also
+    a dev run — the previous-job links should point to dev.aihub.qualcomm.com,
+    and the column header should read "(dev)" not "(prod)".
+    """
+    body = build_issue_body(
+        PERF_REGRESSIONS[:1],
+        [],
+        "https://run",
+        "https://perf",
+        "https://num",
+        deployment="dev",
+    )
+    # Both columns get a (dev) suffix in the header.
+    assert "Job ID (dev)" in body
+    assert "Previous Job ID (dev)" in body
+    assert "Previous Compile Job ID (dev)" in body
+    # No (prod) anywhere — that would mislead an engineer reading a dev issue.
+    assert "(prod)" not in body
+    # Both new and previous links route to dev.
+    assert "[jnew789](https://dev.aihub.qualcomm.com/jobs/jnew789/)" in body
+    assert "[jprev789](https://dev.aihub.qualcomm.com/jobs/jprev789/)" in body
+
+
+def test_dev_run_with_prod_baseline_routes_previous_to_workbench() -> None:
+    """A dev run that explicitly compares against a prod baseline (e.g. a
+    workflow_dispatch with previous_results_branch=main) routes the previous
+    columns to workbench — and labels them (prod).
+    """
+    body = build_issue_body(
+        PERF_REGRESSIONS[:1],
+        [],
+        "https://run",
+        "https://perf",
+        "https://num",
+        deployment="dev",
+        previous_deployment="workbench",
+    )
+    # New columns labelled (dev), previous columns labelled (prod).
+    assert "Job ID (dev)" in body
+    assert "Previous Job ID (prod)" in body
+    # Previous links go to workbench; new links go to dev.
+    assert "[jnew789](https://dev.aihub.qualcomm.com/jobs/jnew789/)" in body
+    assert "[jprev789](https://workbench.aihub.qualcomm.com/jobs/jprev789/)" in body
+    assert "https://dev.aihub.qualcomm.com/jobs/jprev789/" not in body
+
+
+def test_historical_suffixed_columns_pass_through() -> None:
+    """JSON keys that already carry an env suffix (e.g. from older S3 dumps)
+    are passed through verbatim — the linkifier still routes them by suffix.
     """
     row = {
         **PERF_REGRESSIONS[0],
-        "Job ID (dev)": "jcurr_dev",
-        "Previous Job ID (prod)": "jprev_prod",
+        "Job ID": "jignored",
     }
-    # Drop the original "Job ID (prod)" so we have one column per deployment.
-    row.pop("Job ID (prod)", None)
+    # Replace canonical with a suffixed historical-shape key.
+    row.pop("Job ID")
+    row["Job ID (prod)"] = "jhistoric"
 
     body = build_issue_body(
         [row], [], "https://run", "https://perf", "https://num", deployment="dev"
     )
-
-    # Current-run job (column suffix "(dev)") -> dev subdomain.
-    assert "[jcurr_dev](https://dev.aihub.qualcomm.com/jobs/jcurr_dev/)" in body
-    # Previous-prod baseline (column suffix "(prod)") -> workbench subdomain,
-    # not dev — even though the run's deployment is dev.
-    assert "[jprev_prod](https://workbench.aihub.qualcomm.com/jobs/jprev_prod/)" in body
-    assert "https://dev.aihub.qualcomm.com/jobs/jprev_prod/" not in body
+    # Suffixed key wins -> link routes to workbench despite run being on dev.
+    assert "[jhistoric](https://workbench.aihub.qualcomm.com/jobs/jhistoric/)" in body
 
 
 def test_build_issue_body_rejects_malformed_job_ids() -> None:
     """Job IDs that don't match the expected format are not linkified."""
     bad_row = {
         **PERF_REGRESSIONS[0],
-        "Job ID (prod)": "abc](javascript:alert(1)",
+        "Job ID": "abc](javascript:alert(1)",
     }
     body = build_issue_body(
         [bad_row],

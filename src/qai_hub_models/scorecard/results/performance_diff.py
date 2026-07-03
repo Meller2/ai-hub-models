@@ -15,12 +15,14 @@ from qai_hub_models import Precision
 from qai_hub_models.configs.devices_and_chipsets_yaml import DevicesAndChipsetsYaml
 from qai_hub_models.configs.perf_yaml import QAIHMModelPerf
 from qai_hub_models.scorecard.device import ScorecardDevice
-from qai_hub_models.scorecard.envvars import DeploymentEnvvar
+from qai_hub_models.scorecard.params import ScJobParams
 from qai_hub_models.scorecard.path_profile import ScorecardProfilePath
-from qai_hub_models.scorecard.results.yaml import ToolVersionChange
+from qai_hub_models.scorecard.results.yaml import (
+    CompileScorecardJobYaml,
+    ToolVersionChange,
+)
 from qai_hub_models.utils.base_config import BaseQAIHMConfig
 
-# Last 3 values in tuple are: [prev inference time, new inference time, diff, job_id]
 InferenceInfo = tuple[
     str,  # Model ID
     Precision,
@@ -32,6 +34,8 @@ InferenceInfo = tuple[
     float,  # inference time diff
     str,  # New Profile Job ID
     str,  # Previous Profile Job ID
+    str,  # New Compile Job ID
+    str,  # Previous Compile Job ID
 ]
 
 
@@ -55,21 +59,36 @@ class SevereRegression(BaseQAIHMConfig):
     new_inference_time: str = Field(default="", alias="New Inference time")
     factor: str = Field(default="", alias="Kx slower")
     job_id: str = Field(default="", alias="Job ID")
-    previous_job_id: str = Field(default="", alias="Previous Job ID (prod)")
+    previous_job_id: str = Field(default="", alias="Previous Job ID")
+    compile_job_id: str = Field(default="", alias="Compile Job ID")
+    previous_compile_job_id: str = Field(default="", alias="Previous Compile Job ID")
 
     @model_validator(mode="before")
     @classmethod
     def _normalize_dynamic_job_id(cls, values: Any) -> Any:
-        """Handle dynamic 'Job ID (prod)' / 'Job ID (staging)' column names."""
+        """Rename suffixed job-id keys (e.g. "Job ID (prod)") to their bare form.
+
+        Historical JSON artifacts and PrettyTable headers tag job-id columns
+        with the deployment env ("(prod)", "(dev)", "(staging)"). The field
+        aliases use the bare form, so re-route any suffixed key to its
+        canonical name before pydantic validates. Longer prefixes are tried
+        first so "Previous Job ID (prod)" isn't greedily matched as "Job ID".
+        """
         if not isinstance(values, dict):
             return values
-        for key in list(values.keys()):
-            if key.startswith("Job ID") and key not in (
-                "Job ID",
-                "Previous Job ID (prod)",
-            ):
-                values["Job ID"] = values.pop(key)
-                break
+        canonicals = (
+            "Previous Compile Job ID",
+            "Previous Job ID",
+            "Compile Job ID",
+            "Job ID",
+        )
+        for canonical in canonicals:
+            if canonical in values:
+                continue
+            for key in list(values.keys()):
+                if key.startswith(canonical):
+                    values[canonical] = values.pop(key)
+                    break
         return values
 
     @property
@@ -112,7 +131,16 @@ class PerformanceDiff:
     # Regressions with absolute diff at or below this threshold (ms) are excluded
     _MIN_REGRESSION_MS = 1.0
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        current_compile_jobs: CompileScorecardJobYaml | None = None,
+        previous_compile_jobs: CompileScorecardJobYaml | None = None,
+    ) -> None:
+        # Compile job ID lookup yamls. Empty defaults are safe —
+        # _compile_job_id_for() returns "null" on miss.
+        self._current_compile_jobs = current_compile_jobs or CompileScorecardJobYaml()
+        self._previous_compile_jobs = previous_compile_jobs or CompileScorecardJobYaml()
+
         # Perf buckets to track
         self.perf_buckets: list[float] = [
             float("inf"),
@@ -159,6 +187,30 @@ class PerformanceDiff:
         if not num:
             return "null"
         return float(format(num, ".5f"))
+
+    def _compile_job_id_for(
+        self,
+        compile_jobs: CompileScorecardJobYaml,
+        model_id: str,
+        precision: Precision,
+        path: ScorecardProfilePath,
+        device: ScorecardDevice,
+        component: str | None,
+    ) -> str:
+        """Return the compile-job ID for these params, or "null" if missing.
+
+        The linkifier renders "null" as N/A.
+        """
+        params = ScJobParams(
+            model_id=model_id,
+            path=path,
+            precision=precision,
+            device=device,
+            component=component,
+        )
+        if not params.has_compile_job:
+            return "null"
+        return compile_jobs.get_job_id(params) or "null"
 
     def _update_summary_for_path(
         self,
@@ -226,6 +278,22 @@ class PerformanceDiff:
                     diff,
                     new_results.job_id or "null",
                     prev_results.job_id or "null",
+                    self._compile_job_id_for(
+                        self._current_compile_jobs,
+                        model_id,
+                        precision,
+                        path,
+                        device,
+                        component,
+                    ),
+                    self._compile_job_id_for(
+                        self._previous_compile_jobs,
+                        model_id,
+                        precision,
+                        path,
+                        device,
+                        component,
+                    ),
                 )
             )
 
@@ -408,6 +476,10 @@ class PerformanceDiff:
         table : PrettyTable
             Summary table for the given bucket.
         """
+        # Column names are canonical (no env suffix). The issue-body builder
+        # re-tags them with the deployment of each side at render time, since
+        # 'previous' isn't always prod (e.g. dev scorecard runs compare against
+        # the same dev branch's prior run).
         table = PrettyTable(
             [
                 "Model ID",
@@ -418,8 +490,10 @@ class PerformanceDiff:
                 "Prev Inference time",
                 "New Inference time",
                 "Kx faster" if get_progressions else "Kx slower",
-                f"Job ID ({DeploymentEnvvar.get()})",
-                "Previous Job ID (prod)",  # Comparison jobs are always run on prod.
+                "Job ID",
+                "Previous Job ID",
+                "Compile Job ID",
+                "Previous Compile Job ID",
             ]
         )
         data = self.progressions if get_progressions else self.regressions
