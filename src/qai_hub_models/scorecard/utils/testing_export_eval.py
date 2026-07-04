@@ -1881,7 +1881,7 @@ def _get_dataset_cache_patch(
         model_cls,
     )
     return mock.patch(
-        "qai_hub_models.utils.evaluate.get_hub_datasets_path",
+        "qai_hub_models.utils.evaluate.helpers.get_hub_datasets_path",
         return_value=dataset_dir.parent,
     )
 
@@ -2029,7 +2029,7 @@ def accuracy_on_dataset_via_evaluate_and_export(
         ),
     )
     torch_call_patch = mock.patch(
-        "qai_hub_models.utils.evaluate.WorkbenchModel.__call__",
+        "qai_hub_models.utils.evaluate.helpers.WorkbenchModel.__call__",
         side_effect=torch_evaluate_mock_outputs,
     )
     compare_torch_inference_patch = mock.patch(
@@ -2155,7 +2155,7 @@ def torch_accuracy_on_dataset(
     evaluator = model.get_evaluator()
 
     torch_call_patch = mock.patch(
-        "qai_hub_models.utils.evaluate.WorkbenchModel.__call__",
+        "qai_hub_models.utils.evaluate.helpers.WorkbenchModel.__call__",
         side_effect=torch_evaluate_mock_outputs,
     )
     scorecard_path = ScorecardProfilePath.ONNX

@@ -275,7 +275,7 @@ def mock_on_device_model_call(inference_job: hub.InferenceJob) -> Callable:
 def mock_tabulate_fn(df: pd.DataFrame, **kwargs: Any) -> tuple[list[str], str]:
     psnr_values = []
     for _, value in df.iterrows():
-        psnr_values.append(f"{value.psnr:.4g}")
+        psnr_values.append(f"{float(value.psnr):.4g}")
     return psnr_values, tabulate(df, **kwargs)  # pyright: ignore[reportArgumentType]
 
 

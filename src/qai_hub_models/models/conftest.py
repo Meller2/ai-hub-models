@@ -16,7 +16,7 @@ def disable_evaluate_cache() -> Generator[None, None, None]:
     """This method should not be directly invoked in any unit test or scorecard."""
     with (
         patch(
-            "qai_hub_models.utils.evaluate._populate_data_cache_impl",
+            "qai_hub_models.utils.evaluate.helpers._populate_data_cache_impl",
             side_effect=RuntimeError(
                 "Dataset cache should not be directly populated within scorecard."
             ),

@@ -42,6 +42,7 @@ from qai_hub_models.utils.export.quantize import (
 from qai_hub_models.utils.export.result import CollectionExportResult, ComponentGroup
 from qai_hub_models.utils.export.summary import (
     extract_tool_versions,
+    print_inference_summary,
     print_profile_summary,
 )
 from qai_hub_models.utils.export.upload import upload_collection_source
@@ -318,6 +319,19 @@ def export_model(
         if profile_jobs:
             for job in profile_jobs.values():
                 print_profile_summary(job)
+        if inference_jobs:
+            for component_name, inference_job in inference_jobs.items():
+                component = model.components[component_name]
+                print_inference_summary(
+                    component,
+                    inference_job,
+                    input_specs[component_name],
+                    target_runtime,
+                    outputs_to_skip=list(
+                        (code_gen.outputs_to_skip_validation or {}).keys()
+                    ),
+                    metrics=code_gen.inference_metrics,
+                )
         print_tool_versions(tool_versions, tool_versions_from_device)
         if code_gen.has_on_target_demo:
             print_on_target_demo_cmd(
