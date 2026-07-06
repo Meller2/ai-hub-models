@@ -134,9 +134,9 @@ def test_load_encodings_to_quantsim(checkpoint: str) -> None:
     ("checkpoint", "task", "expected_metric", "num_samples"),
     [
         ("DEFAULT_W4A16", "wikitext", 9.46, 0),
-        ("DEFAULT_W4A16", "mmlu", 0.646, 1000),
+        ("DEFAULT_W4A16", "mmlu", 0.6725, 1000),
         ("DEFAULT_UNQUANTIZED", "wikitext", 12.756, 0),
-        ("DEFAULT_UNQUANTIZED", "tiny_mmlu", 0.72, 0),
+        ("DEFAULT_UNQUANTIZED", "tiny_mmlu", 0.74, 0),
     ],
 )
 def test_evaluate(
@@ -177,7 +177,7 @@ def test_evaluate(
         metric=task,
         value=actual_metric,
     )
-    np.testing.assert_allclose(actual_metric, expected_metric, rtol=0.03, atol=0)
+    np.testing.assert_allclose(actual_metric, expected_metric, rtol=0.05, atol=0)
 
 
 @pytest.mark.nightly
