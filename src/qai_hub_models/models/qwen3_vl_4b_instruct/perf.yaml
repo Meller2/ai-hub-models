@@ -177,7 +177,7 @@ precisions:
           Snapdragon 8 Elite Gen 5 QRD:
             geniex_qairt:
               llm_metrics:
-              - context_length: 2048
+              - context_length: 4096
                 tokens_per_second: 29.162899
                 time_to_first_token_range_milliseconds:
                   min: 49.4
