@@ -238,3 +238,29 @@ def test_engine_prefix_jit_model(monkeypatch: pytest.MonkeyPatch) -> None:
     path_values = {p[1].value for p in profile_paths}
     assert "qnn_dlc" in path_values
     assert "qnn_context_binary" not in path_values
+
+
+def test_llm_runtimes_do_not_match_qnn_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Multi-graph LLMs list only GENIE/GENIEX_QAIRT runtimes. These live on the
+    GENIEX inference engine, not QNN, so QNN compile paths like
+    qnn_dlc_via_qnn_ep must NOT run against them (they would hit the AOT-only
+    assertion in base_multi_graph_model.get_graph_hub_compile_options).
+    """
+    EnabledPathsEnvvar.patchenv(
+        monkeypatch, {SpecialPathSetting.DEFAULT, "qnn_dlc_via_qnn_ep"}
+    )
+    EnabledPrecisionsEnvvar.patchenv(monkeypatch, {SpecialPrecisionSetting.DEFAULT})
+
+    llm_runtimes: dict[Precision, list[TargetRuntime]] = {
+        Precision.w4a16: [TargetRuntime.GENIE, TargetRuntime.GENIEX_QAIRT],
+    }
+    profile_paths = get_profile_parameterized_pytest_config(
+        "", llm_runtimes, llm_runtimes
+    )
+    path_values = {p[1].value for p in profile_paths}
+    assert "qnn_dlc_via_qnn_ep" not in path_values
+    assert "qnn_dlc" not in path_values
+    assert "qnn_context_binary" not in path_values
+    assert "genie" in path_values
+    assert "geniex_qairt" in path_values

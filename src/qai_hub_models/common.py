@@ -373,6 +373,7 @@ class InferenceEngine(Enum):
     TFLITE = "tflite"
     QNN = "qnn"
     ONNX = "onnx"
+    GENIEX = "geniex"
     GENIEX_LLAMACPP = "geniex_llamacpp"
 
     @property
@@ -383,6 +384,8 @@ class InferenceEngine(Enum):
             return "QAIRT (Qualcomm AI Runtime)"
         if self == InferenceEngine.ONNX:
             return "ONNX Runtime"
+        if self == InferenceEngine.GENIEX:
+            return "GenieX (Qualcomm GenAI Inference Extensions)"
         if self == InferenceEngine.GENIEX_LLAMACPP:
             return "GenieX Llama.cpp Plugin"
         assert_never(self)
@@ -499,9 +502,9 @@ class TargetRuntime(Enum):
         ):
             return InferenceEngine.ONNX
         if self == TargetRuntime.GENIE:
-            return InferenceEngine.QNN
+            return InferenceEngine.GENIEX
         if self == TargetRuntime.GENIEX_QAIRT:
-            return InferenceEngine.QNN
+            return InferenceEngine.GENIEX
         if self == TargetRuntime.GENIEX_LLAMACPP:
             return InferenceEngine.GENIEX_LLAMACPP
         assert_never(self)
